@@ -5,6 +5,7 @@ import type { Config, MsgEvent } from './types'
 import StatusBar from './components/StatusBar'
 import SendPanel from './components/SendPanel'
 import MessageStream from './components/MessageStream'
+import ModeDiagram from './components/ModeDiagram'
 import './App.css'
 
 export default function App() {
@@ -81,6 +82,11 @@ const { messages, lastSnapshot } = useMemo(() => {
         sseAlive={sseAlive}
         onMode={onMode}
         onDisconnect={onDisconnect}
+      />
+      <ModeDiagram
+        mode={config?.mode ?? null}
+        connected={config?.connected ?? false}
+        clientId={config?.client_id ?? null}
       />
       <div className="layout">
         <MessageStream messages={messages} />
