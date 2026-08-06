@@ -6,7 +6,8 @@ import threading
 from .mqtt import (
     MQTTReader, MQTTError, MQTT_TYPES,
     parse_connect, parse_publish, parse_subscribe,
-    build_connack, build_suback, build_puback, build_pingresp, build_publish,
+    build_connack, build_suback, build_puback, build_pubrec, build_pubcomp,
+    build_pingresp, build_publish,
 )
 from .appstate import emit_message
 
@@ -59,6 +60,7 @@ class BridgeHandler:
         emit_message(
             self.state, "out", "PUBLISH",
             topic=topic, payload=payload, qos=qos,
+            injected=True,
         )
         return {"ok": True, "bytes": len(pkt)}
 
@@ -83,7 +85,14 @@ class BridgeHandler:
             if qos == 1:
                 self._send(build_puback(pkt_id))
             elif qos == 2:
-                self._send(build_puback(pkt_id))  # simplification: on n'entreprend pas PUBREC/PUBREL
+                # QoS2 : on ne repond qu'avec un PUBREC ; le PUBCOMP viendra apres le PUBREL.
+                self._send(build_pubrec(pkt_id))
+        elif ptype == 6:  # PUBREL (fin du handshake QoS2) -> PUBCOMP
+            if len(body) >= 2:
+                pkt_id = struct.unpack_from(">H", body)[0]
+            else:
+                pkt_id = 0
+            self._send(build_pubcomp(pkt_id))
         elif ptype == 8:  # SUBSCRIBE
             pkt_id, topics = parse_subscribe(body)
             for t, _q in topics:

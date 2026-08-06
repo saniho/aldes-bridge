@@ -16,6 +16,7 @@ export interface MsgEvent {
   topic?: string | null
   payload?: string | null
   qos?: number
+  injected?: boolean
   mode: Mode
 }
 

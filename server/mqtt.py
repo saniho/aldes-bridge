@@ -150,6 +150,18 @@ def build_puback(pkt_id):
     return b"\x40" + encode_remaining_length(2) + struct.pack(">H", pkt_id)
 
 
+def build_pubrec(pkt_id):
+    return b"\x50" + encode_remaining_length(2) + struct.pack(">H", pkt_id)
+
+
+def build_pubrel(pkt_id):
+    return b"\x62" + encode_remaining_length(2) + struct.pack(">H", pkt_id)
+
+
+def build_pubcomp(pkt_id):
+    return b"\x70" + encode_remaining_length(2) + struct.pack(">H", pkt_id)
+
+
 def build_pingresp():
     return b"\xD0\x00"
 

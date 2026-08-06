@@ -13,7 +13,7 @@ from server.events import EventBus
 from server.engine import Engine
 from server.mqtt import (
     MQTTReader, MQTTError,
-    build_connect, build_subscribe, build_publish,
+    build_connect, build_subscribe, build_publish, build_pubrel,
 )
 from server.tls import client_context, server_context
 
@@ -125,17 +125,53 @@ def test_bridge_inject():
     assert topic == "dev/box/messages/devicebound/1"
     assert body[o + 2:].decode() == '{"cmd":"hello"}'  # qos1 -> 2 octets packet id
 
-    # verifier que l'evenement est journalise
+    # verifier que l'evenement est journalise et marque "injected"
     msgs = [e for e in events.snapshot() if e.get("kind") == "message"]
     out = [m for m in msgs if m["direction"] == "out" and m["type"] == "PUBLISH"]
     assert out, "commande envoyee non journalisee"
     import json as _json
     assert _json.loads(out[-1]["payload"]) == {"cmd": "hello"}
+    assert out[-1].get("injected") is True, "injection non marquee injected=True"
+
+    # telemetrie box->bridge : PUBACK attendu, evenement NON marque injected
+    tls.sendall(build_publish("dev/box/telemetry", '{"t":1}', qos=1))
+    assert read_packet(tls)[0] == 4, "attendu PUBACK"
+    time.sleep(0.3)
+    up = [m for m in events.snapshot()
+          if m.get("kind") == "message" and m["direction"] == "in" and m["type"] == "PUBLISH"]
+    assert up, "telemetrie non journalisee"
+    assert up[-1].get("injected") is None, "telemetrie ne doit pas etre injected"
 
     tls.close()
     eng.stop()
     time.sleep(0.3)
     assert wait_state(state, "connected", False), "session non down"
+    print("  OK")
+
+
+def test_bridge_qos2():
+    print("== test_bridge_qos2 ==")
+    events = EventBus()
+    state = AppState("fake-host", 9999, events)
+    state.set_mode("bridge")
+    eng = Engine(state, mqtt_port=18887)
+    eng.start()
+    time.sleep(0.5)
+
+    tls = box_socket(18887)
+    tls.sendall(build_connect("box-qos2"))
+    assert read_packet(tls)[0] == 2, "attendu CONNACK"
+
+    # PUBLISH QoS2 -> on doit repondre PUBREC (type 5), pas PUBACK (type 4)
+    tls.sendall(build_publish("dev/box/qos2", '{"x":2}', qos=2))
+    assert read_packet(tls)[0] == 5, "attendu PUBREC pour un QoS2"
+    # PUBREL -> on doit repondre PUBCOMP (type 7)
+    tls.sendall(build_pubrel(1))
+    assert read_packet(tls)[0] == 7, "attendu PUBCOMP apres PUBREL"
+
+    tls.close()
+    eng.stop()
+    time.sleep(0.3)
     print("  OK")
 
 
@@ -172,6 +208,10 @@ def test_proxy_relay_inject():
     assert topic == "dev/box/messages/devicebound/9"
     assert body[o:].decode() == '{"cmd":"proxy"}'
 
+    msgs = [e for e in events.snapshot() if e.get("kind") == "message" and e["type"] == "PUBLISH"]
+    injected = [m for m in msgs if m.get("injected")]
+    assert injected and injected[-1].get("injected") is True, "injection proxy non marquee injected"
+
     # telemetrie box->real relayee : le fake Azure doit recevoir le PUBLISH
     tls.sendall(build_publish("dev/box/messages/telemetry", '{"t":21}', qos=0))
     time.sleep(0.5)
@@ -185,5 +225,6 @@ def test_proxy_relay_inject():
 
 if __name__ == "__main__":
     test_bridge_inject()
+    test_bridge_qos2()
     test_proxy_relay_inject()
     print("TOUS LES TESTS PASSENT")

@@ -15,6 +15,42 @@
   border-bottom: 1px solid #262a35;
 }
 
+.filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid #262a35;
+  flex-wrap: wrap;
+}
+
+.filters input[type='text'],
+.filters input:not([type]),
+.filters select {
+  background: #0f1217;
+  border: 1px solid #2a2f3a;
+  border-radius: 6px;
+  color: #dfe3ea;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.filters input {
+  min-width: 120px;
+  flex: 1;
+}
+
+.ck {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #8b919c;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 .legend {
   display: flex;
   gap: 16px;
@@ -63,6 +99,21 @@
 
 .msg.out {
   border-left: 3px solid #f59e0b55;
+}
+
+.msg.injected {
+  border-color: #22c55e99;
+}
+
+.badge {
+  background: #22c55e;
+  color: #06220f;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-left: 4px;
 }
 
 .head {

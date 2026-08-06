@@ -62,7 +62,7 @@ class ProxyHandler:
         self._pkt_id += 1
         pkt = build_publish(topic, payload, qos=0, pkt_id=self._pkt_id)
         self._send_box(pkt)
-        emit_message(self.state, "out", "PUBLISH", topic=topic, payload=payload, qos=0)
+        emit_message(self.state, "out", "PUBLISH", topic=topic, payload=payload, qos=0, injected=True)
         return {"ok": True, "direction": "out", "qos": 0}
 
     # --- relay box -> real ---
