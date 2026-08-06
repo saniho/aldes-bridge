@@ -84,7 +84,11 @@ const { messages, lastSnapshot } = useMemo(() => {
       />
       <div className="layout">
         <MessageStream messages={messages} />
-        <SendPanel mode={config?.mode ?? null} connected={config?.connected ?? false} />
+        <SendPanel
+          mode={config?.mode ?? null}
+          connected={config?.connected ?? false}
+          clientId={config?.client_id ?? null}
+        />
       </div>
     </div>
   )
