@@ -29,6 +29,9 @@ export default function MessageStream({ messages }: Props) {
   const [dir, setDir] = useState<'all' | 'in' | 'out'>('all')
   const [type, setType] = useState('all')
   const [injectedOnly, setInjectedOnly] = useState(false)
+  const [follow, setFollow] = useState(true)
+  const [nearBottom, setNearBottom] = useState(true)
+  const [copied, setCopied] = useState<number | null>(null)
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -44,10 +47,43 @@ export default function MessageStream({ messages }: Props) {
     })
   }, [messages, search, dir, type, injectedOnly])
 
-  useEffect(() => {
+  const onScroll = () => {
+    const el = boxRef.current
+    if (!el) return
+    const near = el.scrollHeight - el.scrollTop - el.clientHeight < 24
+    setNearBottom(near)
+    if (near) setFollow(true)
+    else setFollow(false)
+  }
+
+  const jumpToBottom = () => {
+    setFollow(true)
     const el = boxRef.current
     if (el) el.scrollTop = el.scrollHeight
-  }, [filtered])
+  }
+
+  useEffect(() => {
+    if (follow) {
+      const el = boxRef.current
+      if (el) el.scrollTop = el.scrollHeight
+    }
+  }, [filtered, follow])
+
+  useEffect(() => {
+    if (copied === null) return
+    const t = setTimeout(() => setCopied(null), 1500)
+    return () => clearTimeout(t)
+  }, [copied])
+
+  const copy = async (payload: string | null | undefined, i: number) => {
+    if (!payload) return
+    try {
+      await navigator.clipboard.writeText(payload)
+      setCopied(i)
+    } catch {
+      /* clipboard refusé — silencieux */
+    }
+  }
 
   return (
     <div className={styles.wrap}>
@@ -55,6 +91,9 @@ export default function MessageStream({ messages }: Props) {
         <span className={styles.legend}>
           <span className={styles.in}>▲ box → cloud</span>
           <span className={styles.out}>▼ cloud → box</span>
+        </span>
+        <span className={styles.count}>
+          {filtered.length} / {messages.length}
         </span>
       </div>
       <div className={styles.filters}>
@@ -85,8 +124,16 @@ export default function MessageStream({ messages }: Props) {
           />
           injections
         </label>
+        <label className={styles.ck}>
+          <input
+            type="checkbox"
+            checked={follow}
+            onChange={(e) => setFollow(e.target.checked)}
+          />
+          suivre
+        </label>
       </div>
-      <div className={styles.box} ref={boxRef}>
+      <div className={styles.box} ref={boxRef} onScroll={onScroll}>
         {filtered.length === 0 && <div className={styles.empty}>aucun message</div>}
         {filtered.map((m, i) => (
           <div
@@ -106,10 +153,23 @@ export default function MessageStream({ messages }: Props) {
               <span className={styles.qos}>{m.qos !== undefined ? `qos${m.qos}` : ''}</span>
             </div>
             {m.topic && <div className={styles.topic}>{m.topic}</div>}
-            {m.payload && <pre className={styles.payload}>{m.payload}</pre>}
+            {m.payload && (
+              <pre
+                className={styles.payload + (copied === i ? ' ' + styles.copied : '')}
+                onClick={() => copy(m.payload, i)}
+                title="copier"
+              >
+                {copied === i ? '📋 copié' : m.payload}
+              </pre>
+            )}
           </div>
         ))}
       </div>
+      {!nearBottom && filtered.length > 0 && (
+        <button className={styles.goto} onClick={jumpToBottom}>
+          ↓ suivre
+        </button>
+      )}
     </div>
   )
 }

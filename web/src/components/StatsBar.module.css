@@ -1,0 +1,37 @@
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 6px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  font-size: 12px;
+}
+
+.stat {
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.flow {
+  margin-left: auto;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+
+.flow.live {
+  color: var(--green);
+}
+
+.flow.stale {
+  color: var(--out);
+  border-color: var(--line-out);
+}
+
+.flow.off {
+  color: var(--text-faint);
+}

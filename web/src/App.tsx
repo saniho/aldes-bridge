@@ -6,6 +6,7 @@ import StatusBar from './components/StatusBar'
 import SendPanel from './components/SendPanel'
 import MessageStream from './components/MessageStream'
 import ModeDiagram from './components/ModeDiagram'
+import StatsBar from './components/StatsBar'
 import './App.css'
 
 export default function App() {
@@ -54,6 +55,13 @@ const { messages, lastSnapshot } = useMemo(() => {
   }, [lastSnapshot])
 
   const onMode = useCallback(async (m: 'proxy' | 'bridge') => {
+    const cur = config?.mode ?? m
+    const msg =
+      m === 'bridge'
+        ? `Passer en mode bridge ?\n\nLa box ne passera plus par le cloud Azure (chemin : box → bridge uniquement).`
+        : `Passer en mode proxy ?\n\nLa box rejoindra à nouveau le cloud Azure via le bridge.`
+    const hint = cur === m ? ` (déjà en mode ${m})` : ''
+    if (!window.confirm(msg + hint)) return
     try {
       const r = await setMode(m)
       setConfig((c) => {
@@ -63,9 +71,10 @@ const { messages, lastSnapshot } = useMemo(() => {
     } catch (e) {
       alert(`changement de mode impossible : ${(e as Error).message}`)
     }
-  }, [])
+  }, [config?.mode])
 
   const onDisconnect = useCallback(async () => {
+    if (!window.confirm('Déconnecter la box ?\n\nToute connexion en cours sera coupée.')) return
     try {
       await disconnect()
     } catch (e) {
@@ -108,6 +117,10 @@ const { messages, lastSnapshot } = useMemo(() => {
         mode={config?.mode ?? null}
         connected={config?.connected ?? false}
         clientId={config?.client_id ?? null}
+      />
+      <StatsBar
+        messages={messages}
+        connected={config?.connected ?? false}
       />
       <div className="layout">
         <MessageStream messages={messages} />
