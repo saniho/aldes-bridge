@@ -1,26 +1,28 @@
 .wrap {
   border-bottom: 1px solid #262a35;
   background: #12161f;
-  padding: 10px 16px;
+  padding: 14px 20px 16px;
 }
 
 .flow {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
 }
 
 .node {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   background: #1b202a;
   border: 1px solid #2a2f3a;
-  border-radius: 8px;
-  padding: 8px 12px;
-  min-width: 96px;
+  border-radius: 10px;
+  padding: 12px 18px;
+  min-width: 118px;
   transition: all 0.2s ease;
 }
 
@@ -38,18 +40,19 @@
 }
 
 .icon {
-  font-size: 18px;
+  font-size: 22px;
+  line-height: 1;
 }
 
 .name {
   font-weight: 700;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .sub {
-  font-size: 10px;
+  font-size: 11px;
   color: #8b919c;
-  max-width: 110px;
+  max-width: 130px;
   text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -60,12 +63,14 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1px;
-  padding: 0 4px;
+  gap: 3px;
+  padding: 0 6px;
+  flex-shrink: 0;
 }
 
 .seg .arrow {
-  font-size: 14px;
+  font-size: 22px;
+  line-height: 1;
 }
 
 .seg.live {
@@ -73,26 +78,29 @@
 }
 
 .seg.off {
-  color: #5b6169;
+  color: #495057;
   opacity: 0.6;
 }
 
 .seg.muted {
-  color: #5b6169;
+  color: #495057;
 }
 
 .seglab {
-  font-size: 9px;
-  letter-spacing: 0.04em;
+  font-size: 10px;
+  letter-spacing: 0.03em;
   color: #8b919c;
   white-space: nowrap;
 }
 
 .explain {
-  margin: 0;
-  font-size: 12px;
+  margin: 0 auto;
+  max-width: 720px;
+  text-align: center;
+  font-size: 13px;
   color: #9aa1ac;
-  line-height: 1.5;
+  line-height: 1.6;
+  padding: 0 4px;
 }
 
 .explain strong {
