@@ -4,8 +4,8 @@
   gap: 16px;
   flex-wrap: wrap;
   padding: 8px 16px;
-  border-bottom: 1px solid #262a35;
-  background: #151922;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-card);
 }
 
 .mode {
@@ -27,7 +27,7 @@
 }
 
 .bridge {
-  background: #22c55e;
+  background: var(--green);
 }
 
 .conn {
@@ -37,18 +37,19 @@
 }
 
 .ok {
-  color: #22c55e;
+  color: var(--green);
 }
 
 .off {
-  color: #8b919c;
+  color: var(--text-soft);
 }
 
 .cid {
-  background: #1e2430;
+  background: var(--bg-chip);
   padding: 1px 8px;
   border-radius: 4px;
   font-size: 12px;
+  color: var(--text);
 }
 
 .topics {
@@ -58,8 +59,8 @@
 }
 
 .topic {
-  background: #1e2430;
-  color: #9db4ff;
+  background: var(--bg-chip);
+  color: var(--topic);
   border-radius: 4px;
   padding: 1px 8px;
   font-size: 11px;
@@ -73,16 +74,16 @@
 }
 
 .actions button {
-  background: #232937;
-  border: 1px solid #3a3f4d;
-  color: #dfe3ea;
+  background: var(--bg-input);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
   border-radius: 6px;
   padding: 4px 12px;
   cursor: pointer;
 }
 
 .actions button:hover {
-  border-color: #6b7280;
+  border-color: var(--text-soft);
 }
 
 .sse {
@@ -90,11 +91,11 @@
   letter-spacing: 0.08em;
   padding: 2px 6px;
   border-radius: 4px;
-  border: 1px solid #3a3f4d;
-  color: #8b919c;
+  border: 1px solid var(--border-strong);
+  color: var(--text-soft);
 }
 
 .live {
-  color: #22c55e;
-  border-color: #22c55e55;
+  color: var(--green);
+  border-color: var(--line-green);
 }

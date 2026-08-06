@@ -1,6 +1,6 @@
 .wrap {
-  border-bottom: 1px solid #262a35;
-  background: #12161f;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-soft);
   padding: 14px 20px 16px;
 }
 
@@ -18,8 +18,8 @@
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  background: #1b202a;
-  border: 1px solid #2a2f3a;
+  background: var(--bg-node);
+  border: 1px solid var(--border-input);
   border-radius: 10px;
   padding: 12px 18px;
   min-width: 118px;
@@ -27,12 +27,12 @@
 }
 
 .node.highlight {
-  border-color: #22c55e;
-  box-shadow: 0 0 0 1px #22c55e55;
+  border-color: var(--green);
+  box-shadow: 0 0 0 1px var(--line-green);
 }
 
 .node.active {
-  border-color: #f59e0b;
+  border-color: var(--out);
 }
 
 .node.muted {
@@ -51,7 +51,7 @@
 
 .sub {
   font-size: 11px;
-  color: #8b919c;
+  color: var(--text-soft);
   max-width: 130px;
   text-align: center;
   overflow: hidden;
@@ -74,22 +74,22 @@
 }
 
 .seg.live {
-  color: #22c55e;
+  color: var(--green);
 }
 
 .seg.off {
-  color: #495057;
+  color: var(--arrow-off);
   opacity: 0.6;
 }
 
 .seg.muted {
-  color: #495057;
+  color: var(--arrow-off);
 }
 
 .seglab {
   font-size: 10px;
   letter-spacing: 0.03em;
-  color: #8b919c;
+  color: var(--text-soft);
   white-space: nowrap;
 }
 
@@ -98,16 +98,16 @@
   max-width: 720px;
   text-align: center;
   font-size: 13px;
-  color: #9aa1ac;
+  color: var(--text-dim);
   line-height: 1.6;
   padding: 0 4px;
 }
 
 .explain strong {
-  color: #dfe3ea;
+  color: var(--text);
 }
 
 .explain em {
-  color: #dfe3ea;
+  color: var(--text);
   font-style: italic;
 }

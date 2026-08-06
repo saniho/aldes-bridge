@@ -1,6 +1,6 @@
 .panel {
-  background: #151922;
-  border: 1px solid #262a35;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 14px;
   height: fit-content;
@@ -20,7 +20,7 @@
 
 .row label {
   width: 62px;
-  color: #8b919c;
+  color: var(--text-soft);
   font-size: 12px;
 }
 
@@ -28,10 +28,10 @@
 .row textarea,
 .row select {
   flex: 1;
-  background: #0f1217;
-  border: 1px solid #2a2f3a;
+  background: var(--bg-input);
+  border: 1px solid var(--border-input);
   border-radius: 6px;
-  color: #dfe3ea;
+  color: var(--text);
   padding: 6px 8px;
   font-size: 12px;
   font-family: inherit;
@@ -42,9 +42,9 @@
 }
 
 .row button {
-  background: #2563eb;
+  background: var(--accent);
   border: none;
-  color: white;
+  color: var(--accent-fg);
   border-radius: 6px;
   padding: 6px 14px;
   cursor: pointer;
@@ -52,44 +52,44 @@
 }
 
 .row button:disabled {
-  background: #334155;
+  background: var(--btn-disabled);
   cursor: not-allowed;
-  color: #94a3b8;
+  color: var(--btn-disabled-fg);
 }
 
 .row button[type='button'] {
   background: transparent;
-  border: 1px solid #3a3f4d;
-  color: #aeb4c0;
+  border: 1px solid var(--border-strong);
+  color: var(--text-muted);
   font-weight: 400;
 }
 
 .status {
   margin-top: 6px;
   font-size: 12px;
-  color: #86efac;
+  color: var(--green-bg);
 }
 
 .hint {
   margin: -4px 0 10px 70px;
   font-size: 11px;
-  color: #8b919c;
+  color: var(--text-soft);
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
 .hint code {
-  background: #1e2430;
-  color: #9db4ff;
+  background: var(--bg-chip);
+  color: var(--topic);
   padding: 1px 6px;
   border-radius: 4px;
 }
 
 .hint button {
   background: transparent;
-  border: 1px solid #3a3f4d;
-  color: #aeb4c0;
+  border: 1px solid var(--border-strong);
+  color: var(--text-muted);
   border-radius: 5px;
   padding: 1px 8px;
   font-size: 11px;
@@ -97,12 +97,12 @@
 }
 
 .hint button:hover {
-  border-color: #6b7280;
-  color: #fff;
+  border-color: var(--text-soft);
+  color: var(--text);
 }
 
 .warn {
   margin-top: 8px;
   font-size: 11px;
-  color: #f59e0b;
+  color: var(--out);
 }

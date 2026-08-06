@@ -11,9 +11,10 @@ body,
 
 body {
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  background: #101218;
-  color: #dfe3ea;
+  background: var(--bg);
+  color: var(--text);
   font-size: 14px;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
 code {
@@ -31,22 +32,45 @@ h1 {
   align-items: center;
   justify-content: space-between;
   padding: 10px 16px;
-  border-bottom: 1px solid #262a35;
-  background: #151922;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-card);
+}
+
+.topRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
 }
 
 .clear {
   background: transparent;
-  border: 1px solid #3a3f4d;
-  color: #aeb4c0;
+  border: 1px solid var(--border-strong);
+  color: var(--text-muted);
   border-radius: 6px;
   padding: 4px 12px;
   cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
 }
 
 .clear:hover {
-  border-color: #6b7280;
-  color: #fff;
+  border-color: var(--text-soft);
+  color: var(--text);
+}
+
+.theme {
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  color: var(--text-muted);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.theme:hover {
+  border-color: var(--text-soft);
+  color: var(--text);
 }
 
 .layout {

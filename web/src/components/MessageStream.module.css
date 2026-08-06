@@ -2,8 +2,8 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: #151922;
-  border: 1px solid #262a35;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
 }
@@ -12,7 +12,7 @@
   display: flex;
   align-items: center;
   padding: 8px 12px;
-  border-bottom: 1px solid #262a35;
+  border-bottom: 1px solid var(--border);
 }
 
 .filters {
@@ -20,17 +20,17 @@
   align-items: center;
   gap: 8px;
   padding: 6px 12px;
-  border-bottom: 1px solid #262a35;
+  border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
 }
 
 .filters input[type='text'],
 .filters input:not([type]),
 .filters select {
-  background: #0f1217;
-  border: 1px solid #2a2f3a;
+  background: var(--bg-input);
+  border: 1px solid var(--border-input);
   border-radius: 6px;
-  color: #dfe3ea;
+  color: var(--text);
   padding: 4px 8px;
   font-size: 12px;
   font-family: inherit;
@@ -46,7 +46,7 @@
   align-items: center;
   gap: 5px;
   font-size: 12px;
-  color: #8b919c;
+  color: var(--text-soft);
   cursor: pointer;
   white-space: nowrap;
 }
@@ -64,11 +64,11 @@
 }
 
 .in {
-  color: #60a5fa;
+  color: var(--in);
 }
 
 .out {
-  color: #f59e0b;
+  color: var(--out);
 }
 
 .box {
@@ -81,7 +81,7 @@
 }
 
 .empty {
-  color: #5b6169;
+  color: var(--text-faint);
   text-align: center;
   padding: 40px;
 }
@@ -89,25 +89,25 @@
 .msg {
   border-radius: 8px;
   padding: 6px 10px;
-  border: 1px solid #262a35;
-  background: #1b202a;
+  border: 1px solid var(--border);
+  background: var(--bg-node);
 }
 
 .msg.in {
-  border-left: 3px solid #2563eb55;
+  border-left: 3px solid var(--line-in);
 }
 
 .msg.out {
-  border-left: 3px solid #f59e0b55;
+  border-left: 3px solid var(--line-out);
 }
 
 .msg.injected {
-  border-color: #22c55e99;
+  border-color: var(--line-inj);
 }
 
 .badge {
-  background: #22c55e;
-  color: #06220f;
+  background: var(--green);
+  color: var(--badge-fg);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -124,7 +124,7 @@
 }
 
 .ts {
-  color: #6b7280;
+  color: var(--text-soft);
 }
 
 .type {
@@ -137,7 +137,7 @@
 }
 
 .qos {
-  color: #8b919c;
+  color: var(--text-soft);
   margin-left: auto;
   font-size: 11px;
 }
@@ -145,16 +145,16 @@
 .topic {
   margin-top: 4px;
   font-size: 12px;
-  color: #9db4ff;
+  color: var(--topic);
 }
 
 .payload {
   margin: 6px 0 0;
-  background: #101218;
+  background: var(--bg);
   border-radius: 6px;
   padding: 8px;
   font-size: 11px;
   white-space: pre-wrap;
   word-break: break-word;
-  color: #c8d3e0;
+  color: var(--text);
 }

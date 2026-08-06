@@ -11,6 +11,18 @@ import './App.css'
 export default function App() {
   const [config, setConfig] = useState<Config | null>(null)
   const { events, connected: sseAlive } = useSse(true)
+  const [theme, setTheme] = useState<'nuit' | 'jour'>(() => {
+    return (localStorage.getItem('aldes-theme') as 'nuit' | 'jour') || 'nuit'
+  })
+
+  useEffect(() => {
+    if (theme === 'jour') {
+      document.documentElement.dataset.theme = 'jour'
+    } else {
+      delete document.documentElement.dataset.theme
+    }
+    localStorage.setItem('aldes-theme', theme)
+  }, [theme])
 
   useEffect(() => {
     getConfig().then((cfg) => {
@@ -73,9 +85,18 @@ const { messages, lastSnapshot } = useMemo(() => {
     <div className="app">
       <header className="top">
         <h1>Aldes Bridge</h1>
-        <button className="clear" onClick={onClear}>
-          vider
-        </button>
+        <div className="topRight">
+          <button
+            className="theme"
+            onClick={() => setTheme((t) => (t === 'nuit' ? 'jour' : 'nuit'))}
+            title={theme === 'nuit' ? 'Passer en mode jour' : 'Passer en mode nuit'}
+          >
+            {theme === 'nuit' ? '☀️ jour' : '🌙 nuit'}
+          </button>
+          <button className="clear" onClick={onClear}>
+            vider
+          </button>
+        </div>
       </header>
       <StatusBar
         config={config}
