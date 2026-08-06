@@ -1,0 +1,100 @@
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 8px 16px;
+  border-bottom: 1px solid #262a35;
+  background: #151922;
+}
+
+.mode {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #555;
+}
+
+.proxy {
+  background: #eab308;
+}
+
+.bridge {
+  background: #22c55e;
+}
+
+.conn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ok {
+  color: #22c55e;
+}
+
+.off {
+  color: #8b919c;
+}
+
+.cid {
+  background: #1e2430;
+  padding: 1px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.topics {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.topic {
+  background: #1e2430;
+  color: #9db4ff;
+  border-radius: 4px;
+  padding: 1px 8px;
+  font-size: 11px;
+}
+
+.actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.actions button {
+  background: #232937;
+  border: 1px solid #3a3f4d;
+  color: #dfe3ea;
+  border-radius: 6px;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+
+.actions button:hover {
+  border-color: #6b7280;
+}
+
+.sse {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #3a3f4d;
+  color: #8b919c;
+}
+
+.live {
+  color: #22c55e;
+  border-color: #22c55e55;
+}

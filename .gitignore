@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Node / web
+node_modules/
+web/dist/
+dist/
+*.tsbuildinfo
+web/vite.config.js
+web/vite.config.d.ts
+
+# Tests artifacts
+.pytest_cache/
+
+# Secrets / local
+*.key
+*.crt
+*.csr
+*.pem
+.env
+
+# OS
+.DS_Store
+
+# Ops helpers locaux (contennent des identifiants/secret SSH) — ne pas publier
+sshrun.py
+monitor_proxy.py

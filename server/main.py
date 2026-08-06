@@ -1,0 +1,65 @@
+#!/usr/bin/env python3
+"""Point d'entree Aldes Bridge.
+
+Le mode (proxy | bridge) s'active par defaut ici mais est surtout changeable depuis
+la Web UI (POST /api/mode). Le listener MQTT/TLS reste identique pour les deux modes.
+"""
+import argparse
+import os
+
+from .appstate import AppState
+from .events import EventBus
+from .engine import Engine
+
+APP_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _default_web_dir():
+    for cand in ("dist", "web/dist"):
+        p = os.path.join(APP_ROOT, cand)
+        if os.path.isdir(p) and os.path.exists(os.path.join(p, "index.html")):
+            return p
+    return os.path.join(APP_ROOT, "dist")
+
+
+def build_parser():
+    ap = argparse.ArgumentParser(prog="aldes-bridge", description="Bridge Aldes (proxy MITM / faux broker) + WebUI.")
+    ap.add_argument("--mode", choices=["proxy", "bridge"], default="proxy",
+                    help="mode initial (changeable depuis la WebUI)")
+    ap.add_argument("--bind", default="0.0.0.0", help="adresse de bind (MQTT + web)")
+    ap.add_argument("--mqtt-port", type=int, default=8883, help="port MQTT/TLS (defaut 8883)")
+    ap.add_argument("--web-port", type=int, default=8080, help="port de la WebUI/API (defaut 8080)")
+    ap.add_argument("--real-host", default="aldesiotsuite.azure-devices.net",
+                    help="hote Azure reel (mode proxy)")
+    ap.add_argument("--real-port", type=int, default=8883)
+    ap.add_argument("--web-dir", default=_default_web_dir(), help="dossier du frontend construit")
+    ap.add_argument("--history-size", type=int, default=200, help="nb de messages gardes")
+    return ap
+
+
+def main(argv=None):
+    args = build_parser().parse_args(argv)
+
+    try:
+        import uvicorn
+    except ImportError:
+        import sys
+        sys.stderr.write("Paquet manquant: fastapi + uvicorn. Installez avec:\n"
+                         "  pip install fastapi 'uvicorn[standard]'\n")
+        raise SystemExit(2)
+
+    events = EventBus(args.history_size)
+    state = AppState(args.real_host, args.real_port, events)
+    state.set_mode(args.mode)
+
+    engine = Engine(state, mqtt_port=args.mqtt_port, bind=args.bind)
+    engine.start()
+    state.set_error("ecoute MQTT sur %s:%d, web sur %s:%d" % (args.bind, args.mqtt_port, args.bind, args.web_port))
+
+    from .api import create_app
+    app = create_app(state, engine, args.web_dir)
+    uvicorn.run(app, host=args.bind, port=args.web_port, log_level="info")
+
+
+if __name__ == "__main__":
+    main()

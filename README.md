@@ -1,0 +1,99 @@
+# Aldes Bridge
+
+Pont MQTT over TLS pour intercepter, analyser **et commander** une box **Aldes Connect**
+(qui remonte vers Azure IoT Hub), avec une Web UI React.
+
+Deux modes (bascule possible à chaud depuis la Web UI, appliquée à la prochaine connexion de la box) :
+
+- **proxy** — transparent : le pont relaie réellement la box vers `aldesiotsuite.azure-devices.net`,
+  tout en affichant/sniffant chaque trame, et permet d'injecter des commandes vers la box (QoS0).
+- **bridge** — faux broker : la box se connecte au pont qui joue le rôle d'Azure ; messages observés,
+  commandes injectées en QoS1 ; *aucune* communication avec le vrai cloud.
+
+Un unique listener TLS sur le port 8883 sert les deux modes ; le choix du mode est dans `AppState`
+
+## Stack
+
+- **Backend** : Python 3.11, FastAPI + uvicorn (API HTTP + SSE), aucune lib MQTT externe (codec maison dans `server/mqtt.py`).
+- **Frontend** : React 18 + Vite + TypeScript (`web/`), construit puis servi statique par FastAPI.
+- **Docker** : multi-stage (build node → runtime python), réseau host.
+
+## Structure
+
+```
+server/
+  main.py        # point d'entrée CLI (python3 -m server.main)
+  engine.py      # listener TLS unique + dispatch par AppState.mode
+  appstate.py    # mode, connexion, historique de trames, snapshots SSE
+  bridge.py      # faux broker + injection (QoS1)
+  proxy.py       # MITM vers Azure réel + injection boxward (QoS0)
+  tls.py         # certificats auto-signés per-connexion, ctx permissif
+  mqtt.py        # codec MQTT 3.1.1 (CONNECT/PUBLISH/SUBSCRIBE/...)
+  events.py      # EventBus ring + export SSE
+  api.py         # FastAPI : /api/* + SPA fallback
+web/             # frontend React/Vite
+tests/           # test_engine.py (bridge + proxy MITM)
+Dockerfile
+docker-compose.yml
+```
+
+## Démarrage
+
+### Docker (déploiement)
+
+```bash
+docker compose up -d --build
+```
+
+- MQTT/TLS : `0.0.0.0:8883` (la box s'y connecte)
+- WebUI/API : `0.0.0.0:8080`
+
+### Sans Docker (dev)
+
+```bash
+pip install -r requirements.txt
+cd web && npm install && npm run build && cd ..
+python3 -m server.main --web-dir ./web/dist
+```
+
+### Développement frontend (proxy vers l'API)
+
+```bash
+python3 -m server.main --web-port 8080 --mqtt-port 8883 &
+cd web && npm run dev   # http://localhost:5173, /api proxy → 8080
+```
+
+## API
+
+| Méthode | Chemin | Description |
+|---|---|---|
+| GET | `/api/config` | mode actuel |
+| GET | `/api/state` | config + derniers messages (snapshot) |
+| GET | `/api/events` | flux SSE (snapshot initial puis messages/status temps réel) |
+| POST | `/api/mode` | `{"mode":"proxy"\|"bridge"}` — effet à la prochaine connexion |
+| POST | `/api/send` | `{"topic","payload","qos"}` — injecte une commande vers la box |
+| POST | `/api/disconnect` | force la session (pour appliquer le mode tout de suite) |
+| POST | `/api/clear` | vide l'historique affiché |
+| GET | `/` | SPA (frontend construit) |
+
+## Paramètres CLI (`python3 -m server.main --help`)
+
+- `--mode proxy|bridge` (défaut `proxy`) — mode initial, changeable depuis la WebUI
+- `--bind 0.0.0.0`, `--mqtt-port 8883`, `--web-port 8080`
+- `--real-host aldesiotsuite.azure-devices.net`, `--real-port 8883`
+- `--web-dir <dist>` (frontend construit)
+- `--history-size 200`
+
+## Tests
+
+```bash
+python3 tests/test_engine.py
+```
+
+## Notes / historique
+
+- Anciens scripts legacy : `dump_mqtt.py` (faux broker simple), `mqtt_proxy.py` (proxy promo initial),
+  `monitor_proxy.py`, `setup-dns.sh`.
+- La box doit pointer vers cette machine (rediriger `aldesiotsuite.azure-devices.net:8883` vers le pont,
+  dans le DNS ou le NAT) pour se connecter au pont — soit réellement au cloud.
+- Mode **bridge** : la box ne "répond" pas de vrai AWS; les __commandes__ vers la box passent par `devices/<boxid>/messages/devicebound`.

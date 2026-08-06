@@ -1,0 +1,11 @@
+services:
+  bridge:
+    build: .
+    image: aldes-bridge:latest
+    container_name: aldes-bridge
+    restart: unless-stopped
+    # réseau host : la box Aldes se connecte en TLS au port 8883 de la machine
+    network_mode: host
+    environment:
+      - ALDES_MODE=proxy
+    # app = python3 -m server.main [--mode proxy --mqtt-port 8883 --web-port 8080 --real-host aldesiotsuite.azure-devices.net]

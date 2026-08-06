@@ -1,0 +1,11 @@
+.git
+.gitignore
+**/__pycache__
+**/*.pyc
+node_modules
+web/node_modules
+web/dist
+.tests
+*.key
+*.crt
+*.log
