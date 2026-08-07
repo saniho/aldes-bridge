@@ -31,6 +31,10 @@ class RawClient(threading.Thread):
     # --- cycle de vie ---
     def stop(self):
         self._stop.set()
+        self.drop()
+
+    def drop(self):
+        """Ferme la session courante sans tuer la boucle de reconnexion."""
         sock = self._sock
         if sock is not None:
             try:
@@ -41,10 +45,8 @@ class RawClient(threading.Thread):
     def run(self):
         backoff = 0.5
         while not self._stop.is_set():
-            if not self._session():
-                backoff = min(backoff * 2, 10)
-            else:
-                backoff = 0.5
+            ok = self._session()
+            backoff = 0.5 if ok else min(backoff * 2, 10)
             time.sleep(backoff)
 
     def _session(self):
@@ -100,7 +102,7 @@ class RawClient(threading.Thread):
                 self._handle(pkt)
         finally:
             self._teardown()
-        return False
+        return True
 
     def _send(self, data):
         sock = self._sock

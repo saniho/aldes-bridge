@@ -313,6 +313,13 @@ def test_raw_native():
            if m.get("kind") == "message" and m["direction"] == "out" and m["type"] == "PUBLISH"]
     assert out and out[-1].get("injected") is True, "injection raw non marquee injected"
 
+    # disconnect() ne doit pas tuer la boucle de reconnexion
+    r = eng.disconnect()
+    assert r["ok"] and r["session"] == "dropped", r
+    time.sleep(0.3)
+    assert not wait_state(state, "connected", False), "doit etre decroche apres disconnect"
+    assert wait_state(state, "connected", True), "le client raw doit se reconnecter au broker"
+
     eng.stop()
     eng.join(timeout=3)
     fake.sock.close()

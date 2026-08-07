@@ -164,7 +164,7 @@ class Engine(threading.Thread):
             with self._lock:
                 raw = self._raw
             if raw:
-                raw.stop()
+                raw.drop()
                 return {"ok": True, "session": "dropped"}
             return {"ok": True, "session": "none"}
         with self._lock:
