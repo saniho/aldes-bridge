@@ -7,6 +7,7 @@ interface Props {
   mode: Mode | null
   connected: boolean
   clientId: string | null
+  defaultTopic?: string | null
 }
 
 const PRESETS: { label: string; payload: string }[] = [
@@ -29,17 +30,17 @@ function topicFor(clientId: string): string {
   return `devices/${clientId}/messages/devicebound`
 }
 
-export default function SendPanel({ connected, clientId }: Props) {
+export default function SendPanel({ connected, clientId, defaultTopic }: Props) {
   const [topic, setTopic] = useState('')
   const [payload, setPayload] = useState('')
   const [preset, setPreset] = useState('')
   const [qos, setQos] = useState(0)
   const [status, setStatus] = useState<string | null>(null)
 
-  const targetTopic = useMemo(
-    () => (clientId ? topicFor(clientId) : null),
-    [clientId]
-  )
+  const targetTopic = useMemo(() => {
+    if (defaultTopic) return defaultTopic
+    return clientId ? topicFor(clientId) : null
+  }, [defaultTopic, clientId])
 
   useEffect(() => {
     if (targetTopic && !topic) {

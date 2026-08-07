@@ -166,6 +166,10 @@ def build_pingresp():
     return b"\xD0\x00"
 
 
+def build_pingreq():
+    return b"\xC0\x00"
+
+
 def build_suback(pkt_id, codes):
     body = struct.pack(">H", pkt_id) + bytes(codes)
     return b"\x90" + encode_remaining_length(len(body)) + body

@@ -30,6 +30,21 @@
   background: var(--green);
 }
 
+.raw {
+  background: #8b5cf6;
+}
+
+.modeSel {
+  background: var(--bg-input);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
 .conn {
   display: flex;
   align-items: center;

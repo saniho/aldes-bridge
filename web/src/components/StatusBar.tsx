@@ -8,7 +8,7 @@ interface Props {
   onDisconnect: () => void
 }
 
-const FLIP = { proxy: 'bridge', bridge: 'proxy' } as const
+const MODES: Mode[] = ['proxy', 'bridge', 'raw']
 
 export default function StatusBar({ config, sseAlive, onMode, onDisconnect }: Props) {
   const mode: Mode | null = config?.mode ?? null
@@ -45,12 +45,18 @@ export default function StatusBar({ config, sseAlive, onMode, onDisconnect }: Pr
 
       <div className={styles.actions}>
         <span className={styles.sse + (sseAlive ? ' ' + styles.live : '')}>SSE</span>
-        {mode && (
-          <>
-            <button onClick={() => onMode(FLIP[mode])}>passer en {FLIP[mode]}</button>
-            {connected && <button onClick={onDisconnect}>déconnecter</button>}
-          </>
-        )}
+        <select
+          className={styles.modeSel}
+          value={mode ?? 'proxy'}
+          onChange={(e) => onMode(e.target.value as Mode)}
+        >
+          {MODES.map((m) => (
+            <option key={m} value={m}>
+              {m}
+            </option>
+          ))}
+        </select>
+        {connected && <button onClick={onDisconnect}>déconnecter</button>}
       </div>
     </div>
   )

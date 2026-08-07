@@ -18,6 +18,15 @@ class ModeBody(BaseModel):
     mode: str
 
 
+class RawBody(BaseModel):
+    host: str = ""
+    port: int = 1883
+    tls: bool = True
+    client_id: str = ""
+    cmd_topic: str = ""
+    evt_topic: str = ""
+
+
 def create_app(state, engine, web_dir):
     app = FastAPI(title="Aldes Bridge", docs_url=None, redoc_url=None)
     web_dir = os.path.abspath(web_dir)
@@ -72,7 +81,27 @@ def create_app(state, engine, web_dir):
             mode = state.set_mode(body.mode)
         except ValueError as exc:
             return JSONResponse(status_code=400, content={"error": str(exc)})
+        engine.set_mode(mode)
         return {"mode": mode, "takeEffect": "next-connect"}
+
+    @app.get("/api/raw")
+    def api_raw_get():
+        return state.raw_config()
+
+    @app.post("/api/raw")
+    def api_raw_set(body: RawBody):
+        fields = {
+            "host": body.host,
+            "port": body.port,
+            "tls": body.tls,
+            "client_id": body.client_id,
+            "cmd_topic": body.cmd_topic,
+            "evt_topic": body.evt_topic,
+        }
+        state.raw_config(fields)
+        # force une reconnexion du client raw si le mode raw est actif
+        engine.set_raw()
+        return state.raw_config()
 
     @app.post("/api/send")
     def api_send(body: SendBody):

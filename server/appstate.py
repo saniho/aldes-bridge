@@ -47,7 +47,17 @@ def emit_message(state, direction, mtype, topic=None, payload=None, qos=None, **
 
 
 class AppState:
-    MODES = ("proxy", "bridge")
+    MODES = ("proxy", "bridge", "raw")
+
+    DEFAULT_RAW = {
+        "enabled": False,
+        "host": "127.0.0.1",
+        "port": 1883,
+        "tls": True,
+        "client_id": "aldes-bridge",
+        "cmd_topic": "aldes/vmc/cmd/devices/MAC_AIR/messages/devicebound",
+        "evt_topic": "devices_MAC_AIR/messages/events",
+    }
 
     def __init__(self, real_host, real_port, events):
         self.events = events if events is not None else EventBus()
@@ -59,6 +69,7 @@ class AppState:
         self._client_id = None
         self._topics = set()
         self._last_error = None
+        self._raw = dict(AppState.DEFAULT_RAW)
 
     @property
     def mode(self):
@@ -107,6 +118,15 @@ class AppState:
             topics = sorted(self._topics)
         self.events.publish({"kind": "status", "subscribed_topics": topics})
 
+    # --- Configuration du mode "raw" (client MQTT natif vers un broker) ---
+    def raw_config(self, fields=None):
+        with self._lock:
+            if fields is None:
+                return dict(self._raw)
+            update = {k: v for k, v in fields.items() if k in self._raw}
+            self._raw.update(update)
+            return dict(self._raw)
+
     def snapshot(self):
         with self._lock:
             return {
@@ -115,4 +135,5 @@ class AppState:
                 "client_id": self._client_id,
                 "topics": sorted(self._topics),
                 "last_error": self._last_error,
+                "raw": dict(self._raw),
             }

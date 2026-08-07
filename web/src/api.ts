@@ -18,6 +18,29 @@ export async function getConfig(): Promise<{ mode: Mode }> {
   return json<{ mode: Mode }>(await fetch('/api/config'))
 }
 
+export async function getRaw(): Promise<import('./types').RawConfig> {
+  return json<import('./types').RawConfig>(await fetch('/api/raw'))
+}
+
+export async function setRaw(
+  cfg: Partial<import('./types').RawConfig>
+): Promise<import('./types').RawConfig> {
+  return json<import('./types').RawConfig>(
+    await fetch('/api/raw', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        host: cfg.host ?? '',
+        port: cfg.port ?? 1883,
+        tls: cfg.tls ?? true,
+        client_id: cfg.client_id ?? '',
+        cmd_topic: cfg.cmd_topic ?? '',
+        evt_topic: cfg.evt_topic ?? ''
+      })
+    })
+  )
+}
+
 export async function setMode(mode: Mode): Promise<{ mode: Mode }> {
   return json<{ mode: Mode }>(
     await fetch('/api/mode', {

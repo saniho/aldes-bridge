@@ -81,6 +81,14 @@ h1 {
   height: calc(100vh - 116px);
 }
 
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
 @media (max-width: 900px) {
   .layout {
     grid-template-columns: 1fr;

@@ -14,6 +14,7 @@ from server.engine import Engine
 from server.mqtt import (
     MQTTReader, MQTTError,
     build_connect, build_subscribe, build_publish, build_pubrel,
+    build_suback, build_puback, parse_publish,
 )
 from server.tls import client_context, server_context
 
@@ -37,6 +38,58 @@ def box_socket(port, tries=40):
 
 def read_packet(tls):
     return MQTTReader(tls).read_packet()
+
+
+class FakeRawBroker(threading.Thread):
+    """Faux broker : accepte le client du bridge (mode raw), CONNACK+SUBACK,
+    renvoie un PUBLISH (evenement) et capte les PUBLISH de commande recus."""
+
+    def __init__(self, port):
+        super().__init__(daemon=True)
+        self.port = port
+        self.recv = []
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.sock.bind(("127.0.0.1", port))
+        self.sock.listen(4)
+
+    def run(self):
+        import struct as _s
+        self.sock.settimeout(8)
+        try:
+            c, a = self.sock.accept()
+        except socket.timeout:
+            return
+        c.settimeout(8)
+        reader = MQTTReader(c)
+        try:
+            if reader.read_packet()[0] != 1:
+                c.close()
+                return
+            c.sendall(b"\x20\x02\x00\x00")  # CONNACK
+            spkt = reader.read_packet()     # SUBSCRIBE
+            pid = _s.unpack_from(">H", spkt[2], 0)[0]
+            c.sendall(build_suback(pid, [1]))
+            # evenement serveur -> client
+            c.sendall(build_publish("devices/MAC_AIR/messages/events", '{"evt":"ok"}', qos=0))
+            while True:
+                pkt = reader.read_packet()
+                if pkt is None:
+                    break
+                ptype, flags, body, raw = pkt
+                if ptype == 3:
+                    topic, o = parse_publish(body)
+                    q = (flags >> 1) & 0x03
+                    plen = o + 2 if q else o
+                    self.recv.append((topic, body[plen:]))
+                    if (flags >> 1) & 0x03 == 1:
+                        pid = _s.unpack_from(">H", body, o)[0]
+                        c.sendall(build_puback(pid))
+                elif ptype == 12:
+                    c.sendall(b"\xD0\x00")
+        except MQTTError:
+            pass
+        c.close()
 
 
 class FakeRealBroker(threading.Thread):
@@ -223,8 +276,52 @@ def test_proxy_relay_inject():
     print("  OK")
 
 
+def test_raw_native():
+    print("== test_raw_native ==")
+    fake = FakeRawBroker(18888)
+    fake.start()
+    time.sleep(0.3)
+
+    events = EventBus()
+    state = AppState("fake-host", 9999, events)
+    state.set_mode("raw")
+    state.raw_config({
+        "host": "127.0.0.1", "port": 18888, "tls": False,
+        "client_id": "raw-test", "cmd_topic": "aldes/vmc/cmd/dev/1", "evt_topic": "devices_1/messages/events",
+    })
+    eng = Engine(state, mqtt_port=18889)
+    eng.start()
+    time.sleep(1.0)
+
+    assert wait_state(state, "connected", True), "client raw non connecte: %s" % state.snapshot()
+    assert state.snapshot()["client_id"] == "raw-test"
+
+    # l'evenement serveur doit etre journalise en direction 'in', PAS marque injected
+    msgs = [e for e in events.snapshot() if e.get("kind") == "message" and e["type"] == "PUBLISH"]
+    inbound = [m for m in msgs if m["direction"] == "in"]
+    assert inbound, "evenement broker non journalise"
+    assert inbound[-1].get("injected") is None, "evenement reel ne doit pas etre injected"
+
+    # injection : doit publier sur le broker (topic saisi)
+    res = eng.inject("alds/test/dev/1", '{"cmd":"x"}', 1)
+    assert res["ok"], res
+    time.sleep(0.5)
+    assert fake.recv, "commande non recue par le broker"
+    topic, payload = fake.recv[-1]
+    assert topic == "alds/test/dev/1" and payload.decode() == '{"cmd":"x"}', (topic, payload)
+    out = [m for m in events.snapshot()
+           if m.get("kind") == "message" and m["direction"] == "out" and m["type"] == "PUBLISH"]
+    assert out and out[-1].get("injected") is True, "injection raw non marquee injected"
+
+    eng.stop()
+    eng.join(timeout=3)
+    fake.sock.close()
+    print("  OK")
+
+
 if __name__ == "__main__":
     test_bridge_inject()
     test_bridge_qos2()
     test_proxy_relay_inject()
+    test_raw_native()
     print("TOUS LES TESTS PASSENT")

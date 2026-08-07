@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSse } from './hooks/useSse'
 import { getConfig, setMode, disconnect, clearHistory } from './api'
-import type { Config, MsgEvent } from './types'
+import type { Config, Mode, MsgEvent } from './types'
 import StatusBar from './components/StatusBar'
 import SendPanel from './components/SendPanel'
 import MessageStream from './components/MessageStream'
 import ModeDiagram from './components/ModeDiagram'
 import StatsBar from './components/StatsBar'
+import RawPanel from './components/RawPanel'
 import './App.css'
 
 export default function App() {
@@ -54,12 +55,14 @@ const { messages, lastSnapshot } = useMemo(() => {
     if (lastSnapshot) setConfig(lastSnapshot)
   }, [lastSnapshot])
 
-  const onMode = useCallback(async (m: 'proxy' | 'bridge') => {
+  const onMode = useCallback(async (m: Mode) => {
     const cur = config?.mode ?? m
     const msg =
       m === 'bridge'
         ? `Passer en mode bridge ?\n\nLa box ne passera plus par le cloud Azure (chemin : box → bridge uniquement).`
-        : `Passer en mode proxy ?\n\nLa box rejoindra à nouveau le cloud Azure via le bridge.`
+        : m === 'raw'
+          ? `Passer en mode natif (broker) ?\n\nLe bridge se connectera en client MQTT au broker configuré (box <-> broker <-> bridge).`
+          : `Passer en mode proxy ?\n\nLa box rejoindra à nouveau le cloud Azure via le bridge.`
     const hint = cur === m ? ` (déjà en mode ${m})` : ''
     if (!window.confirm(msg + hint)) return
     try {
@@ -124,11 +127,15 @@ const { messages, lastSnapshot } = useMemo(() => {
       />
       <div className="layout">
         <MessageStream messages={messages} />
-        <SendPanel
-          mode={config?.mode ?? null}
-          connected={config?.connected ?? false}
-          clientId={config?.client_id ?? null}
-        />
+        <div className="side">
+          <SendPanel
+            mode={config?.mode ?? null}
+            connected={config?.connected ?? false}
+            clientId={config?.client_id ?? null}
+            defaultTopic={config?.mode === 'raw' ? config?.raw?.cmd_topic ?? null : null}
+          />
+          {config?.mode === 'raw' && <RawPanel />}
+        </div>
       </div>
     </div>
   )
