@@ -24,7 +24,7 @@ def _default_web_dir():
 
 def build_parser():
     ap = argparse.ArgumentParser(prog="aldes-bridge", description="Bridge Aldes (proxy MITM / faux broker) + WebUI.")
-    ap.add_argument("--mode", choices=["proxy", "bridge", "raw"], default="proxy",
+    ap.add_argument("--mode", choices=["proxy", "bridge", "raw"], default="bridge",
                     help="mode initial (changeable depuis la WebUI)")
     ap.add_argument("--bind", default="0.0.0.0", help="adresse de bind (MQTT + web)")
     ap.add_argument("--mqtt-port", type=int, default=8883, help="port MQTT/TLS (defaut 8883)")
