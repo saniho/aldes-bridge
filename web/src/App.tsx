@@ -8,6 +8,7 @@ import MessageStream from './components/MessageStream'
 import ModeDiagram from './components/ModeDiagram'
 import StatsBar from './components/StatsBar'
 import RawPanel from './components/RawPanel'
+import CommandBuilder from './components/CommandBuilder'
 import './App.css'
 
 export default function App() {
@@ -128,6 +129,12 @@ const { messages, lastSnapshot } = useMemo(() => {
       <div className="layout">
         <MessageStream messages={messages} />
         <div className="side">
+          <CommandBuilder
+            mode={config?.mode ?? null}
+            connected={config?.connected ?? false}
+            clientId={config?.client_id ?? null}
+            defaultTopic={config?.mode === 'raw' ? config?.raw?.cmd_topic ?? null : null}
+          />
           <SendPanel
             mode={config?.mode ?? null}
             connected={config?.connected ?? false}
