@@ -37,6 +37,18 @@ const FNS: { id: string; label: string }[] = [
   { id: 'custom', label: 'JSON libre (personnalisé)' }
 ]
 
+const THERMOS: { id: string; name: string; label: string }[] = [
+  { id: '76542', name: 'Piece Principale', label: 'Piece Principale → 76542' },
+  { id: '76543', name: 'Ch Parents', label: 'Ch Parents → 76543' },
+  { id: '76544', name: 'Ch Romane', label: 'Ch Romane → 76544' },
+  { id: '76545', name: 'Ch Marine', label: 'Ch Marine → 76545' },
+  { id: '76546', name: 'Bureau', label: 'Bureau → 76546' }
+]
+
+function presetsFrom(id: string) {
+  return THERMOS.some((th) => th.id === id)
+}
+
 function topicFor(clientId: string): string {
   return `devices/${clientId}/messages/devicebound`
 }
@@ -62,7 +74,9 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
   const [vacStart, setVacStart] = useState('')
   const [vacEnd, setVacEnd] = useState('')
   const [cmo, setCmo] = useState('1')
-  const [thermos, setThermos] = useState<ThermoRow[]>([{ id: '1', name: '', temp: '21' }])
+  const [thermos, setThermos] = useState<ThermoRow[]>([
+    { id: THERMOS[0].id, name: THERMOS[0].name, temp: '21' }
+  ])
   const [deltat, setDeltat] = useState('21')
   const [json, setJson] = useState('')
   const [topic, setTopic] = useState('')
@@ -239,31 +253,53 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
 
       {fn === 'thermostats' && (
         <>
-          {thermos.map((t, i) => (
-            <div className={styles.row} key={i}>
-              <label>T{i + 1}</label>
-              <input
-                placeholder="ThermostatId"
-                value={t.id}
-                onChange={(e) => setThermo(i, 'id', e.target.value)}
-              />
-              <input
-                placeholder="Object °C"
-                value={t.temp}
-                onChange={(e) => setThermo(i, 'temp', e.target.value)}
-              />
-              <button
-                type="button"
-                onClick={() => setThermos((rows) => rows.filter((_, j) => j !== i))}
-              >
-                ×
-              </button>
-            </div>
-          ))}
+          {thermos.map((t, i) => {
+            const isPreset = presetsFrom(t.id)
+            return (
+              <div className={styles.row} key={i}>
+                <label>T{i + 1}</label>
+                <select
+                  value={isPreset ? t.id : '__free'}
+                  onChange={(e) => {
+                    if (e.target.value === '__free') {
+                      setThermo(i, 'id', '')
+                      setThermo(i, 'name', '')
+                    } else {
+                      const th = THERMOS.find((x) => x.id === e.target.value)!
+                      setThermo(i, 'id', th.id)
+                      setThermo(i, 'name', th.name)
+                    }
+                  }}
+                >
+                  {THERMOS.map((th) => (
+                    <option key={th.id} value={th.id}>
+                      {th.label}
+                    </option>
+                  ))}
+                  <option value="__free">Personnalisé…</option>
+                </select>
+                {!isPreset && (
+                  <input
+                    placeholder="ThermostatId"
+                    value={t.id}
+                    onChange={(e) => setThermo(i, 'id', e.target.value)}
+                  />
+                )}
+                <input
+                  placeholder="Object °C"
+                  value={t.temp}
+                  onChange={(e) => setThermo(i, 'temp', e.target.value)}
+                />
+                <button type="button" onClick={() => setThermos((rows) => rows.filter((_, j) => j !== i))}>
+                  ×
+                </button>
+              </div>
+            )
+          })}
           <div className={styles.hint}>
             <button
               type="button"
-              onClick={() => setThermos((rows) => [...rows, { id: '', name: '', temp: '21' }])}
+              onClick={() => setThermos((rows) => [...rows, { id: THERMOS[0].id, name: THERMOS[0].name, temp: '21' }])}
             >
               + thermostat
             </button>
