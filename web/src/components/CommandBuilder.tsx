@@ -266,7 +266,6 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
                   onChange={(e) => {
                     if (e.target.value === '__free') {
                       setThermo(i, 'id', '')
-                      setThermo(i, 'name', '')
                     } else {
                       const th = THERMOS.find((x) => x.id === e.target.value)!
                       setThermo(i, 'id', th.id)
@@ -281,13 +280,16 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
                   ))}
                   <option value="__free">Personnalisé…</option>
                 </select>
-                {!isPreset && (
-                  <input
-                    placeholder="ThermostatId"
-                    value={t.id}
-                    onChange={(e) => setThermo(i, 'id', e.target.value)}
-                  />
-                )}
+                <input
+                  placeholder="ThermostatId"
+                  value={t.id}
+                  onChange={(e) => setThermo(i, 'id', e.target.value)}
+                />
+                <input
+                  placeholder="Nom (opt.)"
+                  value={t.name}
+                  onChange={(e) => setThermo(i, 'name', e.target.value)}
+                />
                 <input
                   placeholder="Object °C"
                   value={t.temp}
