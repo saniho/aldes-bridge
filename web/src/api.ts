@@ -14,8 +14,8 @@ async function json<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>
 }
 
-export async function getConfig(): Promise<{ mode: Mode }> {
-  return json<{ mode: Mode }>(await fetch('/api/config'))
+export async function getConfig(): Promise<import('./types').Config> {
+  return json<import('./types').Config>(await fetch('/api/config'))
 }
 
 export async function getRaw(): Promise<import('./types').RawConfig> {

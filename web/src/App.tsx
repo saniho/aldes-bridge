@@ -37,14 +37,29 @@ export default function App() {
   }, [theme])
 
   useEffect(() => {
-    getConfig().then((cfg) => {
-      setConfig({
-        mode: cfg.mode,
-        connected: false,
-        client_id: null,
-        topics: []
-      })
-    }).catch(() => {})
+    let alive = true
+    let timer: ReturnType<typeof setInterval> | null = null
+    const poll = async () => {
+      try {
+        const cfg = await getConfig()
+        if (!alive) return
+        setConfig({
+          mode: cfg.mode,
+          connected: cfg.connected ?? false,
+          client_id: cfg.client_id ?? null,
+          topics: cfg.topics ?? [],
+          last_error: cfg.last_error ?? null
+        })
+      } catch {
+        /* on réessaiera au prochain tick */
+      }
+    }
+    poll()
+    timer = setInterval(poll, 4000)
+    return () => {
+      alive = false
+      if (timer) clearInterval(timer)
+    }
   }, [])
 
 const { messages, lastSnapshot } = useMemo(() => {
