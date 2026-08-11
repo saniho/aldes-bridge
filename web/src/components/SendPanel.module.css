@@ -76,6 +76,14 @@
   cursor: pointer;
 }
 
+.thermoRow {
+  flex-wrap: wrap;
+}
+
+.thermoRow > .strToggle {
+  margin-left: 70px;
+}
+
 .status {
   margin-top: 6px;
   font-size: 12px;

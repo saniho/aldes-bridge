@@ -259,7 +259,7 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
           {thermos.map((t, i) => {
             const isPreset = presetsFrom(t.id)
             return (
-              <div className={styles.row} key={i}>
+              <div className={`${styles.row} ${styles.thermoRow}`} key={i}>
                 <label>T{i + 1}</label>
                 <select
                   value={isPreset ? t.id : '__free'}
