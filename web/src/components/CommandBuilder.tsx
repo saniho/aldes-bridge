@@ -34,6 +34,7 @@ const FNS: { id: string; label: string }[] = [
   { id: 'vacances', label: 'changeMode — vacances (W)' },
   { id: 'cmo', label: 'changeCMO — override 0/1' },
   { id: 'thermostats', label: 'updateThermostats' },
+  { id: 't2', label: 'changeTemperatureReference — par thermostat (T2)' },
   { id: 'deltat', label: 'changeTemperatureReference' },
   { id: 'custom', label: 'JSON libre (personnalisé)' }
 ]
@@ -105,6 +106,20 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
     }
     const dbl = (v: number): string => (Number.isInteger(v) ? `${v}.0` : String(v))
 
+    const rowsOf = (): Record<string, number | string>[] | null =>
+      thermos
+        .map((r) => {
+          const raw = r.id.trim()
+          const temp = Number(r.temp)
+          if (!raw || Number.isNaN(temp)) return null
+          const id = r.str ? raw : Number(raw)
+          if (!r.str && Number.isNaN(id)) return null
+          const obj: Record<string, number | string> = { ThermostatId: id, TemperatureSet: temp }
+          if (r.name.trim()) obj.Name = r.name.trim()
+          return obj
+        })
+        .filter((x): x is Record<string, number | string> => x !== null)
+
     if (fn === 'mode') {
       const code = (modeFree ? customCode.trim() : modeSel).toUpperCase()
       if (!code) return null
@@ -121,20 +136,14 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
       return wrap('changeCMO', `[${v}]`)
     }
     if (fn === 'thermostats') {
-      const rows = thermos
-        .map((r) => {
-          const raw = r.id.trim()
-          const temp = Number(r.temp)
-          if (!raw || Number.isNaN(temp)) return null
-          const id = r.str ? raw : Number(raw)
-          if (!r.str && Number.isNaN(id)) return null
-          const obj: Record<string, number | string> = { ThermostatId: id, TemperatureSet: temp }
-          if (r.name.trim()) obj.Name = r.name.trim()
-          return obj
-        })
-        .filter((x): x is Record<string, number | string> => x !== null)
-      if (!rows.length) return null
+      const rows = rowsOf()
+      if (!rows?.length) return null
       return wrap('updateThermostats', JSON.stringify(rows))
+    }
+    if (fn === 't2') {
+      const rows = rowsOf()
+      if (!rows?.length) return null
+      return wrap('changeTemperatureReference', JSON.stringify(rows))
     }
     if (fn === 'deltat') {
       const v = Number(deltat)
@@ -262,7 +271,7 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
         </div>
       )}
 
-      {fn === 'thermostats' && (
+      {(fn === 'thermostats' || fn === 't2') && (
         <>
           {thermos.map((t, i) => {
             const isPreset = presetsFrom(t.id)
@@ -325,6 +334,14 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
               + thermostat
             </button>
           </div>
+          {fn === 't2' && (
+            <div className={styles.hint}>
+              <span>
+                changeTemperatureReference · params = objet thermostat{' '}
+                <code>{`[{"ThermostatId":1,"TemperatureSet":21}]`}</code>
+              </span>
+            </div>
+          )}
         </>
       )}
 
