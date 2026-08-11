@@ -80,6 +80,7 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
   ])
   const [deltat, setDeltat] = useState('21')
   const [json, setJson] = useState('')
+  const [rpc, setRpc] = useState(true)
   const [topic, setTopic] = useState('')
   const [qos, setQos] = useState(1)
   const [status, setStatus] = useState<string | null>(null)
@@ -97,20 +98,27 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
   }, [targetTopic]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const payload = useMemo((): string | null => {
+    const wrap = (method: string, params: string): string => {
+      const body = `{"method":"${method}","params":${params}}`
+      if (!rpc) return body
+      return `{"id":1,"jsonrpc":"2.0",${body.slice(1)}`
+    }
+    const dbl = (v: number): string => (Number.isInteger(v) ? `${v}.0` : String(v))
+
     if (fn === 'mode') {
       const code = (modeFree ? customCode.trim() : modeSel).toUpperCase()
       if (!code) return null
-      return `{"method":"changeMode","params":["${code}"]}`
+      return wrap('changeMode', JSON.stringify([code]))
     }
     if (fn === 'vacances') {
       const s = vacStart ? utcStamp(new Date(vacStart)) : ''
       const e = vacEnd ? utcStamp(new Date(vacEnd)) : ''
       if (!s || !e) return null
-      return `{"method":"changeMode","params":["W${s}${e}"]}`
+      return wrap('changeMode', JSON.stringify([`W${s}${e}`]))
     }
     if (fn === 'cmo') {
       const v = cmo === '1' ? 1 : 0
-      return `{"method":"changeCMO","params":[${v}]}`
+      return wrap('changeCMO', `[${v}]`)
     }
     if (fn === 'thermostats') {
       const rows = thermos
@@ -126,12 +134,12 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
         })
         .filter((x): x is Record<string, number | string> => x !== null)
       if (!rows.length) return null
-      return `{"method":"updateThermostats","params":${JSON.stringify(rows)}}`
+      return wrap('updateThermostats', JSON.stringify(rows))
     }
     if (fn === 'deltat') {
       const v = Number(deltat)
       if (Number.isNaN(v)) return null
-      return `{"method":"changeTemperatureReference","params":[${v}]}`
+      return wrap('changeTemperatureReference', `[${dbl(v)}]`)
     }
     if (fn === 'custom') {
       if (!json.trim()) return null
@@ -143,7 +151,7 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
       return json.trim()
     }
     return null
-  }, [fn, modeSel, modeFree, customCode, vacStart, vacEnd, cmo, thermos, deltat, json])
+  }, [fn, modeSel, modeFree, customCode, vacStart, vacEnd, cmo, thermos, deltat, json, rpc])
 
   const setThermo = (i: number, key: keyof ThermoRow, v: string | boolean) =>
     setThermos((rows) => rows.map((r, j) => (j === i ? { ...r, [key]: v } : r)))
@@ -321,15 +329,20 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
       )}
 
       {fn === 'deltat' && (
-        <div className={styles.row}>
-          <label>ΔT °C</label>
-          <input
-            type="number"
-            step="0.5"
-            value={deltat}
-            onChange={(e) => setDeltat(e.target.value)}
-          />
-        </div>
+        <>
+          <div className={styles.row}>
+            <label>ΔT °C</label>
+            <input
+              type="number"
+              step="0.5"
+              value={deltat}
+              onChange={(e) => setDeltat(e.target.value)}
+            />
+          </div>
+          <div className={styles.hint}>
+            <span>changeTemperatureReference · params en <code>double</code> (ex. <code>21.0</code>)</span>
+          </div>
+        </>
       )}
 
       {fn === 'custom' && (
@@ -357,6 +370,14 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
           <option value={1}>1</option>
           <option value={2}>2</option>
         </select>
+        <label className={styles.strToggle}>
+          <input
+            type="checkbox"
+            checked={rpc}
+            onChange={(e) => setRpc(e.target.checked)}
+          />
+          JSON-RPC 2.0
+        </label>
         <button onClick={submit} disabled={!connected || !payload}>
           envoyer
         </button>
