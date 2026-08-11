@@ -55,10 +55,24 @@ function topicFor(clientId: string): string {
   return `devices/${clientId}/messages/devicebound`
 }
 
+function randHex(n: number): string {
+  let s = ''
+  for (let i = 0; i < n; i++) s += Math.floor(Math.random() * 16).toString(16)
+  return s
+}
+
+function randomUUID(): string {
+  return (
+    `${randHex(8)}-${randHex(4)}-4${randHex(3)}-` +
+    `${(8 + Math.floor(Math.random() * 4)).toString(16)}${randHex(3)}-` +
+    `${randHex(12)}`
+  )
+}
+
 function withPropBag(base: string, clientId: string | null): string {
   const m = base.match(/^devices\/([^/]+)\/messages\/devicebound$/)
   const id = m ? m[1] : clientId ?? ''
-  const mid = crypto.randomUUID()
+  const mid = randomUUID()
   const to = encodeURIComponent(`/devices/${id}/messages/deviceBound`)
   return `${base}/%24.mid=${mid}&%24.to=${to}&iothub-ack=full`
 }
