@@ -10,6 +10,7 @@ import os
 from .appstate import AppState
 from .events import EventBus
 from .engine import Engine
+from .eventlog import EventLog
 
 APP_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -34,6 +35,10 @@ def build_parser():
     ap.add_argument("--real-port", type=int, default=8883)
     ap.add_argument("--web-dir", default=_default_web_dir(), help="dossier du frontend construit")
     ap.add_argument("--history-size", type=int, default=200, help="nb de messages gardes")
+    ap.add_argument("--log-file", default=os.path.join(APP_ROOT, "logs", "events.log.jsonl"),
+                    help="fichier de log persistant (JSONL), vide pour desactiver")
+    ap.add_argument("--log-max", type=int, default=25 * 1024 * 1024,
+                    help="taille max (octets) du fichier de log avant rotation")
     return ap
 
 
@@ -48,7 +53,11 @@ def main(argv=None):
                          "  pip install fastapi 'uvicorn[standard]'\n")
         raise SystemExit(2)
 
-    events = EventBus(args.history_size)
+    log = None
+    if args.log_file:
+        log = EventLog(args.log_file, max_bytes=args.log_max)
+    events = EventBus(args.history_size, log=log)
+    restored = events.restore_from_log(args.history_size)
     state = AppState(args.real_host, args.real_port, events)
     state.set_mode(args.mode)
 

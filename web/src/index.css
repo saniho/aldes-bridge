@@ -58,6 +58,28 @@ h1 {
   color: var(--text);
 }
 
+.hist {
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  color: var(--text-muted);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.hist:hover {
+  border-color: var(--text-soft);
+  color: var(--text);
+}
+
+.hist.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
 .theme {
   background: transparent;
   border: 1px solid var(--border-strong);
@@ -79,6 +101,60 @@ h1 {
   gap: 12px;
   padding: 12px 16px;
   height: calc(100vh - 116px);
+}
+
+.streamCol {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.streamCol > :last-child {
+  flex: 1;
+  min-height: 0;
+}
+
+.histbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 12px;
+  color: var(--text-soft);
+  flex-wrap: wrap;
+}
+
+.histLabel {
+  margin-right: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.histActions {
+  display: flex;
+  gap: 8px;
+}
+
+.histActions button {
+  background: var(--bg-input);
+  border: 1px solid var(--border-input);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 12px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.histActions button:hover:not(:disabled) {
+  border-color: var(--text-soft);
+}
+
+.histActions button:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .side {

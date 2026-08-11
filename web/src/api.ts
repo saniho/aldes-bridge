@@ -72,3 +72,14 @@ export async function disconnect(): Promise<{ ok: boolean }> {
 export async function clearHistory(): Promise<{ ok: boolean }> {
   return json<{ ok: boolean }>(await fetch('/api/clear', { method: 'POST' }))
 }
+
+export interface LogPage {
+  total: number
+  limit: number
+  offset: number
+  events: import('./types').BridgeEvent[]
+}
+
+export async function getLogs(limit: number, offset: number): Promise<LogPage> {
+  return json<LogPage>(await fetch(`/api/logs?limit=${limit}&offset=${offset}`))
+}

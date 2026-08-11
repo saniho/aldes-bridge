@@ -13,6 +13,9 @@ dist/
 web/vite.config.js
 web/vite.config.d.ts
 
+# Log MQTT persistant
+logs/
+
 # Tests artifacts
 .pytest_cache/
 

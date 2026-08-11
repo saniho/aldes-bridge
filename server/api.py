@@ -44,6 +44,22 @@ def create_app(state, engine, web_dir):
     def api_state():
         return {"config": state.snapshot(), "messages": state.events.snapshot()}
 
+    @app.get("/api/logs")
+    def api_logs(limit: int = 200, offset: int = 0):
+        """Lecture a posteriori du log disque persistant (plus recent d'abord)."""
+        limit = max(1, min(limit, 1000))
+        offset = max(0, offset)
+        log = state.events.log
+        if log is None:
+            return {"total": 0, "limit": limit, "offset": offset, "events": []}
+        events = log.tail(limit, offset)
+        return {
+            "total": log.total(),
+            "limit": limit,
+            "offset": offset,
+            "events": events,
+        }
+
     @app.get("/api/events")
     async def api_events():
         q = state.events.subscribe()

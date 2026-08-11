@@ -4,13 +4,31 @@ import asyncio
 import threading
 from collections import deque
 
+from .eventlog import EventLog
+
 
 class EventBus:
-    def __init__(self, history_size=500):
+    def __init__(self, history_size=500, log=None):
         self._history = deque(maxlen=history_size)
+        self._log = log  # EventLog ou None (pas de persistance)
         self._subs = []
         self._lock = threading.Lock()
         self._loop = None
+
+    @property
+    def log(self):
+        return self._log
+
+    def restore_from_log(self, n=500):
+        """Recharge l'historique depuis le log disque (apres un redemarrage)."""
+        if self._log is None:
+            return 0
+        n = max(0, min(n, self._log.total()))
+        evs = self._log.tail_oldest_first(n)
+        with self._lock:
+            for ev in evs:
+                self._history.append(ev)
+        return len(evs)
 
     def attach_loop(self, loop):
         """Attache la loop asyncio du serveur web (appele au startup FastAPI)."""
@@ -34,9 +52,13 @@ class EventBus:
     def clear(self):
         with self._lock:
             self._history.clear()
+        if self._log is not None:
+            self._log.clear()
 
     def publish(self, event):
         """Publie un evenement. Appele depuis les threads MQTT et l'API."""
+        if self._log is not None:
+            self._log.append(event)
         with self._lock:
             self._history.append(event)
             subs = list(self._subs)

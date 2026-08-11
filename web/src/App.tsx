@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSse } from './hooks/useSse'
-import { getConfig, setMode, disconnect, clearHistory } from './api'
-import type { Config, Mode, MsgEvent } from './types'
+import { getConfig, setMode, disconnect, clearHistory, getLogs } from './api'
+import type { BridgeEvent, Config, Mode, MsgEvent } from './types'
 import StatusBar from './components/StatusBar'
 import SendPanel from './components/SendPanel'
 import MessageStream from './components/MessageStream'
@@ -17,6 +17,15 @@ export default function App() {
   const [theme, setTheme] = useState<'nuit' | 'jour'>(() => {
     return (localStorage.getItem('aldes-theme') as 'nuit' | 'jour') || 'nuit'
   })
+  const [histOpen, setHistOpen] = useState(false)
+  const [log, setLog] = useState<{
+    events: BridgeEvent[]
+    total: number
+    offset: number
+    loading: boolean
+  }>({ events: [], total: 0, offset: 0, loading: false })
+
+  const LOG_PAGE = 200
 
   useEffect(() => {
     if (theme === 'jour') {
@@ -89,16 +98,55 @@ const { messages, lastSnapshot } = useMemo(() => {
   const onClear = useCallback(async () => {
     try {
       await clearHistory()
+      setLog({ events: [], total: 0, offset: 0, loading: false })
     } catch (e) {
       alert((e as Error).message)
     }
   }, [])
+
+  const loadLog = useCallback(
+    async (offset: number, mode: 'replace' | 'append') => {
+      setLog((l) => ({ ...l, loading: true }))
+      try {
+        const page = await getLogs(LOG_PAGE, offset)
+        setLog((l) => ({
+          events: mode === 'append' ? [...l.events, ...page.events] : page.events,
+          total: page.total,
+          offset: offset + page.events.length,
+          loading: false
+        }))
+      } catch (e) {
+        setLog((l) => ({ ...l, loading: false }))
+        alert(`historique indisponible : ${(e as Error).message}`)
+      }
+    },
+    []
+  )
+
+  useEffect(() => {
+    if (histOpen && log.events.length === 0 && !log.loading) loadLog(0, 'replace')
+  }, [histOpen, log.events.length, log.loading, loadLog])
+
+  const shown = useMemo<MsgEvent[]>(() => {
+    if (!histOpen) return messages
+    return log.events.filter((e): e is MsgEvent => e.kind === 'message')
+  }, [histOpen, messages, log.events])
 
   return (
     <div className="app">
       <header className="top">
         <h1>Aldes Bridge</h1>
         <div className="topRight">
+          <button
+            className={'hist' + (histOpen ? ' active' : '')}
+            onClick={() => {
+              if (histOpen) setHistOpen(false)
+              else setHistOpen(true)
+            }}
+            title={histOpen ? 'Revenir au flux en temps réel' : 'Consulter le log persistant (à posteriori)'}
+          >
+            {histOpen ? '⚡ temps réel' : '🕘 historique'}
+          </button>
           <button
             className="theme"
             onClick={() => setTheme((t) => (t === 'nuit' ? 'jour' : 'nuit'))}
@@ -127,8 +175,29 @@ const { messages, lastSnapshot } = useMemo(() => {
         connected={config?.connected ?? false}
       />
       <div className="layout">
-        <MessageStream messages={messages} />
-        <div className="side">
+        <>
+          <div className="streamCol">
+            {histOpen && (
+              <div className="histbar">
+                <span className="histLabel">
+                  🕘 historique — {log.events.length} trames affichées / {log.total} au total
+                </span>
+                <span className="histActions">
+                  <button
+                    disabled={log.loading || log.offset >= log.total}
+                    onClick={() => loadLog(log.offset, 'append')}
+                  >
+                    {log.loading ? 'chargement…' : '↕ charger antérieur'}
+                  </button>
+                  <button disabled={log.loading || log.offset === 0} onClick={() => loadLog(0, 'replace')}>
+                    ⤒ début
+                  </button>
+                </span>
+              </div>
+            )}
+            <MessageStream messages={shown} />
+          </div>
+          <div className="side">
           <CommandBuilder
             mode={config?.mode ?? null}
             connected={config?.connected ?? false}
@@ -142,7 +211,8 @@ const { messages, lastSnapshot } = useMemo(() => {
             defaultTopic={config?.mode === 'raw' ? config?.raw?.cmd_topic ?? null : null}
           />
           {config?.mode === 'raw' && <RawPanel />}
-        </div>
+          </div>
+        </>
       </div>
     </div>
   )
