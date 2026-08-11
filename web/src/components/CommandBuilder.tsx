@@ -55,6 +55,14 @@ function topicFor(clientId: string): string {
   return `devices/${clientId}/messages/devicebound`
 }
 
+function withPropBag(base: string, clientId: string | null): string {
+  const m = base.match(/^devices\/([^/]+)\/messages\/devicebound$/)
+  const id = m ? m[1] : clientId ?? ''
+  const mid = crypto.randomUUID()
+  const to = encodeURIComponent(`/devices/${id}/messages/deviceBound`)
+  return `${base}/%24.mid=${mid}&%24.to=${to}&iothub-ack=full`
+}
+
 function utcStamp(d: Date): string {
   const p = (n: number) => String(n).padStart(2, '0')
   return (
@@ -82,6 +90,7 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
   const [deltat, setDeltat] = useState('21')
   const [json, setJson] = useState('')
   const [rpc, setRpc] = useState(true)
+  const [propbag, setPropbag] = useState(false)
   const [topic, setTopic] = useState('')
   const [qos, setQos] = useState(1)
   const [status, setStatus] = useState<string | null>(null)
@@ -169,10 +178,11 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
     setStatus(null)
     if (!topic.trim()) return setStatus('topic requis')
     if (!payload) return setStatus('params incomplets')
+    const effTopic = propbag ? withPropBag(topic.trim(), clientId) : topic.trim()
     try {
-      const r = await sendCommand(topic.trim(), payload, qos)
+      const r = await sendCommand(effTopic, payload, qos)
       setStatus(
-        `envoyé : ${r.topic ?? topic} / qos ${r.qos ?? qos}${
+        `envoyé : ${r.topic ?? effTopic} / qos ${r.qos ?? qos}${
           r.bytes !== undefined ? ` (${r.bytes} octets)` : ''
         }`
       )
@@ -394,6 +404,15 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
             onChange={(e) => setRpc(e.target.checked)}
           />
           JSON-RPC 2.0
+        </label>
+        <label className={styles.strToggle}>
+          <input
+            type="checkbox"
+            checked={propbag}
+            onChange={(e) => setPropbag(e.target.checked)}
+            title="Ajoute %24.mid, %24.to, iothub-ack au topic devicebound (format C2D Azure réel)"
+          />
+          property bag C2D
         </label>
         <button onClick={submit} disabled={!connected || !payload}>
           envoyer
