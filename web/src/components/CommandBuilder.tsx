@@ -195,6 +195,10 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
     const effTopic = propbag ? withPropBag(topic.trim(), clientId) : topic.trim()
     try {
       const r = await sendCommand(effTopic, payload, qos)
+      if (!r.ok) {
+        setStatus(`refusé côté serveur${r.error ? ' : ' + r.error : ''}`)
+        return
+      }
       setStatus(
         `envoyé : ${r.topic ?? effTopic} / qos ${r.qos ?? qos}${
           r.bytes !== undefined ? ` (${r.bytes} octets)` : ''

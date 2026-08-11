@@ -55,8 +55,8 @@ export async function sendCommand(
   topic: string,
   payload: string,
   qos: number
-): Promise<{ ok: boolean; topic?: string; qos?: number; bytes?: number }> {
-  return json<{ ok: boolean }>(
+): Promise<{ ok: boolean; topic?: string; qos?: number; bytes?: number; error?: string }> {
+  return json<{ ok: boolean; topic?: string; qos?: number; bytes?: number; error?: string }>(
     await fetch('/api/send', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
