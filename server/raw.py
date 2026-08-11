@@ -10,7 +10,7 @@ import threading
 import time
 
 from . import mqtt
-from .appstate import emit_message
+from .appstate import emit_message, set_conn_ctx, clear_conn_ctx
 from .tls import client_context
 
 
@@ -83,6 +83,7 @@ class RawClient(threading.Thread):
         self._sock = s
         self._reader = reader
         self._pending.clear()
+        set_conn_ctx("raw", cfg.get("host"))
         self.state.session_up(cfg["client_id"])
 
         last_ping = time.time()
@@ -127,6 +128,7 @@ class RawClient(threading.Thread):
             except Exception:
                 pass
         self.state.session_down()
+        clear_conn_ctx()
 
     # -- lecture d'un packet entrant ---
     def _handle(self, pkt):

@@ -13,10 +13,11 @@ from .appstate import emit_message
 
 
 class BridgeHandler:
-    def __init__(self, state, sock, addr):
+    def __init__(self, state, sock, addr, session=None):
         self.state = state
         self.sock = sock
         self.addr = addr
+        self.session = session
         self._send_lock = threading.Lock()
         self._pkt_id = 0
         self._closed = False
@@ -60,7 +61,7 @@ class BridgeHandler:
         emit_message(
             self.state, "out", "PUBLISH",
             topic=topic, payload=payload, qos=qos,
-            injected=True,
+            injected=True, session=self.session, host=(self.addr[0] if self.addr else None),
         )
         return {"ok": True, "bytes": len(pkt)}
 

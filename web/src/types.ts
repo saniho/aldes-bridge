@@ -29,6 +29,8 @@ export interface MsgEvent {
   qos?: number
   injected?: boolean
   mode: Mode
+  session?: number | string | null
+  host?: string | null
 }
 
 export interface StatusEvent {

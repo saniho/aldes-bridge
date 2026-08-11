@@ -8,8 +8,10 @@ Modes:
 import socket
 import threading
 import time
+from itertools import count
 
 from .tls import server_context
+from .appstate import set_conn_ctx, clear_conn_ctx
 from .bridge import BridgeHandler
 from .proxy import ProxyHandler
 from .raw import RawClient
@@ -27,6 +29,7 @@ class Engine(threading.Thread):
         self._raw = None  # RawClient actif (mode raw)
         self._mode_changed = threading.Event()
         self._sock = None
+        self._sessions = count(1)
 
     def stop(self):
         self._stop_ev.set()
@@ -128,8 +131,10 @@ class Engine(threading.Thread):
             self._sock = None
 
     def _handle(self, cs, addr):
+        session = next(self._sessions)
+        set_conn_ctx(session, addr[0])
         mode = self.state.mode
-        handler = BridgeHandler(self.state, cs, addr) if mode == "bridge" else ProxyHandler(self.state, cs, addr)
+        handler = BridgeHandler(self.state, cs, addr, session) if mode == "bridge" else ProxyHandler(self.state, cs, addr, session)
         with self._lock:
             self._current = handler
         try:
@@ -138,6 +143,7 @@ class Engine(threading.Thread):
             with self._lock:
                 if self._current is handler:
                     self._current = None
+            clear_conn_ctx()
             self.state.session_down()
             try:
                 cs.close()

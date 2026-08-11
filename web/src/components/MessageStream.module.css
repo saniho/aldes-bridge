@@ -150,6 +150,24 @@
   font-size: 11px;
 }
 
+.sess {
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-size: 9px;
+  font-weight: 700;
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.host {
+  background: var(--bg-chip);
+  color: var(--topic);
+  font-size: 10px;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-variant-numeric: tabular-nums;
+}
+
 .topic {
   margin-top: 4px;
   font-size: 12px;

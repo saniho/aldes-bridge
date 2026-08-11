@@ -40,7 +40,7 @@ export default function MessageStream({ messages }: Props) {
       if (type !== 'all' && m.type !== type) return false
       if (injectedOnly && !m.injected) return false
       if (!q) return true
-      const hay = [m.type, LABEL[m.type] ?? '', m.topic ?? '', m.payload ?? '']
+      const hay = [m.type, LABEL[m.type] ?? '', m.topic ?? '', m.payload ?? '', String(m.session ?? ''), String(m.host ?? '')]
         .join(' ')
         .toLowerCase()
       return hay.includes(q)
@@ -149,6 +149,10 @@ export default function MessageStream({ messages }: Props) {
               <span className={styles.ts}>{m.ts}</span>
               <span className={styles.kind}>{LABEL[m.type] ?? m.type}</span>
               <span className={styles.dir}>{m.direction === 'out' ? 'box' : 'cloud'}</span>
+              {m.session !== undefined && m.session !== null && (
+                <span className={styles.sess}>#{m.session}</span>
+              )}
+              {m.host && <span className={styles.host}>{m.host}</span>}
               {m.injected && <span className={styles.badge}>INJECTÉ</span>}
               <span className={styles.qos}>{m.qos !== undefined ? `qos${m.qos}` : ''}</span>
             </div>

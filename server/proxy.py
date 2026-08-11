@@ -15,10 +15,11 @@ from .tls import client_context, resolve
 class ProxyHandler:
     """Relaye box <-> vrai Azure et permet d'injecter des trames PUBLISH vers la box."""
 
-    def __init__(self, state, box_sock, addr):
+    def __init__(self, state, box_sock, addr, session=None):
         self.state = state
         self.box_sock = box_sock
         self.addr = addr
+        self.session = session
         self.real_sock = None
         self.real_tls = None
         self._box_write_lock = threading.Lock()
@@ -62,7 +63,8 @@ class ProxyHandler:
         self._pkt_id += 1
         pkt = build_publish(topic, payload, qos=0, pkt_id=self._pkt_id)
         self._send_box(pkt)
-        emit_message(self.state, "out", "PUBLISH", topic=topic, payload=payload, qos=0, injected=True)
+        emit_message(self.state, "out", "PUBLISH", topic=topic, payload=payload, qos=0,
+                 injected=True, session=self.session, host=(self.addr[0] if self.addr else None))
         return {"ok": True, "direction": "out", "qos": 0}
 
     # --- relay box -> real ---

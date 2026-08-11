@@ -4,6 +4,20 @@ from datetime import datetime, timezone
 
 from .events import EventBus
 
+# Contexte de connexion : taggé par le thread qui gère une session box.
+_CONN_CTX = threading.local()
+
+
+def set_conn_ctx(session=None, host=None):
+    """Enregistre la session courante (thread du handler) pour tagger les events."""
+    _CONN_CTX.session = session
+    _CONN_CTX.host = host
+
+
+def clear_conn_ctx():
+    _CONN_CTX.session = None
+    _CONN_CTX.host = None
+
 
 def _iso():
     return datetime.now(timezone.utc).astimezone().isoformat(timespec="milliseconds")
@@ -42,6 +56,12 @@ def emit_message(state, direction, mtype, topic=None, payload=None, qos=None, **
         ev["payload"] = decode_payload(payload)
     if qos is not None:
         ev["qos"] = qos
+    session = getattr(_CONN_CTX, "session", None)
+    host = getattr(_CONN_CTX, "host", None)
+    if session is not None:
+        ev["session"] = session
+    if host is not None:
+        ev["host"] = host
     ev.update(extra)
     state.events.publish(ev)
 
