@@ -64,6 +64,18 @@
   font-weight: 400;
 }
 
+.strToggle {
+  flex: 0 0 auto;
+  width: auto !important;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-soft);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
 .status {
   margin-top: 6px;
   font-size: 12px;

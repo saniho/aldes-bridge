@@ -14,6 +14,7 @@ interface ThermoRow {
   id: string
   name: string
   temp: string
+  str: boolean
 }
 
 const MODES: { code: string; label: string }[] = [
@@ -75,7 +76,7 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
   const [vacEnd, setVacEnd] = useState('')
   const [cmo, setCmo] = useState('1')
   const [thermos, setThermos] = useState<ThermoRow[]>([
-    { id: THERMOS[0].id, name: THERMOS[0].name, temp: '21' }
+    { id: THERMOS[0].id, name: THERMOS[0].name, temp: '21', str: false }
   ])
   const [deltat, setDeltat] = useState('21')
   const [json, setJson] = useState('')
@@ -114,9 +115,11 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
     if (fn === 'thermostats') {
       const rows = thermos
         .map((r) => {
-          const id = Number(r.id.trim())
+          const raw = r.id.trim()
           const temp = Number(r.temp)
-          if (!r.id.trim() || Number.isNaN(id) || Number.isNaN(temp)) return null
+          if (!raw || Number.isNaN(temp)) return null
+          const id = r.str ? raw : Number(raw)
+          if (!r.str && Number.isNaN(id)) return null
           const obj: Record<string, number | string> = { ThermostatId: id, TemperatureSet: temp }
           if (r.name.trim()) obj.Name = r.name.trim()
           return obj
@@ -142,7 +145,7 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
     return null
   }, [fn, modeSel, modeFree, customCode, vacStart, vacEnd, cmo, thermos, deltat, json])
 
-  const setThermo = (i: number, key: keyof ThermoRow, v: string) =>
+  const setThermo = (i: number, key: keyof ThermoRow, v: string | boolean) =>
     setThermos((rows) => rows.map((r, j) => (j === i ? { ...r, [key]: v } : r)))
 
   const submit = async () => {
@@ -290,6 +293,14 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
                   value={t.temp}
                   onChange={(e) => setThermo(i, 'temp', e.target.value)}
                 />
+                <label className={styles.strToggle}>
+                  <input
+                    type="checkbox"
+                    checked={t.str}
+                    onChange={(e) => setThermo(i, 'str', e.target.checked)}
+                  />
+                  string
+                </label>
                 <button type="button" onClick={() => setThermos((rows) => rows.filter((_, j) => j !== i))}>
                   ×
                 </button>
@@ -299,7 +310,7 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
           <div className={styles.hint}>
             <button
               type="button"
-              onClick={() => setThermos((rows) => [...rows, { id: THERMOS[0].id, name: THERMOS[0].name, temp: '21' }])}
+              onClick={() => setThermos((rows) => [...rows, { id: THERMOS[0].id, name: THERMOS[0].name, temp: '21', str: false }])}
             >
               + thermostat
             </button>
