@@ -136,15 +136,23 @@ class Engine(threading.Thread):
         mode = self.state.mode
         handler = BridgeHandler(self.state, cs, addr, session) if mode == "bridge" else ProxyHandler(self.state, cs, addr, session)
         with self._lock:
+            old = self._current
             self._current = handler
+        # Une nouvelle connexion rend l'ancien handler obsolete : son nettoyage
+        # final (session_down/cloud_down) ne doit pas ecraser l'etat de la
+        # session vivante (course a la deconnexion/reconnexion de la box).
+        if old is not None:
+            old.stale = True
         try:
             handler.run()
         finally:
             with self._lock:
-                if self._current is handler:
+                current = self._current is handler
+                if current:
                     self._current = None
             clear_conn_ctx()
-            self.state.session_down()
+            if current:
+                self.state.session_down()
             try:
                 cs.close()
             except Exception:

@@ -326,6 +326,74 @@ def test_raw_native():
     print("  OK")
 
 
+class FakeConnHandler:
+    """Faux handler : bloque dans run() jusqu'a relachement, sans reseau."""
+
+    def __init__(self, state, cs, addr, session=None):
+        self.state = state
+        self.cs = cs
+        self.stale = False
+        self.entered = threading.Event()
+        self.release = threading.Event()
+
+    def run(self):
+        self.entered.set()
+        self.release.wait()
+        self.release.clear()
+
+
+def test_stale_handler_does_not_reset_connected():
+    print("== test_stale_handler_does_not_reset_connected ==")
+    import server.engine as eng_mod
+
+    events = EventBus()
+    state = AppState("fake-host", 9999, events)
+    state.set_mode("proxy")
+
+    orig_proxy = eng_mod.ProxyHandler
+    eng_mod.ProxyHandler = FakeConnHandler
+    try:
+        eng = Engine(state, mqtt_port=18890)
+
+        s1, c1 = socket.socketpair()
+        s2, c2 = socket.socketpair()
+
+        # connexion A : devient la session active, CONNECT -> connected=True
+        t_a = threading.Thread(target=eng._handle, args=(c1, ("10.0.0.1", 40001)))
+        t_a.start()
+        a = eng.current_handler
+        assert a.entered.wait(2), "handler A non demarre"
+        state.session_up("ABCDEF123456_TONE")
+        assert state.snapshot()["connected"] is True
+
+        # connexion B arrive pendant que A tourne encore : B devient courant, A stale
+        t_b = threading.Thread(target=eng._handle, args=(c2, ("10.0.0.2", 40002)))
+        t_b.start()
+        b = eng.current_handler
+        assert b.entered.wait(2), "handler B non demarre"
+        assert a.stale is True, "A doit etre marque stale quand B prend le relai"
+
+        # A se termine APRES que B soit courant : il ne doit PAS ecraser l'etat
+        a.release.set()
+        t_a.join(timeout=3)
+        assert not t_a.is_alive()
+        assert state.snapshot()["connected"] is True, "l'ancien handler a ecrase connected=True"
+        assert eng.current_handler is b, "A ne doit pas retirer B de current"
+
+        # B se termine normalement : lui seul declenche session_down
+        b.release.set()
+        t_b.join(timeout=3)
+        assert not t_b.is_alive()
+        assert state.snapshot()["connected"] is False, "le handler courant doit poser session_down"
+        assert eng.current_handler is None
+
+        for s in (s1, s2):
+            s.close()
+    finally:
+        eng_mod.ProxyHandler = orig_proxy
+    print("  OK")
+
+
 if __name__ == "__main__":
     test_bridge_inject()
     test_bridge_qos2()

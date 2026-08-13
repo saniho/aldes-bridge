@@ -24,6 +24,7 @@ class ProxyHandler:
         self.real_tls = None
         self._box_write_lock = threading.Lock()
         self._closed = False
+        self.stale = False  # marque par l'engine quand une nouvelle connexion prend le relai
         self._pkt_id = 0
 
     # --- vie ---
@@ -47,7 +48,8 @@ class ProxyHandler:
         try:
             t1.join(); t2.join()
         finally:
-            self.state.cloud_down()
+            if not self.stale:
+                self.state.cloud_down()
 
     def shutdown(self):
         self._closed = True
