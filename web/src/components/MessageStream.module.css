@@ -150,6 +150,23 @@
   font-size: 11px;
 }
 
+.copyBtn {
+  background: var(--bg-chip);
+  border: 1px solid var(--border-input);
+  color: var(--text-soft);
+  border-radius: 5px;
+  padding: 1px 8px;
+  font-size: 10px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.copyBtn:hover {
+  color: var(--text);
+  border-color: var(--text-soft);
+}
+
 .sess {
   background: var(--accent);
   color: var(--accent-fg);
