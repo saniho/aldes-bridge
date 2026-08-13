@@ -84,5 +84,6 @@ export interface AldesProduct {
   isConnected: boolean
   lastUpdatedDate: string
   lastUpdatedAt: string | null
+  updatedAt?: string | null
   indicator: AldesIndicator
 }

@@ -103,6 +103,11 @@ Mapping télémetrie → product (voir `server/aldes.py`) :
   La box envoie ces valeurs comme l'heure de **son** cadran (Europe/Paris par défaut) :
   elles sont réinterprétées dans ce fuseau puis exposées en UTC (`lastUpdatedAt` correct).
   Fuseau configurable via `ALDES_BOX_TZ` (ex. `Europe/Paris`).
+- `updatedAt` → horodatage **serveur** de la dernière mise à jour de la télémetrie
+  (affiché « mise à jour » dans l'onglet températures, distinct du `dt` fourni par la box).
+- Les dernières télémetries captées sont persistées dans `logs/telemetry.json`
+  (volume monté) : les températures restent disponibles entre deux flux et après
+  redémarrage du conteneur, jusqu'à l'arrivée d'un nouveau flux.
 - `reference` dérivé : `TONE_AQUA_AIR` si la box a de l'ECS (`NED`/`UDM`), sinon `TONE_AIR`
 
 Les écritures (`updateThermostats`, `commands`) sont acceptées et journalisées dans le bus

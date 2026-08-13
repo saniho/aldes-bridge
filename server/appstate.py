@@ -108,7 +108,7 @@ class AppState:
         "evt_topic": "devices_MAC_AIR/messages/events",
     }
 
-    def __init__(self, real_host, real_port, events, mode_file=None):
+    def __init__(self, real_host, real_port, events, mode_file=None, telemetry_file=None):
         self.events = events if events is not None else EventBus()
         self._lock = threading.Lock()
         self.real_host = real_host
@@ -125,6 +125,10 @@ class AppState:
         self._cloud_since = None
         # Fichier de persistance du mode (survite au redemarrage du conteneur).
         self._mode_file = mode_file
+        # Persistance des telemetries captees : les dernieres valeurs restent
+        # disponibles entre deux flux (et meme apres un redemarrage).
+        self._telemetry_file = telemetry_file
+        self._load_telemetry()
 
     @property
     def mode(self):
@@ -160,6 +164,47 @@ class AppState:
             os.replace(tmp, path)
         except OSError:
             pass
+
+    def _load_telemetry(self):
+        """Recharge les dernieres telemetries capturees depuis telemetry_file."""
+        path = self._telemetry_file
+        if not path:
+            return
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            return
+        if isinstance(data, dict):
+            self.telemetry = {k: v for k, v in data.items() if isinstance(v, dict)}
+
+    def _save_telemetry(self):
+        """Persiste les telemetries (a appeler sous self._lock)."""
+        path = self._telemetry_file
+        if not path:
+            return
+        try:
+            os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+            tmp = path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(self.telemetry, f)
+            os.replace(tmp, path)
+        except OSError:
+            pass
+
+    def store_telemetry(self, pid, data):
+        """Mes des champs d'une telemetrie T.ONE dans state.telemetry[pid].
+
+        Memorisera la derniere valeur connue (survit au prochain flux et au
+        redemarrage) et horodate la mise a jour cote serveur (_upd_at, epoch UTC).
+        """
+        with self._lock:
+            current = dict(self.telemetry.get(pid, {}))
+            current.update(data)
+            current["_pid"] = pid
+            current["_upd_at"] = time.time()
+            self.telemetry[pid] = current
+            self._save_telemetry()
 
     def session_up(self, client_id):
         with self._lock:

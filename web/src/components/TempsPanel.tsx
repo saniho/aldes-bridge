@@ -165,8 +165,15 @@ export default function TempsPanel({ pollMs = 5000 }: Props) {
             </table>
 
             <div className={styles.foot}>
-              {p.lastUpdatedDate ? (
-                <>dernière trame : {fmtStamp(p.lastUpdatedDate)}</>
+              {p.updatedAt ? (
+                <>
+                  <span>mise à jour : {fmtStamp(p.updatedAt)}</span>
+                  {p.lastUpdatedDate && (
+                    <span className={styles.trame} title="horodatage dt fourni par la box">
+                      trame box : {fmtStamp(p.lastUpdatedDate)}
+                    </span>
+                  )}
+                </>
               ) : (
                 'pas encore de données'
               )}

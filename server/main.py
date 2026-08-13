@@ -15,6 +15,7 @@ from .eventlog import EventLog
 APP_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 DEFAULT_MODE_FILE = os.path.join(APP_ROOT, "logs", "mode.json")
+DEFAULT_TELEMETRY_FILE = os.path.join(APP_ROOT, "logs", "telemetry.json")
 
 
 def _default_web_dir():
@@ -44,6 +45,8 @@ def build_parser():
                     help="fichier de log persistant (JSONL), vide pour desactiver")
     ap.add_argument("--log-max", type=int, default=25 * 1024 * 1024,
                     help="taille max (octets) du fichier de log avant rotation")
+    ap.add_argument("--telemetry-file", default=os.environ.get("ALDES_TELEMETRY_FILE", DEFAULT_TELEMETRY_FILE),
+                    help="persistance des dernieres telemetries capturees (JSON), vide pour desactiver")
     return ap
 
 
@@ -63,7 +66,8 @@ def main(argv=None):
         log = EventLog(args.log_file, max_bytes=args.log_max)
     events = EventBus(args.history_size, log=log)
     restored = events.restore_from_log(args.history_size)
-    state = AppState(args.real_host, args.real_port, events, mode_file=args.mode_file)
+    state = AppState(args.real_host, args.real_port, events,
+                     mode_file=args.mode_file, telemetry_file=args.telemetry_file)
     # Le mode persiste (mode.json) prime sur le mode CLI/env au redemarrage.
     state.set_mode(read_persisted_mode(args.mode_file) or args.mode)
 

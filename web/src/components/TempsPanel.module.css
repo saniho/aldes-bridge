@@ -163,4 +163,12 @@
   margin-top: 10px;
   font-size: 12px;
   color: var(--text-faint);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.trame {
+  color: var(--text-soft);
 }

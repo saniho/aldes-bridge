@@ -90,15 +90,9 @@ def capture_telemetry(state, payload):
     pid = data.get("productid") or data.get("modemid")
     if not pid:
         return
-    try:
-        snap = state.telemetry
-    except AttributeError:
-        return
-    with state._lock:
-        current = dict(snap.get(pid, {}))
-        current.update(data)
-        current["_pid"] = pid
-        snap[pid] = current
+    # La fusion des champs + horodatage de mise a jour + persistance vivent
+    # dans AppState.store_telemetry (sous le verrou, ecriture atomique).
+    state.store_telemetry(pid, data)
 
 
 def _epoch_to_iso(value):
@@ -120,6 +114,19 @@ def _epoch_to_iso(value):
         return utc_wall.isoformat()
     naive = utc_wall.replace(tzinfo=None)
     return naive.replace(tzinfo=_BOX_TZ).astimezone(timezone.utc).isoformat()
+
+
+def _utc_iso(value):
+    """Epoch UTC reel (horodatage cote serveur) -> ISO UTC, ou None."""
+    if not value:
+        return None
+    try:
+        ts = float(value)
+    except (TypeError, ValueError):
+        return None
+    if ts <= 0:
+        return None
+    return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
 
 
 def _num(value, default=None):
@@ -182,6 +189,7 @@ def build_product(telemetry, connected):
         "isConnected": bool(connected),
         "lastUpdatedDate": _epoch_to_iso(telemetry.get("dt")) or "",
         "lastUpdatedAt": _epoch_to_iso(telemetry.get("dt")),
+        "updatedAt": _utc_iso(telemetry.get("_upd_at")),
         "gpsLatitude": 0.0,
         "gpsLongitude": 0.0,
         "indicator": {

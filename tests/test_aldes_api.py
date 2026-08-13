@@ -69,6 +69,28 @@ def test_capture_parses_prefixed_by_binary_header():
     assert set(state.telemetry) == {"ABCDEF123456_TONE"}
 
 
+def test_store_tracks_server_update_time():
+    import os
+    import tempfile
+    from datetime import datetime, timezone
+
+    d = tempfile.mkdtemp()
+    tf = os.path.join(d, "telemetry.json")
+    state = AppState("h", 8883, EventBus(), telemetry_file=tf)
+    capture_telemetry(state, json.dumps({"productid": "P_TONE", "MT0": 21.5}))
+    p = build_products(state)[0]
+    assert p["updatedAt"]  # horodatage de mise a jour cote serveur
+    ts = datetime.fromisoformat(p["updatedAt"]).astimezone(timezone.utc)
+    assert abs((datetime.now(timezone.utc) - ts).total_seconds()) < 60
+
+    # Les dernieres valeurs survivent au redemarrage (recharge du fichier).
+    state2 = AppState("h", 8883, EventBus(), telemetry_file=tf)
+    p2 = build_products(state2)[0]
+    assert p2["serial_number"] == "P_TONE"
+    assert p2["indicator"]["thermostats"][0]["CurrentTemperature"] == 21.5
+    assert p2["updatedAt"]
+
+
 def test_decode_payload_skips_binary_header():
     from server.appstate import decode_payload
     raw = b"\x00F" + json.dumps({"productid": "X"}).encode()
