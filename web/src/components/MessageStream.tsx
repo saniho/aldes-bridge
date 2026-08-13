@@ -155,6 +155,15 @@ export default function MessageStream({ messages }: Props) {
               {m.host && <span className={styles.host}>{m.host}</span>}
               {m.injected && <span className={styles.badge}>INJECTÉ</span>}
               <span className={styles.qos}>{m.qos !== undefined ? `qos${m.qos}` : ''}</span>
+              {m.payload && (
+                <button
+                  className={styles.copyBtn}
+                  onClick={() => copy(m.payload, i)}
+                  title="copier le message"
+                >
+                  {copied === i ? 'copié ✓' : 'copier'}
+                </button>
+              )}
             </div>
             {m.topic && <div className={styles.topic}>{m.topic}</div>}
             {m.payload && (
