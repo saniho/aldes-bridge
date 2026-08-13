@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { MsgEvent } from '../types'
+import { fmtParis } from '../parisTime'
 import styles from './MessageStream.module.css'
 
 interface Props {
@@ -146,7 +147,9 @@ export default function MessageStream({ messages }: Props) {
             }
           >
             <div className={styles.head}>
-              <span className={styles.ts}>{m.ts}</span>
+              <span className={styles.ts} title="fuseau Paris">
+                {fmtParis(m.ts)}
+              </span>
               <span className={styles.kind}>{LABEL[m.type] ?? m.type}</span>
               <span className={styles.dir}>{m.direction === 'out' ? 'box' : 'cloud'}</span>
               {m.session !== undefined && m.session !== null && (

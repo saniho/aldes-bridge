@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getProducts } from '../api'
 import type { AldesProduct } from '../types'
+import { fmtParis } from '../parisTime'
 import styles from './TempsPanel.module.css'
 
 interface Props {
@@ -36,7 +37,8 @@ function fmtMode(code: string | null, water: boolean): string {
 }
 
 function fmtStamp(iso: string): string {
-  return iso ? iso.replace('T', ' ').replace('+00:00', ' UTC') : ''
+  const s = fmtParis(iso)
+  return s ? `${s} (Paris)` : ''
 }
 
 export default function TempsPanel({ pollMs = 5000 }: Props) {
