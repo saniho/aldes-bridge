@@ -4,7 +4,7 @@ import json
 import os
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel
 
 
@@ -146,7 +146,7 @@ def create_app(state, engine, web_dir):
 
     @app.get("/favicon.ico")
     def favicon():
-        return JSONResponse(status_code=204, content=None)
+        return Response(status_code=204)
 
     @app.get("/{rest:path}")
     def spa_fallback(rest: str):
