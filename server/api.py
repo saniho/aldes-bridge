@@ -2,10 +2,13 @@
 import asyncio
 import json
 import os
+import urllib.parse
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel
+
+from .appstate import _iso
 
 
 class SendBody(BaseModel):
@@ -132,6 +135,55 @@ def create_app(state, engine, web_dir):
     def api_clear():
         state.events.clear()
         return {"ok": True}
+
+    # --- Rejeu de l'API Aldes pour l'integration HA "saniho-ha" ---
+    # La box est reliee au bridge en mode bridge/proxy : ses telemetries sont
+    # capturees (appstate.capture_telemetry) puis re-exposees ici au format
+    # consomme par custom_components/aldes.
+    from .aldes import build_products, make_token
+
+    @app.post("/oauth2/token")
+    async def aldes_token(request: Request):
+        raw = await request.body()
+        try:
+            form = urllib.parse.parse_qs(raw.decode("utf-8", errors="replace"))
+        except Exception:
+            form = {}
+        username = (form.get("username") or [""])[0].strip()
+        password = (form.get("password") or [""])[0].strip()
+        if not username or not password:
+            return JSONResponse(status_code=400, content={"error": "invalid_grant"})
+        state.events.publish({
+            "kind": "status", "ts": _iso(), "note": "authentification Aldes (token emis)",
+            "username": username,
+        })
+        return make_token(username=username)
+
+    @app.get("/aldesoc/v5/users/me/products")
+    def aldes_products():
+        return build_products(state)
+
+    @app.patch("/aldesoc/v5/users/me/products/{modem}/updateThermostats")
+    async def aldes_update_thermostats(modem: str, request: Request):
+        body = await request.json()
+        state.events.publish({
+            "kind": "message", "type": "ALDES_WRITE",
+            "topic": "devices/%s/messages/devicebound" % modem,
+            "payload": json.dumps(body, ensure_ascii=False),
+            "note": "consigne thermostat recue (non renvoyee a la box)",
+        })
+        return {"success": True, "modem": modem, "thermostats": body}
+
+    @app.post("/aldesoc/v5/users/me/products/{modem}/commands")
+    async def aldes_commands(modem: str, request: Request):
+        body = await request.json()
+        state.events.publish({
+            "kind": "message", "type": "ALDES_WRITE",
+            "topic": "devices/%s/messages/devicebound" % modem,
+            "payload": json.dumps(body, ensure_ascii=False),
+            "note": "commande recue (non renvoyee a la box)",
+        })
+        return {"success": True, "modem": modem, "command": body}
 
     # --- SPA (doit etre declare apres /api/*) ---
     def _build_index():

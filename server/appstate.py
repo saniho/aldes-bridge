@@ -43,6 +43,11 @@ def decode_payload(payload):
 
 
 def emit_message(state, direction, mtype, topic=None, payload=None, qos=None, **extra):
+    # Capte les telemetries T.ONE publiees par la box (direction "in") pour
+    # les re-exposer via l'API Aldes (server/aldes.py).
+    if direction == "in" and mtype == "PUBLISH":
+        from .aldes import capture_telemetry
+        capture_telemetry(state, payload)
     ev = {
         "kind": "message",
         "ts": _iso(),
@@ -90,11 +95,17 @@ class AppState:
         self._topics = set()
         self._last_error = None
         self._raw = dict(AppState.DEFAULT_RAW)
+        self.telemetry = {}
 
     @property
     def mode(self):
         with self._lock:
             return self._mode
+
+    @property
+    def connected(self):
+        with self._lock:
+            return self._connected
 
     def set_mode(self, mode):
         if mode not in self.MODES:

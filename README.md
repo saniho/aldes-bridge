@@ -76,6 +76,32 @@ cd web && npm run dev   # http://localhost:5173, /api proxy → 8080
 | POST | `/api/clear` | vide l'historique affiché |
 | GET | `/` | SPA (frontend construit) |
 
+### Rejeu de l'API Aldes (pour l'intégration Home Assistant « saniho-ha »)
+
+Le pont réexpose les télémetries T.ONE captées sur le MQTT sous un format identique à
+`aldesiotsuite-aldeswebapi.azurewebsites.net`, pour que `custom_components/aldes` puisse être
+redirigé vers le pont (ex. `API_URL_BASE = "http://<pont>:8080"` dans `api.py` de l'intégration) :
+
+| Méthode | Chemin | Description |
+|---|---|---|
+| POST | `/oauth2/token` | `grant_type=password` — tout identifiant/mot de passe non vide → `access_token` (Bearer) |
+| GET | `/aldesoc/v5/users/me/products` | liste des produits déduits des télémetries captées |
+| PATCH | `/aldesoc/v5/users/me/products/{modem}/updateThermostats` | consigne thermostat (journalisée, non renvoyée à la box) |
+| POST | `/aldesoc/v5/users/me/products/{modem}/commands` | commande (journalisée, non renvoyée à la box) |
+
+Mapping télémetrie → product (voir `server/aldes.py`) :
+
+- `modemid` → `modem`, `productid` → `serial_number`
+- `MT0..MT9` → `indicator.thermostats[].CurrentTemperature`, `UsC0..UsC9` → `TemperatureSet`
+- `UAM` (0-8) → `current_air_mode` (`"A".."I"`, cf. enum TOneMode de l'app), `UDM` (0-2) → `current_water_mode` (`"L"/"M"/"N"`)
+- `NED` → `qte_eau_chaude` (%), `NpiH` → `settings.people` (index de `HomeComposition`, l'intégration affiche `people + 2`)
+- `dt` → `lastUpdatedDate`, `Dvac`/`Fvac` (epoch, 0 = off) → `date_debut_vac`/`date_fin_vac`
+- `reference` dérivé : `TONE_AQUA_AIR` si la box a de l'ECS (`NED`/`UDM`), sinon `TONE_AIR`
+
+Les écritures (`updateThermostats`, `commands`) sont acceptées et journalisées dans le bus
+d'événements (`ALDES_WRITE`) mais pas encore renvoyées à la box : le format exact de commande
+`devicebound` attendu par celle-ci reste à confirmer (voir dépôt `/tmp/opencode/saniho-ha`).
+
 ## Paramètres CLI (`python3 -m server.main --help`)
 
 - `--mode proxy|bridge` (défaut `proxy`) — mode initial, changeable depuis la WebUI
@@ -88,6 +114,7 @@ cd web && npm run dev   # http://localhost:5173, /api proxy → 8080
 
 ```bash
 python3 tests/test_engine.py
+python3 tests/test_aldes_api.py
 ```
 
 ## Notes / historique
