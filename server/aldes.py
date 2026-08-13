@@ -21,8 +21,27 @@ Mapping de la telemetrie brute (payload PUBLISH boxward) vers le product :
     Dvac/Fvac   -> indicator.date_debut_vac / date_fin_vac (epoch, 0 = off)
 """
 import json
+import os
 import uuid
 from datetime import datetime, timezone
+
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:  # pragma: no cover
+    ZoneInfo = None
+
+# La box T.ONE envoie dt / Dvac / Fvac comme l'heure de SON cadran (fuseau local,
+# Europe/Paris par defaut : +02:00 l'ete, +01:00 l'hiver) mais sous forme d'un
+# epoch "naif" lu comme UTC. On les reinterprete dans le fuseau de la box
+# (configurable via ALDES_BOX_TZ) avant de fournir l'ISO UTC, sinon l'horodatage
+# affiche pointe ~2 h dans le futur. Sans tzdata, on retombe sur l'epoch brut.
+_BOX_TZ_NAME = os.environ.get("ALDES_BOX_TZ", "Europe/Paris")
+_BOX_TZ = None
+if ZoneInfo is not None:
+    try:
+        _BOX_TZ = ZoneInfo(_BOX_TZ_NAME)
+    except Exception:
+        _BOX_TZ = None
 
 # --- Types de produit T.ONE connus (cles du mapping des integrations HA) ---
 FRIENDLY_NAMES = {
@@ -83,7 +102,11 @@ def capture_telemetry(state, payload):
 
 
 def _epoch_to_iso(value):
-    """Epoch (float/secondes, 0 = inactif) -> ISO 8601, ou None."""
+    """Epoch "cadran box" (Europe/Paris par defaut) -> ISO UTC, ou None.
+
+    La valeur est l'heure locale affichee par la box (naive). Pour retrouver
+    le vrai instant, on lui attache le fuseau de la box puis on convertit en UTC.
+    """
     if not value:
         return None
     try:
@@ -92,7 +115,11 @@ def _epoch_to_iso(value):
         return None
     if ts <= 0:
         return None
-    return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+    utc_wall = datetime.fromtimestamp(ts, tz=timezone.utc)
+    if _BOX_TZ is None:
+        return utc_wall.isoformat()
+    naive = utc_wall.replace(tzinfo=None)
+    return naive.replace(tzinfo=_BOX_TZ).astimezone(timezone.utc).isoformat()
 
 
 def _num(value, default=None):

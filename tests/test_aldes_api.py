@@ -125,6 +125,20 @@ def test_product_fields():
     assert p["lastUpdatedDate"].startswith("2026-")
 
 
+def test_dt_interpreted_in_box_timezone():
+    # La box envoie dt comme son heure locale (Europe/Paris, UTC+2 en ete) ;
+    # l'epoch 1786635200 correspond au cadran 15:33 heure de Paris, donc 13:33 UTC.
+    p = build_product(TELEMETRY, True)
+    assert p["lastUpdatedAt"] == "2026-08-13T13:33:20+00:00"
+    assert p["lastUpdatedDate"] == "2026-08-13T13:33:20+00:00"
+
+
+def test_dt_zero_or_missing_is_off():
+    off = build_product({**TELEMETRY, "dt": 0}, True)
+    assert off["lastUpdatedAt"] is None
+    assert off["lastUpdatedDate"] == ""
+
+
 def test_build_products_empty_fallback():
     state = make_state()
     products = build_products(state)

@@ -99,7 +99,10 @@ Mapping télémetrie → product (voir `server/aldes.py`) :
 - `MT0..MT9` → `indicator.thermostats[].CurrentTemperature`, `UsC0..UsC9` → `TemperatureSet`
 - `UAM` (0-8) → `current_air_mode` (`"A".."I"`, cf. enum TOneMode de l'app), `UDM` (0-2) → `current_water_mode` (`"L"/"M"/"N"`)
 - `NED` → `qte_eau_chaude` (%), `NpiH` → `settings.people` (index de `HomeComposition`, l'intégration affiche `people + 2`)
-- `dt` → `lastUpdatedDate`, `Dvac`/`Fvac` (epoch, 0 = off) → `date_debut_vac`/`date_fin_vac`
+- `dt` → `lastUpdatedDate`, `Dvac`/`Fvac` (epoch, 0 = off) → `date_debut_vac`/`date_fin_vac`.
+  La box envoie ces valeurs comme l'heure de **son** cadran (Europe/Paris par défaut) :
+  elles sont réinterprétées dans ce fuseau puis exposées en UTC (`lastUpdatedAt` correct).
+  Fuseau configurable via `ALDES_BOX_TZ` (ex. `Europe/Paris`).
 - `reference` dérivé : `TONE_AQUA_AIR` si la box a de l'ECS (`NED`/`UDM`), sinon `TONE_AIR`
 
 Les écritures (`updateThermostats`, `commands`) sont acceptées et journalisées dans le bus
