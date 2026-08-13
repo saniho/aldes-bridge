@@ -9,6 +9,7 @@ import ModeDiagram from './components/ModeDiagram'
 import StatsBar from './components/StatsBar'
 import RawPanel from './components/RawPanel'
 import CommandBuilder from './components/CommandBuilder'
+import TempsPanel from './components/TempsPanel'
 import './App.css'
 
 export default function App() {
@@ -16,6 +17,9 @@ export default function App() {
   const { events, connected: sseAlive } = useSse(true)
   const [theme, setTheme] = useState<'nuit' | 'jour'>(() => {
     return (localStorage.getItem('aldes-theme') as 'nuit' | 'jour') || 'nuit'
+  })
+  const [view, setView] = useState<'flux' | 'temps'>(() => {
+    return (localStorage.getItem('aldes-view') as 'flux' | 'temps') || 'flux'
   })
   const [histOpen, setHistOpen] = useState(false)
   const [log, setLog] = useState<{
@@ -37,6 +41,14 @@ export default function App() {
   }, [theme])
 
   useEffect(() => {
+    localStorage.setItem('aldes-view', view)
+  }, [view])
+
+  useEffect(() => {
+    if (histOpen) setHistOpen(false)
+  }, [view])
+
+  useEffect(() => {
     let alive = true
     let timer: ReturnType<typeof setInterval> | null = null
     const poll = async () => {
@@ -48,7 +60,9 @@ export default function App() {
           connected: cfg.connected ?? false,
           client_id: cfg.client_id ?? null,
           topics: cfg.topics ?? [],
-          last_error: cfg.last_error ?? null
+          last_error: cfg.last_error ?? null,
+          box_since: cfg.box_since ?? null,
+          cloud_since: cfg.cloud_since ?? null
         })
       } catch {
         /* on réessaiera au prochain tick */
@@ -152,6 +166,26 @@ const { messages, lastSnapshot } = useMemo(() => {
       <header className="top">
         <h1>Aldes Bridge</h1>
         <div className="topRight">
+          <div className="tabs" role="tablist">
+            <button
+              role="tab"
+              aria-selected={view === 'flux'}
+              className={'tab' + (view === 'flux' ? ' active' : '')}
+              onClick={() => setView('flux')}
+              title="Trames MQTT en temps réel"
+            >
+              🌊 flux
+            </button>
+            <button
+              role="tab"
+              aria-selected={view === 'temps'}
+              className={'tab' + (view === 'temps' ? ' active' : '')}
+              onClick={() => setView('temps')}
+              title="Températures connues (réel / consigne)"
+            >
+              🌡 températures
+            </button>
+          </div>
           <button
             className={'hist' + (histOpen ? ' active' : '')}
             onClick={() => {
@@ -192,25 +226,31 @@ const { messages, lastSnapshot } = useMemo(() => {
       <div className="layout">
         <>
           <div className="streamCol">
-            {histOpen && (
-              <div className="histbar">
-                <span className="histLabel">
-                  🕘 historique — {log.events.length} trames affichées / {log.total} au total
-                </span>
-                <span className="histActions">
-                  <button
-                    disabled={log.loading || log.offset >= log.total}
-                    onClick={() => loadLog(log.offset, 'append')}
-                  >
-                    {log.loading ? 'chargement…' : '↕ charger antérieur'}
-                  </button>
-                  <button disabled={log.loading || log.offset === 0} onClick={() => loadLog(0, 'replace')}>
-                    ⤒ début
-                  </button>
-                </span>
-              </div>
+            {view === 'temps' ? (
+              <TempsPanel />
+            ) : (
+              <>
+                {histOpen && (
+                  <div className="histbar">
+                    <span className="histLabel">
+                      🕘 historique — {log.events.length} trames affichées / {log.total} au total
+                    </span>
+                    <span className="histActions">
+                      <button
+                        disabled={log.loading || log.offset >= log.total}
+                        onClick={() => loadLog(log.offset, 'append')}
+                      >
+                        {log.loading ? 'chargement…' : '↕ charger antérieur'}
+                      </button>
+                      <button disabled={log.loading || log.offset === 0} onClick={() => loadLog(0, 'replace')}>
+                        ⤒ début
+                      </button>
+                    </span>
+                  </div>
+                )}
+                <MessageStream messages={shown} />
+              </>
             )}
-            <MessageStream messages={shown} />
           </div>
           <div className="side">
           <CommandBuilder

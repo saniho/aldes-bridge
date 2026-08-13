@@ -67,6 +67,22 @@
   color: var(--text);
 }
 
+.uptime {
+  font-size: 12px;
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+  background: var(--bg-chip);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 8px;
+  white-space: nowrap;
+}
+
+.cloud {
+  color: var(--topic);
+  border-color: var(--line-green);
+}
+
 .topics {
   display: flex;
   gap: 6px;

@@ -1,5 +1,8 @@
 """Etat applicatif partage entre le moteur MQTT (threads) et l'API web (asyncio)."""
+import json
+import os
 import threading
+import time
 from datetime import datetime, timezone
 
 from .events import EventBus
@@ -12,6 +15,19 @@ def set_conn_ctx(session=None, host=None):
     """Enregistre la session courante (thread du handler) pour tagger les events."""
     _CONN_CTX.session = session
     _CONN_CTX.host = host
+
+
+def read_persisted_mode(path):
+    """Lit le mode persiste (JSON {"mode": ...}), None si absent/invalide."""
+    if not path:
+        return None
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return None
+    mode = data.get("mode") if isinstance(data, dict) else None
+    return mode if mode in AppState.MODES else None
 
 
 def clear_conn_ctx():
@@ -84,7 +100,7 @@ class AppState:
         "evt_topic": "devices_MAC_AIR/messages/events",
     }
 
-    def __init__(self, real_host, real_port, events):
+    def __init__(self, real_host, real_port, events, mode_file=None):
         self.events = events if events is not None else EventBus()
         self._lock = threading.Lock()
         self.real_host = real_host
@@ -96,6 +112,11 @@ class AppState:
         self._last_error = None
         self._raw = dict(AppState.DEFAULT_RAW)
         self.telemetry = {}
+        # Horodatages de connexion (epoch secondes) pour afficher les durees en haut.
+        self._box_since = None
+        self._cloud_since = None
+        # Fichier de persistance du mode (survite au redemarrage du conteneur).
+        self._mode_file = mode_file
 
     @property
     def mode(self):
@@ -112,10 +133,25 @@ class AppState:
             raise ValueError("mode inconnu: %r (attendu: %s)" % (mode, "/".join(self.MODES)))
         with self._lock:
             prev, self._mode = self._mode, mode
+        self._persist_mode()
         self.events.publish({
             "kind": "status", "mode": mode, "prev_mode": prev, "ts": _iso(),
         })
         return mode
+
+    def _persist_mode(self):
+        """Ecrit le mode courant dans mode_file (atomique, ne casse jamais le runtime)."""
+        path = self._mode_file
+        if not path:
+            return
+        try:
+            os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+            tmp = path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump({"mode": self._mode}, f)
+            os.replace(tmp, path)
+        except OSError:
+            pass
 
     def session_up(self, client_id):
         with self._lock:
@@ -123,6 +159,7 @@ class AppState:
             self._client_id = client_id
             self._topics = set()
             self._last_error = None
+            self._box_since = time.time()
         self.events.publish({
             "kind": "status", "connected": True, "client_id": client_id, "ts": _iso(),
         })
@@ -132,8 +169,24 @@ class AppState:
             self._connected = False
             self._client_id = None
             self._topics = set()
+            self._box_since = None
         self.events.publish({
             "kind": "status", "connected": False, "client_id": None, "ts": _iso(),
+        })
+
+    def cloud_up(self):
+        """Connexion du leg bridge -> Azure IoT Hub etablie (mode proxy)."""
+        with self._lock:
+            self._cloud_since = time.time()
+        self.events.publish({
+            "kind": "status", "cloud_connected": True, "ts": _iso(),
+        })
+
+    def cloud_down(self):
+        with self._lock:
+            self._cloud_since = None
+        self.events.publish({
+            "kind": "status", "cloud_connected": False, "ts": _iso(),
         })
 
     def set_error(self, message):
@@ -167,4 +220,7 @@ class AppState:
                 "topics": sorted(self._topics),
                 "last_error": self._last_error,
                 "raw": dict(self._raw),
+                "mode_file": self._mode_file,
+                "box_since": self._box_since,
+                "cloud_since": self._cloud_since,
             }

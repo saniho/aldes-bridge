@@ -83,3 +83,9 @@ export interface LogPage {
 export async function getLogs(limit: number, offset: number): Promise<LogPage> {
   return json<LogPage>(await fetch(`/api/logs?limit=${limit}&offset=${offset}`))
 }
+
+export async function getProducts(): Promise<import('./types').AldesProduct[]> {
+  return json<import('./types').AldesProduct[]>(
+    await fetch('/aldesoc/v5/users/me/products')
+  )
+}

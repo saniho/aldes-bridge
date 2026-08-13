@@ -17,6 +17,8 @@ export interface Config {
   topics: string[]
   last_error?: string | null
   raw?: RawConfig
+  box_since?: number | null
+  cloud_since?: number | null
 }
 
 export interface MsgEvent {
@@ -51,3 +53,36 @@ export interface SnapshotEvent {
 }
 
 export type BridgeEvent = SnapshotEvent | MsgEvent | StatusEvent
+
+export interface AldesThermostat {
+  ThermostatId: string
+  thermostatId?: string
+  Name: string
+  CurrentTemperature: number | null
+  CurrentHumidity?: number | null
+  TemperatureSet: number | null
+}
+
+export interface AldesIndicator {
+  qte_eau_chaude: number | null
+  tmp_principal: number | null
+  current_air_mode: string | null
+  current_water_mode: string | null
+  date_debut_vac: string | null
+  date_fin_vac: string | null
+  hors_gel: boolean
+  settings?: { people?: number | null }
+  thermostats: AldesThermostat[]
+}
+
+export interface AldesProduct {
+  modem: string
+  serial_number: string
+  reference: string
+  name: string
+  type: string
+  isConnected: boolean
+  lastUpdatedDate: string
+  lastUpdatedAt: string | null
+  indicator: AldesIndicator
+}

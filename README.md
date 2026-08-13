@@ -76,6 +76,10 @@ cd web && npm run dev   # http://localhost:5173, /api proxy → 8080
 | POST | `/api/clear` | vide l'historique affiché |
 | GET | `/` | SPA (frontend construit) |
 
+La WebUI a deux onglets : **🌊 flux** (trames MQTT en temps réel / historique) et **🌡 températures**
+(vue des produits Aldes : temp. principale, ECS, modes air/ECS, table des thermostats réel/consigne,
+alimentée par `/aldesoc/v5/users/me/products`, refresh 5 s).
+
 ### Rejeu de l'API Aldes (pour l'intégration Home Assistant « saniho-ha »)
 
 Le pont réexpose les télémetries T.ONE captées sur le MQTT sous un format identique à
@@ -104,7 +108,9 @@ d'événements (`ALDES_WRITE`) mais pas encore renvoyées à la box : le format 
 
 ## Paramètres CLI (`python3 -m server.main --help`)
 
-- `--mode proxy|bridge` (défaut `proxy`) — mode initial, changeable depuis la WebUI
+- `--mode proxy|bridge` (défaut `bridge`, ou env `ALDES_MODE`) — mode initial, changeable depuis la WebUI
+- `--mode-file logs/mode.json` — persistance du mode : un changement fait via la WebUI est
+  rejoué au redémarrage du conteneur (le fichier persistant prime sur `--mode`/`ALDES_MODE`)
 - `--bind 0.0.0.0`, `--mqtt-port 8883`, `--web-port 8080`
 - `--real-host aldesiotsuite.azure-devices.net`, `--real-port 8883`
 - `--web-dir <dist>` (frontend construit)
@@ -115,6 +121,7 @@ d'événements (`ALDES_WRITE`) mais pas encore renvoyées à la box : le format 
 ```bash
 python3 tests/test_engine.py
 python3 tests/test_aldes_api.py
+python3 tests/test_mode_persist.py
 ```
 
 ## Notes / historique

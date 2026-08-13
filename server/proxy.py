@@ -39,10 +39,15 @@ class ProxyHandler:
             self.state.set_error("connexion Azure: %s" % exc)
             return
 
+        self.state.cloud_up()
+
         t1 = threading.Thread(target=self._forward_box_to_real, daemon=True)
         t2 = threading.Thread(target=self._forward_real_to_box, daemon=True)
         t1.start(); t2.start()
-        t1.join(); t2.join()
+        try:
+            t1.join(); t2.join()
+        finally:
+            self.state.cloud_down()
 
     def shutdown(self):
         self._closed = True
