@@ -55,8 +55,13 @@ def capture_telemetry(state, payload):
     if not isinstance(payload, str):
         return
     payload = payload.strip()
-    if not payload.startswith("{"):
+    # La box prefixe chaque telemetrie d'un en-tete binaire (octet de sequence,
+    # ex: \x00F). On coupe tout ce qui precede le debut du JSON.
+    pos = payload.find("{")
+    if pos < 0:
         return
+    if pos > 0:
+        payload = payload[pos:]
     try:
         data = json.loads(payload)
     except Exception:

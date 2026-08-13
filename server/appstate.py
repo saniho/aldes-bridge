@@ -49,6 +49,14 @@ def decode_payload(payload):
         except Exception:
             payload = payload.hex()
     payload = payload.strip()
+    if not payload.startswith(("{", "[")):
+        # La box prefixe ses telemetries d'un en-tete binaire : on ne garde
+        # que le JSON qui suit, sinon l'affichage montre le bruit brut.
+        for marker in ("{", "["):
+            pos = payload.find(marker)
+            if pos > 0:
+                payload = payload[pos:]
+                break
     if payload.startswith(("{", "[")):
         try:
             import json

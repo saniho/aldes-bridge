@@ -62,6 +62,21 @@ def test_capture_telemetry_ignores_non_telemetry():
     assert state.telemetry == {}
 
 
+def test_capture_parses_prefixed_by_binary_header():
+    # La box prefixe ses telemetries d'un octet de sequence (\x00F, \x00E...).
+    state = make_state()
+    capture_telemetry(state, b"\x00F" + json.dumps(TELEMETRY).encode())
+    assert set(state.telemetry) == {"ABCDEF123456_TONE"}
+
+
+def test_decode_payload_skips_binary_header():
+    from server.appstate import decode_payload
+    raw = b"\x00F" + json.dumps({"productid": "X"}).encode()
+    out = decode_payload(raw)
+    assert out.startswith("{")
+    assert "\n" in out
+
+
 def test_reference_aqua_air_when_water_fields():
     assert build_product(TELEMETRY, True)["reference"] == "TONE_AQUA_AIR"
     assert build_product({}, True)["reference"] == "TONE_AIR"
