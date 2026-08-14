@@ -108,6 +108,19 @@
   color: var(--out);
 }
 
+.ballonOn {
+  border-color: var(--line-green);
+}
+
+.ballonOn .statValue {
+  color: var(--green);
+}
+
+.ballonMode {
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
 .tableTitle {
   font-size: 12px;
   color: var(--text-soft);

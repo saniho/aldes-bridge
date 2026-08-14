@@ -41,6 +41,13 @@ function fmtStamp(iso: string): string {
   return s ? `${s} (Paris)` : ''
 }
 
+function ballonMode(code: string | null): { label: string; on: boolean } | null {
+  if (!code) return null
+  const m = WATER_LABEL[code]
+  if (!m) return null
+  return { label: m, on: code !== 'L' }
+}
+
 export default function TempsPanel({ pollMs = 5000 }: Props) {
   const [products, setProducts] = useState<AldesProduct[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -119,6 +126,18 @@ export default function TempsPanel({ pollMs = 5000 }: Props) {
                     : `${p.indicator.qte_eau_chaude} %`}
                 </span>
               </div>
+              {(() => {
+                const b = ballonMode(p.indicator.current_water_mode)
+                return (
+                  <div className={styles.stat + (b && b.on ? ' ' + styles.ballonOn : '')}>
+                    <span className={styles.statLabel}>Ballon</span>
+                    <span className={styles.statValue}>
+                      {b ? (b.on ? 'On' : 'Off') : '—'}
+                      {b && <span className={styles.ballonMode}>&nbsp;· {b.label}</span>}
+                    </span>
+                  </div>
+                )
+              })()}
               <div className={styles.stat}>
                 <span className={styles.statLabel}>Mode air</span>
                 <span className={styles.statValue}>
