@@ -12,6 +12,10 @@ interface Props {
 
 const PRESETS: { label: string; payload: string }[] = [
   {
+    label: 'Change consigne C0 [26]',
+    payload: '{"id":1,"jsonrpc":"2.0","method":"changeConsigneC0","params":["26"]}'
+  },
+  {
     label: 'Change ΔT [21.0]',
     payload: '{"method":"changeTemperatureReference","params":[21.0]}'
   },

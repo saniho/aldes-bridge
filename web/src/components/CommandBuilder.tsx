@@ -30,6 +30,7 @@ const MODES: { code: string; label: string }[] = [
 ]
 
 const FNS: { id: string; label: string }[] = [
+  { id: 'consigne', label: 'changeConsigneC<n> — consigne par zone (réel cloud)' },
   { id: 'mode', label: 'changeMode — mode' },
   { id: 'vacances', label: 'changeMode — vacances (W)' },
   { id: 'cmo', label: 'changeCMO — override 0/1' },
@@ -37,6 +38,19 @@ const FNS: { id: string; label: string }[] = [
   { id: 't2', label: 'changeTemperatureReference — par thermostat (T2)' },
   { id: 'deltat', label: 'changeTemperatureReference' },
   { id: 'custom', label: 'JSON libre (personnalisé)' }
+]
+
+const ZONES: { id: string; label: string }[] = [
+  { id: 'C0', label: 'C0 · Zone 1 (principale)' },
+  { id: 'C1', label: 'C1 · Zone 2' },
+  { id: 'C2', label: 'C2 · Zone 3' },
+  { id: 'C3', label: 'C3 · Zone 4' },
+  { id: 'C4', label: 'C4 · Zone 5' },
+  { id: 'C5', label: 'C5 · Zone 6' },
+  { id: 'C6', label: 'C6 · Zone 7' },
+  { id: 'C7', label: 'C7 · Zone 8' },
+  { id: 'C8', label: 'C8 · Zone 9' },
+  { id: 'C9', label: 'C9 · Zone 10' }
 ]
 
 const THERMOS: { id: string; name: string; label: string }[] = [
@@ -91,7 +105,10 @@ function dateInputValue(d: Date): string {
 }
 
 export default function CommandBuilder({ connected, clientId, defaultTopic }: Props) {
-  const [fn, setFn] = useState('mode')
+  const [fn, setFn] = useState('consigne')
+  const [consZone, setConsZone] = useState('C0')
+  const [consZoneFree, setConsZoneFree] = useState(false)
+  const [consTemp, setConsTemp] = useState('21')
   const [modeSel, setModeSel] = useState('V')
   const [modeFree, setModeFree] = useState(false)
   const [customCode, setCustomCode] = useState('')
@@ -143,6 +160,12 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
         })
         .filter((x): x is Record<string, number | string> => x !== null)
 
+    if (fn === 'consigne') {
+      const zone = (consZoneFree ? consZone.trim() : consZone).toUpperCase()
+      const temp = Number(consTemp)
+      if (!/^C\d{1,2}$/.test(zone) || Number.isNaN(temp)) return null
+      return wrap(`changeConsigne${zone}`, JSON.stringify([consTemp.trim()]))
+    }
     if (fn === 'mode') {
       const code = (modeFree ? customCode.trim() : modeSel).toUpperCase()
       if (!code) return null
@@ -183,7 +206,7 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
       return json.trim()
     }
     return null
-  }, [fn, modeSel, modeFree, customCode, vacStart, vacEnd, cmo, thermos, deltat, json, rpc])
+  }, [fn, consZone, consZoneFree, consTemp, modeSel, modeFree, customCode, vacStart, vacEnd, cmo, thermos, deltat, json, rpc])
 
   const setThermo = (i: number, key: keyof ThermoRow, v: string | boolean) =>
     setThermos((rows) => rows.map((r, j) => (j === i ? { ...r, [key]: v } : r)))
@@ -223,6 +246,55 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
           ))}
         </select>
       </div>
+
+      {fn === 'consigne' && (
+        <>
+          <div className={styles.row}>
+            <label>Zone</label>
+            <select
+              value={consZoneFree ? '__free' : consZone}
+              onChange={(e) => {
+                if (e.target.value === '__free') {
+                  setConsZoneFree(true)
+                } else {
+                  setConsZoneFree(false)
+                  setConsZone(e.target.value)
+                }
+              }}
+            >
+              {ZONES.map((z) => (
+                <option key={z.id} value={z.id}>
+                  {z.label}
+                </option>
+              ))}
+              <option value="__free">Personnalisé…</option>
+            </select>
+            {consZoneFree && (
+              <input
+                value={consZone}
+                onChange={(e) => setConsZone(e.target.value)}
+                placeholder="ex. C3"
+                spellCheck={false}
+              />
+            )}
+          </div>
+          <div className={styles.row}>
+            <label>Consigne °C</label>
+            <input
+              type="number"
+              step="0.5"
+              value={consTemp}
+              onChange={(e) => setConsTemp(e.target.value)}
+            />
+          </div>
+          <div className={styles.hint}>
+            <span>
+              <code>changeConsigneC0..C9</code> · params en chaîne <code>{'["21"]'}</code> — format
+              réellement utilisé par le cloud Aldes (C0 = zone principale)
+            </span>
+          </div>
+        </>
+      )}
 
       {fn === 'mode' && (
         <>
