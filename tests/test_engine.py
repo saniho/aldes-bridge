@@ -113,11 +113,12 @@ class FakeRealBroker(threading.Thread):
         ctx = server_context(BOX_CN)
         tls = ctx.wrap_socket(c, server_side=True)
         tls.settimeout(8)
+        self.conn = tls
         reader = MQTTReader(tls)
         while True:
             try:
                 pkt = reader.read_packet()
-            except MQTTError:
+            except (MQTTError, OSError):
                 break
             if pkt is None:
                 break
@@ -139,6 +140,18 @@ class FakeRealBroker(threading.Thread):
             elif ptype == 12:
                 tls.sendall(b"\xD0\x00")
         tls.close()
+
+    def kill(self):
+        """Mort silencieuse d'Azure : ferme la connexion sans DISCONNECT."""
+        if self.conn is not None:
+            try:
+                self.conn.shutdown(socket.SHUT_RDWR)
+            except Exception:
+                pass
+            try:
+                self.conn.close()
+            except Exception:
+                pass
 
 
 def wait_state(state, attr, value, timeout=5):
@@ -276,6 +289,45 @@ def test_proxy_relay_inject():
     print("  OK")
 
 
+def test_proxy_silent_azure_death():
+    print("== test_proxy_silent_azure_death ==")
+    fake = FakeRealBroker(18891)
+    fake.start()
+    time.sleep(0.3)
+
+    events = EventBus()
+    state = AppState("127.0.0.1", 18891, events)
+    state.set_mode("proxy")
+    eng = Engine(state, mqtt_port=18892)
+    eng.start()
+    time.sleep(0.5)
+
+    tls = box_socket(18892)
+    tls.sendall(build_connect("box-test-death"))
+    assert read_packet(tls)[0] == 2, "attendu CONNACK (relaye du fake Azure)"
+    assert wait_state(state, "connected", True), "snapshot=%s" % state.snapshot()
+    assert state.snapshot()["cloud_since"] is not None
+
+    # Azure meurt en silence (fermeture de socket, pas de DISCONNECT MQTT).
+    fake.kill()
+
+    # Le relais doit dechirer : la box voit la fermeture et l'etat repasse a deconnecte.
+    assert wait_state(state, "connected", False, timeout=6), \
+        "connected doit redescendre apres la mort d'Azure: %s" % state.snapshot()
+    assert state.snapshot()["cloud_since"] is None, "cloud_down doit etre pose"
+    tls.settimeout(5)
+    try:
+        pkt = read_packet(tls)
+    except (MQTTError, OSError):
+        pkt = None
+    assert pkt is None, "la box doit voir la fermeture du lien (pas de nouvelle trame)"
+
+    tls.close()
+    eng.stop()
+    fake.sock.close()
+    print("  OK")
+
+
 def test_raw_native():
     print("== test_raw_native ==")
     fake = FakeRawBroker(18888)
@@ -398,5 +450,6 @@ if __name__ == "__main__":
     test_bridge_inject()
     test_bridge_qos2()
     test_proxy_relay_inject()
+    test_proxy_silent_azure_death()
     test_raw_native()
     print("TOUS LES TESTS PASSENT")

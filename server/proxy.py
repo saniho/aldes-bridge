@@ -12,6 +12,9 @@ from .appstate import emit_message
 from .tls import client_context, resolve
 
 
+RELAY_TIMEOUT = 180.0  # s ; silence >= 3 min d'un cote -> dechirure du relais
+
+
 class ProxyHandler:
     """Relaye box <-> vrai Azure et permet d'injecter des trames PUBLISH vers la box."""
 
@@ -35,7 +38,11 @@ class ProxyHandler:
             self.real_tls = client_context().wrap_socket(
                 self.real_sock, server_hostname=self.state.real_host
             )
-            self.real_tls.settimeout(None)
+            # Dead peer detecte : la box pingue ~toutes les 58 s, Azure repond
+            # donc en moyenne chaque minute. Un silence plus long qu'un tour
+            # complet de keepalive = lien mort (ou boite partie) -> dechirure.
+            self.real_tls.settimeout(RELAY_TIMEOUT)
+            self.box_sock.settimeout(RELAY_TIMEOUT)
         except Exception as exc:
             self.state.set_error("connexion Azure: %s" % exc)
             return
@@ -50,6 +57,23 @@ class ProxyHandler:
         finally:
             if not self.stale:
                 self.state.cloud_down()
+
+    def _teardown(self):
+        """Dechire tout le relais quand un cote meurt : shutdown() de chaque
+        socket pour reveiller les threads bloques en recv/sendall (un simple
+        close() depuis un autre thread ne reveille pas un recv sous Linux),
+        puis fermeture."""
+        self._closed = True
+        for s in (self.real_sock, self.real_tls, self.box_sock):
+            try:
+                s.shutdown(socket.SHUT_RDWR)
+            except Exception:
+                pass
+        for s in (self.real_sock, self.real_tls, self.box_sock):
+            try:
+                s.close()
+            except Exception:
+                pass
 
     def shutdown(self):
         self._closed = True
@@ -82,6 +106,8 @@ class ProxyHandler:
                 packet = reader.read_packet()
             except MQTTError:
                 break
+            except OSError:  # socket.timeout / connexion coupee
+                break
             if packet is None:
                 break
             ptype, flags, body, raw = packet
@@ -93,6 +119,7 @@ class ProxyHandler:
                 self.real_tls.sendall(raw)
             except Exception:
                 break
+        self._teardown()
 
     def _log_box(self, ptype, flags, body, raw):
         if ptype == 1:  # CONNECT
@@ -122,6 +149,8 @@ class ProxyHandler:
                 packet = reader.read_packet()
             except MQTTError:
                 break
+            except OSError:  # socket.timeout / Azure parti
+                break
             if packet is None:
                 break
             ptype, flags, body, raw = packet
@@ -138,3 +167,4 @@ class ProxyHandler:
                 self._send_box(raw)
             except Exception:
                 break
+        self._teardown()
