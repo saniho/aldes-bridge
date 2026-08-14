@@ -25,6 +25,7 @@ const MODES: { code: string; label: string }[] = [
 const FNS: { id: string; label: string }[] = [
   { id: 'consigne', label: 'changeConsigneC<n> — consigne par zone (réel cloud)' },
   { id: 'ballon', label: 'changeMode — ballon eau chaude On/Off' },
+  { id: 'air', label: 'changeMode — rafraîchissement air On/Off' },
   { id: 'mode', label: 'changeMode — mode' },
   { id: 'vacances', label: 'changeMode — vacances (W)' },
   { id: 'cmo', label: 'changeCMO — override 0/1' },
@@ -95,6 +96,7 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
   const [vacEnd, setVacEnd] = useState('')
   const [cmo, setCmo] = useState('1')
   const [ballon, setBallon] = useState('on')
+  const [air, setAir] = useState('on')
   const [json, setJson] = useState('')
   const [rpc, setRpc] = useState(true)
   const [propbag, setPropbag] = useState(false)
@@ -135,6 +137,9 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
     if (fn === 'ballon') {
       return wrap('changeMode', JSON.stringify([ballon === 'off' ? 'L' : 'M']))
     }
+    if (fn === 'air') {
+      return wrap('changeMode', JSON.stringify([air === 'off' ? 'A' : 'F']))
+    }
     if (fn === 'vacances') {
       const s = vacStart ? utcStamp(new Date(vacStart)) : ''
       const e = vacEnd ? utcStamp(new Date(vacEnd)) : ''
@@ -155,7 +160,7 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
       return json.trim()
     }
     return null
-  }, [fn, consZone, consZoneFree, consTemp, ballon, modeSel, modeFree, customCode, vacStart, vacEnd, cmo, json, rpc])
+  }, [fn, consZone, consZoneFree, consTemp, ballon, air, modeSel, modeFree, customCode, vacStart, vacEnd, cmo, json, rpc])
 
   const submit = async () => {
     setStatus(null)
@@ -292,6 +297,23 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
           <div className={styles.hint}>
             <span>
               envoie <code>changeMode</code> <code>{'["M"]'}</code> (On) ou <code>{'["L"]'}</code> (Off)
+            </span>
+          </div>
+        </>
+      )}
+
+      {fn === 'air' && (
+        <>
+          <div className={styles.row}>
+            <label>Rafraîchissement air</label>
+            <select value={air} onChange={(e) => setAir(e.target.value)}>
+              <option value="on">On · Froid confort (F)</option>
+              <option value="off">Off · Arrêt (A)</option>
+            </select>
+          </div>
+          <div className={styles.hint}>
+            <span>
+              envoie <code>changeMode</code> <code>{'["F"]'}</code> (On) ou <code>{'["A"]'}</code> (Off)
             </span>
           </div>
         </>
