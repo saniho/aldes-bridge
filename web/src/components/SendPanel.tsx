@@ -14,19 +14,6 @@ const PRESETS: { label: string; payload: string }[] = [
   {
     label: 'Change consigne C0 [26]',
     payload: '{"id":1,"jsonrpc":"2.0","method":"changeConsigneC0","params":["26"]}'
-  },
-  {
-    label: 'Change ΔT [21.0]',
-    payload: '{"method":"changeTemperatureReference","params":[21.0]}'
-  },
-  {
-    label: 'Change ΔT thermostat 1 [21]',
-    payload:
-      '{"method":"changeTemperatureReference","params":[{"ThermostatId":1,"TemperatureSet":21}]}'
-  },
-  {
-    label: 'Update thermostats',
-    payload: '{"method":"updateThermostats","params":[{"ThermostatId":1,"TemperatureSet":21}]}'
   }
 ]
 

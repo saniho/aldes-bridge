@@ -10,13 +10,6 @@ interface Props {
   defaultTopic?: string | null
 }
 
-interface ThermoRow {
-  id: string
-  name: string
-  temp: string
-  str: boolean
-}
-
 const MODES: { code: string; label: string }[] = [
   { code: 'V', label: 'V · Quotidien' },
   { code: 'X', label: 'X · Boost' },
@@ -34,9 +27,6 @@ const FNS: { id: string; label: string }[] = [
   { id: 'mode', label: 'changeMode — mode' },
   { id: 'vacances', label: 'changeMode — vacances (W)' },
   { id: 'cmo', label: 'changeCMO — override 0/1' },
-  { id: 'thermostats', label: 'updateThermostats' },
-  { id: 't2', label: 'changeTemperatureReference — par thermostat (T2)' },
-  { id: 'deltat', label: 'changeTemperatureReference' },
   { id: 'custom', label: 'JSON libre (personnalisé)' }
 ]
 
@@ -52,18 +42,6 @@ const ZONES: { id: string; label: string }[] = [
   { id: 'C8', label: 'C8 · Zone 9' },
   { id: 'C9', label: 'C9 · Zone 10' }
 ]
-
-const THERMOS: { id: string; name: string; label: string }[] = [
-  { id: '76542', name: 'Piece Principale', label: 'Piece Principale → 76542' },
-  { id: '76543', name: 'Ch Parents', label: 'Ch Parents → 76543' },
-  { id: '76544', name: 'Ch Romane', label: 'Ch Romane → 76544' },
-  { id: '76545', name: 'Ch Marine', label: 'Ch Marine → 76545' },
-  { id: '76546', name: 'Bureau', label: 'Bureau → 76546' }
-]
-
-function presetsFrom(id: string) {
-  return THERMOS.some((th) => th.id === id)
-}
 
 function topicFor(clientId: string): string {
   return `devices/${clientId}/messages/devicebound`
@@ -115,10 +93,6 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
   const [vacStart, setVacStart] = useState('')
   const [vacEnd, setVacEnd] = useState('')
   const [cmo, setCmo] = useState('1')
-  const [thermos, setThermos] = useState<ThermoRow[]>([
-    { id: THERMOS[0].id, name: THERMOS[0].name, temp: '21', str: false }
-  ])
-  const [deltat, setDeltat] = useState('21')
   const [json, setJson] = useState('')
   const [rpc, setRpc] = useState(true)
   const [propbag, setPropbag] = useState(false)
@@ -144,21 +118,6 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
       if (!rpc) return body
       return `{"id":1,"jsonrpc":"2.0",${body.slice(1)}`
     }
-    const dbl = (v: number): string => (Number.isInteger(v) ? `${v}.0` : String(v))
-
-    const rowsOf = (): Record<string, number | string>[] | null =>
-      thermos
-        .map((r) => {
-          const raw = r.id.trim()
-          const temp = Number(r.temp)
-          if (!raw || Number.isNaN(temp)) return null
-          const id = r.str ? raw : Number(raw)
-          if (!r.str && Number.isNaN(id)) return null
-          const obj: Record<string, number | string> = { ThermostatId: id, TemperatureSet: temp }
-          if (r.name.trim()) obj.Name = r.name.trim()
-          return obj
-        })
-        .filter((x): x is Record<string, number | string> => x !== null)
 
     if (fn === 'consigne') {
       const zone = (consZoneFree ? consZone.trim() : consZone).toUpperCase()
@@ -181,21 +140,6 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
       const v = cmo === '1' ? 1 : 0
       return wrap('changeCMO', `[${v}]`)
     }
-    if (fn === 'thermostats') {
-      const rows = rowsOf()
-      if (!rows?.length) return null
-      return wrap('updateThermostats', JSON.stringify(rows))
-    }
-    if (fn === 't2') {
-      const rows = rowsOf()
-      if (!rows?.length) return null
-      return wrap('changeTemperatureReference', JSON.stringify(rows))
-    }
-    if (fn === 'deltat') {
-      const v = Number(deltat)
-      if (Number.isNaN(v)) return null
-      return wrap('changeTemperatureReference', `[${dbl(v)}]`)
-    }
     if (fn === 'custom') {
       if (!json.trim()) return null
       try {
@@ -206,10 +150,7 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
       return json.trim()
     }
     return null
-  }, [fn, consZone, consZoneFree, consTemp, modeSel, modeFree, customCode, vacStart, vacEnd, cmo, thermos, deltat, json, rpc])
-
-  const setThermo = (i: number, key: keyof ThermoRow, v: string | boolean) =>
-    setThermos((rows) => rows.map((r, j) => (j === i ? { ...r, [key]: v } : r)))
+  }, [fn, consZone, consZoneFree, consTemp, modeSel, modeFree, customCode, vacStart, vacEnd, cmo, json, rpc])
 
   const submit = async () => {
     setStatus(null)
@@ -369,97 +310,6 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
             <option value="0">0 · OFF</option>
           </select>
         </div>
-      )}
-
-      {(fn === 'thermostats' || fn === 't2') && (
-        <>
-          {thermos.map((t, i) => {
-            const isPreset = presetsFrom(t.id)
-            return (
-              <div className={`${styles.row} ${styles.thermoRow}`} key={i}>
-                <label>T{i + 1}</label>
-                <select
-                  value={isPreset ? t.id : '__free'}
-                  onChange={(e) => {
-                    if (e.target.value === '__free') {
-                      setThermo(i, 'id', '')
-                    } else {
-                      const th = THERMOS.find((x) => x.id === e.target.value)!
-                      setThermo(i, 'id', th.id)
-                      setThermo(i, 'name', th.name)
-                    }
-                  }}
-                >
-                  {THERMOS.map((th) => (
-                    <option key={th.id} value={th.id}>
-                      {th.label}
-                    </option>
-                  ))}
-                  <option value="__free">Personnalisé…</option>
-                </select>
-                <input
-                  placeholder="ThermostatId"
-                  value={t.id}
-                  onChange={(e) => setThermo(i, 'id', e.target.value)}
-                />
-                <input
-                  placeholder="Nom (opt.)"
-                  value={t.name}
-                  onChange={(e) => setThermo(i, 'name', e.target.value)}
-                />
-                <input
-                  placeholder="Object °C"
-                  value={t.temp}
-                  onChange={(e) => setThermo(i, 'temp', e.target.value)}
-                />
-                <label className={styles.strToggle}>
-                  <input
-                    type="checkbox"
-                    checked={t.str}
-                    onChange={(e) => setThermo(i, 'str', e.target.checked)}
-                  />
-                  string
-                </label>
-                <button type="button" onClick={() => setThermos((rows) => rows.filter((_, j) => j !== i))}>
-                  ×
-                </button>
-              </div>
-            )
-          })}
-          <div className={styles.hint}>
-            <button
-              type="button"
-              onClick={() => setThermos((rows) => [...rows, { id: THERMOS[0].id, name: THERMOS[0].name, temp: '21', str: false }])}
-            >
-              + thermostat
-            </button>
-          </div>
-          {fn === 't2' && (
-            <div className={styles.hint}>
-              <span>
-                changeTemperatureReference · params = objet thermostat{' '}
-                <code>{`[{"ThermostatId":1,"TemperatureSet":21}]`}</code>
-              </span>
-            </div>
-          )}
-        </>
-      )}
-
-      {fn === 'deltat' && (
-        <>
-          <div className={styles.row}>
-            <label>ΔT °C</label>
-            <input
-              type="number"
-              step="0.5"
-              value={deltat}
-              onChange={(e) => setDeltat(e.target.value)}
-            />
-          </div>
-          <div className={styles.hint}>
-            <span>changeTemperatureReference · params en <code>double</code> (ex. <code>21.0</code>)</span>
-          </div>
-        </>
       )}
 
       {fn === 'custom' && (
