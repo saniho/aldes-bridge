@@ -111,8 +111,19 @@ Mapping télémetrie → product (voir `server/aldes.py`) :
 - `reference` dérivé : `TONE_AQUA_AIR` si la box a de l'ECS (`NED`/`UDM`), sinon `TONE_AIR`
 
 Les écritures (`updateThermostats`, `commands`) sont acceptées et journalisées dans le bus
-d'événements (`ALDES_WRITE`) mais pas encore renvoyées à la box : le format exact de commande
-`devicebound` attendu par celle-ci reste à confirmer (voir dépôt `/tmp/opencode/saniho-ha`).
+d'événements (`ALDES_WRITE`) mais pas encore renvoyées à la box.
+
+**Format de commande réel confirmé** (observé sur le cloud Aldes en mode proxy, et rejoué
+avec succès — `UsC0`/`Cre<n>` bougent bien dans les télémetries) : pour changer la consigne
+d'une zone, la box attend un JSON-RPC sur `devices/<id>/messages/devicebound` avec la méthode
+`changeConsigneC<n>` (n = index de zone, 0..9) et la température en **chaîne** dans `params` :
+
+```json
+{"id":1,"jsonrpc":"2.0","method":"changeConsigneC0","params":["25"]}
+```
+
+Ce format est disponible dans la WebUI : « Commande à la box → Fonction → changeConsigneC<n> »,
+et en preset « Change consigne C0 » dans « Envoyer une commande MQTT ».
 
 ## Paramètres CLI (`python3 -m server.main --help`)
 
