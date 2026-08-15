@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { apiCall, type ApiResult } from '../api'
 import styles from './WrapperPanel.module.css'
 
@@ -107,6 +107,8 @@ export default function WrapperPanel({ clientId }: Props) {
   const [place, setPlace] = useState<Record<string, Record<string, string>>>({})
   const [results, setResults] = useState<Record<string, ApiResult | { error: string }>>({})
   const [busy, setBusy] = useState<Record<string, boolean>>({})
+  const [flash, setFlash] = useState<string | null>(null)
+  const resultRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
   const modemDefault = useMemo(
     () => (clientId ? clientId.split('-')[0] : 'ABCDEF123456'),
@@ -114,6 +116,13 @@ export default function WrapperPanel({ clientId }: Props) {
   )
 
   const toggle = (id: string) => setOpen((o) => (o === id ? null : id))
+
+  useEffect(() => {
+    if (!flash) return
+    setOpen((o) => o ?? flash)
+    const el = resultRefs.current[flash]
+    if (el) el.scrollIntoView({ block: 'nearest' })
+  }, [flash])
 
   const run = async (route: RouteDef) => {
     setBusy((b) => ({ ...b, [route.id]: true }))
@@ -155,8 +164,10 @@ export default function WrapperPanel({ clientId }: Props) {
         contentType: route.id === 'token' ? 'form' : 'json'
       })
       setResults((r) => ({ ...r, [route.id]: res }))
+      setFlash(route.id)
     } catch (e) {
       setResults((r) => ({ ...r, [route.id]: { error: (e as Error).message } }))
+      setFlash(route.id)
     } finally {
       setBusy((b) => ({ ...b, [route.id]: false }))
     }
@@ -175,11 +186,30 @@ export default function WrapperPanel({ clientId }: Props) {
       {ROUTES.map((r) => {
         const isOpen = open === r.id
         const res = results[r.id]
+        const isBusy = !!busy[r.id]
+        const status = res && 'error' in res ? 'err' : res ? (res.ok ? 'ok' : 'err') : null
         return (
-          <div key={r.id} className={styles.route + (isOpen ? ' ' + styles.open : '')}>
+          <div
+            key={r.id}
+            className={
+              styles.route +
+              (isOpen ? ' ' + styles.open : '') +
+              (isBusy ? ' ' + styles.busy : '') +
+              (status ? ' ' + styles[status] : '')
+            }
+          >
             <button className={styles.summary} onClick={() => toggle(r.id)}>
               <span className={styles.method + ' ' + styles[r.method.toLowerCase()]}>{r.method}</span>
               <code className={styles.path}>{r.path}</code>
+              {isBusy && <span className={styles.chip + ' ' + styles.chipBusy}>⏳…</span>}
+              {!isBusy && status === 'ok' && res && !('error' in res) && (
+                <span className={styles.chip + ' ' + styles.chipOk}>✓ {res.status}</span>
+              )}
+              {!isBusy && status === 'err' && (
+                <span className={styles.chip + ' ' + styles.chipErr}>
+                  ✗ {res && 'error' in res ? 'erreur' : res ? String(res.status) : ''}
+                </span>
+              )}
               <span className={styles.chevron}>{isOpen ? '▾' : '▸'}</span>
             </button>
             {isOpen && (
@@ -239,7 +269,12 @@ export default function WrapperPanel({ clientId }: Props) {
                 </div>
 
                 {res && (
-                  <div className={styles.result}>
+                  <div
+                    ref={(el) => {
+                      resultRefs.current[r.id] = el
+                    }}
+                    className={styles.result + (flash === r.id ? ' ' + styles.flash : '')}
+                  >
                     {'error' in res ? (
                       <div className={styles.err}>erreur : {res.error}</div>
                     ) : (

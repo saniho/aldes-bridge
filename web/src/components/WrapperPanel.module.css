@@ -31,10 +31,59 @@
   border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .route.open {
   border-color: var(--border-strong);
+}
+
+.route.busy {
+  border-color: var(--accent);
+}
+
+.route.ok {
+  border-color: var(--line-green);
+}
+
+.route.err {
+  border-color: var(--line-out);
+}
+
+.chip {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  border-radius: 999px;
+  padding: 1px 8px;
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.chipOk {
+  color: var(--green);
+  background: var(--line-green);
+}
+
+.chipErr {
+  color: var(--out);
+  background: var(--line-out);
+}
+
+.chipBusy {
+  color: var(--in);
+  background: var(--line-in);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
 }
 
 .summary {
@@ -167,6 +216,21 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.result.flash {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--line-in), 0 0 12px rgba(37, 99, 235, 0.35);
+  animation: flashIn 0.5s ease-out;
+}
+
+@keyframes flashIn {
+  0% {
+    background: var(--line-in);
+  }
+  100% {
+    background: var(--bg);
+  }
 }
 
 .meta {
