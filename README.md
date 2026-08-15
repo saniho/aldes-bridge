@@ -12,6 +12,49 @@ Deux modes (bascule possible à chaud depuis la Web UI, appliquée à la prochai
 
 Un unique listener TLS sur le port 8883 sert les deux modes ; le choix du mode est dans `AppState`
 
+### Schéma — Principe du bridge et du proxy
+
+```
+┌──────────────┐            MQTT/TLS :8883            ┌────────────────────────────────┐
+│   Box Aldes   │ <──────── CONNECT ─────────＋───────>> │         Machine (le pont)        │
+│    T.One      │        (SNI/CN:            │            │                                │
+└──────────────┘   aldesiotsuite.azure-...) │            │   listener TLS unique :8883    │
+                                            │            │   (server/tls.py, ctx permissif)│
+                                            │            └───────────────┬────────────────┘
+                                            │                            │  dispatche selon
+                                            │                            │  AppState.mode
+                                            │                            │
+                        ┌───────────────────┴────────────────────┐        │
+                        ▼                                       ▼        │
+          ┌──────────────────────────┐             ┌────────────────────────────┐
+          │   MODE bridge            │             │   MODE proxy               │
+          │   (faux broker)         │             │   (transparent / MITM)     │
+          │   server/bridge.py       │             │   server/proxy.py           │
+          │                          │             │                            │
+          │   La box croit parler à  │             │   Le pont relaie réellement │
+          │   Azure, mais rien ne    │             │   vers le vrai cloud :      │
+          │   sort vers le cloud.    │             │                            │
+          │   · télémetries captées  │             │   ┌────────────────────┐    │
+          │     et ré-exposées (rejeu│             │   │  Azure IoT Hub     │    │
+          │     API Aldes)           │             │   │ aldesiotsuite.     │    │
+          │   · commandes injectées  │             │   │ azure-devices.net  │    │
+          │     vers la box (QoS1)   │             │   └────────┬───────────┘    │
+          └──────────────────────────┘             │    relais │ (QoS0 / snif)   │
+                                                    └──────────┴─────────────────┘
+
+   Boucle DNS (maskdns) : la box résout
+   aldesiotsuite.azure-devices.net ─────► IP de la machine
+   (sans elle, la box irait réellement sur Azure)
+
+   Légende :
+     ─────►  flux MQTT (télémetries boxward / commandes devicebound)
+     ·····   chemin que prendraient les trames sans le maskdns (cloud réel)
+   WebUI / API HTTP :8080 : /api/* + SSE + rejeu API Aldes (intégration HA saniho-ha)
+```
+
+Les deux modes partagent le même listener TLS et la même WebUI ; seule la destination
+**des trames** change (faux broker local vs relais vers Azure), d'où la bascule à chaud.
+
 ## Stack
 
 - **Backend** : Python 3.11, FastAPI + uvicorn (API HTTP + SSE), aucune lib MQTT externe (codec maison dans `server/mqtt.py`).
@@ -61,6 +104,106 @@ python3 -m server.main --web-dir ./web/dist
 ```bash
 python3 -m server.main --web-port 8080 --mqtt-port 8883 &
 cd web && npm run dev   # http://localhost:5173, /api proxy → 8080
+```
+
+## Installation complète sur une nouvelle machine (maskdns + Docker)
+
+Cette rubrique détaille les étapes pour installer le pont de zéro sur une machine
+(le « serveur ») qui remplacera le cloud Aldes pour la box dans le réseau local.
+Elle suppose une machine Ubuntu/Debian sur un réseau avec une box internet type Freebox.
+
+Le principe en deux temps :
+
+1. **Le pont** : conteneur Docker qui écoute le MQTT/TLS (`:8883`) et sert la WebUI/API (`:8080`).
+2. **Le maskdns** : dnsmasq local qui fait pointer `aldesiotsuite.azure-devices.net` vers la
+   machine, pour que la box Aldes (qui résout ce nom à chaque connexion) atterrisse sur le pont
+   et non sur le vrai cloud Azure.
+
+> ⚠️ **Indispensable** : la box Aldes se connecte à l'heure actuelle réellement au cloud Azure.
+> Tant que le maskdns n'est **pas** en place, la box continue de fonctionner normalement via le
+> cloud ; dès qu'il est en place, elle passera par le pont. Les deux ne coexistent pas — le pont
+> en mode `proxy` peut néanmoins relayer la box vers le vrai cloud (cf. « Modes » en tête de fichier).
+
+### Étape 0 — Prérequis
+
+```bash
+sudo apt update && sudo apt install -y docker.io docker-compose-v2 dnsmasq dnsutils git
+sudo systemctl enable --now docker
+sudo usermod -aG docker "$USER"   # re-login pour que ça prenne effet
+```
+
+Adapter les adresses IP de la machine : remplacer chaque occurrence de `192.168.1.90` (et
+éventuellement le `server=192.168.1.254`) par l'adresse de la nouvelle machine et de la box internet.
+
+### Étape 1 — Récupérer le code
+
+```bash
+git clone https://github.com/saniho/aldes-bridge.git /opt/aldes-bridge
+cd /opt/aldes-bridge
+```
+
+### Étape 2 — Configurer le maskdns (dnsmasq)
+
+Le script `setup-dns.sh` installe et configure dnsmasq pour rediriger
+`aldesiotsuite.azure-devices.net` vers la machine, puis relayer le reste du DNS vers la box internet :
+
+```bash
+sudo bash setup-dns.sh
+```
+
+Ce script :
+
+- installe `dnsmasq` (si absent) ;
+- écrit `/etc/dnsmasq.d/aldes.conf` : `address=/aldesiotsuite.azure-devices.net/<IP_machine>`
+  + `server=<IP_box_internet>` (reste du DNS relayé) + `listen-address=<IP_machine>` ;
+- désactive la config dnsmasq par défaut et (re)démarre le service ;
+- vérifie avec `dig @127.0.0.1 aldesiotsuite.azure-devices.net +short` (doit renvoyer l'IP de la machine).
+
+> ⚠️ **Configurer le DNS du réseau** : dnsmasq ne sert à rien si les machines du réseau
+> ne passent pas par lui. Dans l'interface de la Freebox
+> (`http://mafreebox.freebox.fr` → Mode avancé → Réseau local → DHCP), régler le **DNS 1**
+> sur l'IP de la machine. La box Aldes (et toute autre machine du réseau) résoudra alors
+> `aldesiotsuite.azure-devices.net` via le pont.
+
+### Étape 3 — Lancer le conteneur
+
+```bash
+cd /opt/aldes-bridge
+sudo docker compose up -d --build
+```
+
+Vérifier que le conteneur tourne :
+
+```bash
+sudo docker ps --filter name=aldes-bridge
+```
+
+- MQTT/TLS : `0.0.0.0:8883` (c'est ce que la box joint via le maskdns)
+- WebUI/API : `http://<IP_machine>:8080`
+
+### Étape 4 — Tester que tout est en place
+
+```bash
+# 1) DNS : la machine (via dnsmasq) doit renvoyer sa propre IP
+dig @127.0.0.1 aldesiotsuite.azure-devices.net +short
+
+# 2) Le pont répond
+curl -s http://<IP_machine>:8080/api/config
+#   -> {"mode":"proxy","connected":false, ...}
+
+# 3) (optionnel) depuis la box réseau locale, idem : résolution + port 8080 joignable
+```
+
+Une fois la box reconnectée (elle se réabonne périodiquement à
+`aldesiotsuite.azure-devices.net`), elle apparaît `connected: true` dans `/api/config`
+et les trames MQTT s'affichent dans la WebUI (onglet « flux »).
+
+### Mise à jour
+
+```bash
+cd /opt/aldes-bridge
+git pull
+./deploy.sh main   # ou : sudo docker compose up -d --build
 ```
 
 ## API
@@ -146,7 +289,8 @@ python3 tests/test_mode_persist.py
 ## Notes / historique
 
 - Anciens scripts legacy : `dump_mqtt.py` (faux broker simple), `mqtt_proxy.py` (proxy promo initial),
-  `monitor_proxy.py`, `setup-dns.sh`.
+  `monitor_proxy.py`.
+- `setup-dns.sh` configure le maskdns dnsmasq (voir « Installation complète sur une nouvelle machine »).
 - La box doit pointer vers cette machine (rediriger `aldesiotsuite.azure-devices.net:8883` vers le pont,
   dans le DNS ou le NAT) pour se connecter au pont — soit réellement au cloud.
 - Mode **bridge** : la box ne "répond" pas de vrai AWS; les __commandes__ vers la box passent par `devices/<boxid>/messages/devicebound`.
