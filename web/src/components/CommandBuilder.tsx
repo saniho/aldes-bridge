@@ -25,7 +25,7 @@ const MODES: { code: string; label: string }[] = [
 const FNS: { id: string; label: string }[] = [
   { id: 'consigne', label: 'changeConsigneC<n> — consigne par zone (réel cloud)' },
   { id: 'ballon', label: 'changeMode — ballon eau chaude On/Off' },
-  { id: 'air', label: 'changeMode — rafraîchissement air On/Off' },
+  { id: 'air', label: 'changeMode — rafraîchissement air (confort/prog C/prog D/arrêt)' },
   { id: 'mode', label: 'changeMode — mode' },
   { id: 'vacances', label: 'changeMode — vacances (W)' },
   { id: 'cmo', label: 'changeCMO — override 0/1' },
@@ -96,7 +96,7 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
   const [vacEnd, setVacEnd] = useState('')
   const [cmo, setCmo] = useState('1')
   const [ballon, setBallon] = useState('on')
-  const [air, setAir] = useState('on')
+  const [airMode, setAirMode] = useState('F')
   const [json, setJson] = useState('')
   const [rpc, setRpc] = useState(true)
   const [propbag, setPropbag] = useState(false)
@@ -138,7 +138,7 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
       return wrap('changeMode', JSON.stringify([ballon === 'off' ? 'L' : 'M']))
     }
     if (fn === 'air') {
-      return wrap('changeMode', JSON.stringify([air === 'off' ? 'A' : 'F']))
+      return wrap('changeMode', JSON.stringify([airMode]))
     }
     if (fn === 'vacances') {
       const s = vacStart ? utcStamp(new Date(vacStart)) : ''
@@ -160,7 +160,7 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
       return json.trim()
     }
     return null
-  }, [fn, consZone, consZoneFree, consTemp, ballon, air, modeSel, modeFree, customCode, vacStart, vacEnd, cmo, json, rpc])
+  }, [fn, consZone, consZoneFree, consTemp, ballon, airMode, modeSel, modeFree, customCode, vacStart, vacEnd, cmo, json, rpc])
 
   const submit = async () => {
     setStatus(null)
@@ -306,14 +306,18 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
         <>
           <div className={styles.row}>
             <label>Rafraîchissement air</label>
-            <select value={air} onChange={(e) => setAir(e.target.value)}>
-              <option value="on">On · Froid confort (F)</option>
-              <option value="off">Off · Arrêt (A)</option>
+            <select value={airMode} onChange={(e) => setAirMode(e.target.value)}>
+              <option value="F">Confort · mode confort</option>
+              <option value="H">Progr C · programme rafraîchissement C</option>
+              <option value="I">Progr D · programme rafraîchissement D</option>
+              <option value="A">Arrêt</option>
             </select>
           </div>
           <div className={styles.hint}>
             <span>
-              envoie <code>changeMode</code> <code>{'["F"]'}</code> (On) ou <code>{'["A"]'}</code> (Off)
+              envoie <code>changeMode</code> <code>{'["F"]'}</code> (confort),{' '}
+              <code>{'["H"]'}</code> (Progr C), <code>{'["I"]'}</code> (Progr D),{' '}
+              <code>{'["A"]'}</code> (arrêt)
             </span>
           </div>
         </>
