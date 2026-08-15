@@ -64,18 +64,49 @@ function parseRequested(messages: MsgEvent[]): Record<string, number> {
   return map
 }
 
+/** Détecte les mises à jour de température envoyées par la box (non-injectées) */
+function parseBoxTemps(messages: MsgEvent[]): Record<string, number> {
+  const map: Record<string, number> = {}
+  for (const m of messages) {
+    if (m.injected) continue
+    const p = m.payload
+    if (!p) continue
+    const mm = p.match(/"UsC(\d{1,2})"\s*:\s*([0-9.]+)/)
+    if (!mm) continue
+    const v = parseFloat(mm[2])
+    if (!Number.isNaN(v)) map[mm[1]] = v
+  }
+  return map
+}
+
 export default function TempsPanel({ pollMs = 5000, clientId, connected, messages }: Props) {
   const [products, setProducts] = useState<AldesProduct[]>([])
   const [error, setError] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
   const [requested, setRequested] = useState<Record<string, number>>({})
+  const [confirmed, setConfirmed] = useState<Record<string, boolean>>({})
   const [sending, setSending] = useState<string | null>(null)
 
   const requestedFromSse = useMemo(() => parseRequested(messages ?? []), [messages])
+  const boxTemps = useMemo(() => parseBoxTemps(messages ?? []), [messages])
 
   useEffect(() => {
     setRequested((r) => ({ ...r, ...requestedFromSse }))
   }, [requestedFromSse])
+
+  useEffect(() => {
+    if (Object.keys(boxTemps).length === 0) return
+    setConfirmed((c) => {
+      const next = { ...c }
+      for (const [zone, val] of Object.entries(boxTemps)) {
+        const req = requestedFromSse[zone]
+        if (req !== undefined && Math.abs(req - val) < 0.01) {
+          next[zone] = true
+        }
+      }
+      return next
+    })
+  }, [boxTemps, requestedFromSse])
 
   useEffect(() => {
     let alive = true
@@ -114,6 +145,7 @@ export default function TempsPanel({ pollMs = 5000, clientId, connected, message
     try {
       await sendCommand(`devices/${clientId}/messages/devicebound`, payload, 1)
       setRequested((r) => ({ ...r, [t.ThermostatId]: next }))
+      setConfirmed((c) => ({ ...c, [t.ThermostatId]: false }))
     } catch (e) {
       alert(`échec envoi ${zone} : ${(e as Error).message}`)
     } finally {
@@ -221,8 +253,7 @@ export default function TempsPanel({ pollMs = 5000, clientId, connected, message
                 )}
                 {ts.map((t) => {
                   const req = requested[t.ThermostatId]
-                  const applied = t.TemperatureSet
-                  const diff = req !== undefined && applied !== null && Math.abs(req - applied) > 0.01
+                  const isPending = req !== undefined && !confirmed[t.ThermostatId]
                   return (
                     <tr key={t.ThermostatId}>
                       <td className={styles.zone}>{t.Name}</td>
@@ -247,7 +278,7 @@ export default function TempsPanel({ pollMs = 5000, clientId, connected, message
                             +
                           </button>
                         </div>
-                        {diff && (
+                        {isPending && (
                           <div className={styles.pending}>
                             demandé {fmtDeg(req, 1)}
                           </div>
