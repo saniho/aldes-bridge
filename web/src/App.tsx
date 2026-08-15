@@ -236,7 +236,11 @@ const { messages, lastSnapshot } = useMemo(() => {
       <div className="layout">
         {view === 'temps' && (
           <div className="streamCol">
-            <TempsPanel />
+            <TempsPanel
+              clientId={config?.client_id ?? null}
+              connected={config?.connected ?? false}
+              messages={messages}
+            />
           </div>
         )}
         {view === 'commande' && (

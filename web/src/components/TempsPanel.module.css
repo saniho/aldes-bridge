@@ -167,6 +167,54 @@
   color: var(--out);
 }
 
+.consigneRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stepBtn {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-node);
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s;
+  line-height: 1;
+  padding: 0;
+}
+
+.stepBtn:hover:not(:disabled) {
+  background: var(--bg-card);
+  border-color: var(--out);
+  color: var(--out);
+}
+
+.stepBtn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.consigneVal {
+  min-width: 48px;
+  text-align: center;
+}
+
+.pending {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--out);
+  font-weight: 500;
+  opacity: 0.85;
+}
+
 .none {
   color: var(--text-faint);
   text-align: center;

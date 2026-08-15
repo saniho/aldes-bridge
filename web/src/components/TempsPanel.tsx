@@ -1,11 +1,14 @@
-import { useEffect, useState } from 'react'
-import { getProducts } from '../api'
-import type { AldesProduct } from '../types'
+import { useEffect, useMemo, useState } from 'react'
+import { getProducts, sendCommand } from '../api'
+import type { AldesProduct, MsgEvent } from '../types'
 import { fmtParis } from '../parisTime'
 import styles from './TempsPanel.module.css'
 
 interface Props {
   pollMs?: number
+  clientId?: string | null
+  connected?: boolean
+  messages?: MsgEvent[]
 }
 
 const AIR_LABEL: Record<string, string> = {
@@ -48,10 +51,31 @@ function ballonMode(code: string | null): { label: string; on: boolean } | null 
   return { label: m, on: code !== 'L' }
 }
 
-export default function TempsPanel({ pollMs = 5000 }: Props) {
+function parseRequested(messages: MsgEvent[]): Record<string, number> {
+  const map: Record<string, number> = {}
+  for (const m of messages) {
+    const p = m.payload
+    if (!p) continue
+    const mm = p.match(/"method"\s*:\s*"changeConsigneC(\d{1,2})"\s*,\s*"params"\s*:\s*\["([^"]+)"\]/)
+    if (!mm) continue
+    const v = parseFloat(mm[2])
+    if (!Number.isNaN(v)) map[mm[1]] = v
+  }
+  return map
+}
+
+export default function TempsPanel({ pollMs = 5000, clientId, connected, messages }: Props) {
   const [products, setProducts] = useState<AldesProduct[]>([])
   const [error, setError] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
+  const [requested, setRequested] = useState<Record<string, number>>({})
+  const [sending, setSending] = useState<string | null>(null)
+
+  const requestedFromSse = useMemo(() => parseRequested(messages ?? []), [messages])
+
+  useEffect(() => {
+    setRequested((r) => ({ ...r, ...requestedFromSse }))
+  }, [requestedFromSse])
 
   useEffect(() => {
     let alive = true
@@ -76,6 +100,26 @@ export default function TempsPanel({ pollMs = 5000 }: Props) {
       if (timer) clearInterval(timer)
     }
   }, [pollMs])
+
+  const canSend = !!connected && !!clientId
+
+  const step = async (t: { ThermostatId: string; TemperatureSet: number | null; CurrentTemperature: number | null }, delta: number) => {
+    if (!canSend) return
+    const zone = 'C' + t.ThermostatId
+    const base = t.TemperatureSet ?? t.CurrentTemperature ?? 0
+    const next = Math.round((base + delta) * 2) / 2
+    const val = Number.isInteger(next) ? String(next) : next.toFixed(1)
+    const payload = JSON.stringify({ id: 1, jsonrpc: '2.0', method: `changeConsigne${zone}`, params: [val] })
+    setSending(zone)
+    try {
+      await sendCommand(`devices/${clientId}/messages/devicebound`, payload, 1)
+      setRequested((r) => ({ ...r, [t.ThermostatId]: next }))
+    } catch (e) {
+      alert(`échec envoi ${zone} : ${(e as Error).message}`)
+    } finally {
+      setSending(null)
+    }
+  }
 
   if (failed && products.length === 0) {
     return (
@@ -175,13 +219,43 @@ export default function TempsPanel({ pollMs = 5000 }: Props) {
                     </td>
                   </tr>
                 )}
-                {ts.map((t) => (
-                  <tr key={t.ThermostatId}>
-                    <td className={styles.zone}>{t.Name}</td>
-                    <td className={styles.reel}>{fmtDeg(t.CurrentTemperature)}</td>
-                    <td className={styles.consigne}>{fmtDeg(t.TemperatureSet)}</td>
-                  </tr>
-                ))}
+                {ts.map((t) => {
+                  const req = requested[t.ThermostatId]
+                  const applied = t.TemperatureSet
+                  const diff = req !== undefined && applied !== null && Math.abs(req - applied) > 0.01
+                  return (
+                    <tr key={t.ThermostatId}>
+                      <td className={styles.zone}>{t.Name}</td>
+                      <td className={styles.reel}>{fmtDeg(t.CurrentTemperature)}</td>
+                      <td className={styles.consigne}>
+                        <div className={styles.consigneRow}>
+                          <button
+                            className={styles.stepBtn}
+                            onClick={() => step(t, -1)}
+                            disabled={!canSend || sending !== null}
+                            title="Diminuer de 1 °C"
+                          >
+                            −
+                          </button>
+                          <span className={styles.consigneVal}>{fmtDeg(t.TemperatureSet)}</span>
+                          <button
+                            className={styles.stepBtn}
+                            onClick={() => step(t, 1)}
+                            disabled={!canSend || sending !== null}
+                            title="Augmenter de 1 °C"
+                          >
+                            +
+                          </button>
+                        </div>
+                        {diff && (
+                          <div className={styles.pending}>
+                            demandé {fmtDeg(req, 1)}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
 
