@@ -44,6 +44,32 @@ function fmtStamp(iso: string): string {
   return s ? `${s} (Paris)` : ''
 }
 
+const FRESH_MIN = 15
+const WATCH_MIN = 45
+
+type Freshness = 'fresh' | 'watch' | 'stale'
+
+function ageMin(iso: string | null | undefined, now: number): number | null {
+  if (!iso) return null
+  const t = new Date(iso).getTime()
+  if (Number.isNaN(t)) return null
+  return Math.max(0, Math.floor((now - t) / 60000))
+}
+
+function fmtAge(min: number): string {
+  if (min < 1) return "moins d'1 min"
+  if (min < 60) return `${min} min`
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  return m ? `${h} h ${m.toString().padStart(2, '0')}` : `${h} h`
+}
+
+function freshness(min: number): Freshness {
+  if (min <= FRESH_MIN) return 'fresh'
+  if (min <= WATCH_MIN) return 'watch'
+  return 'stale'
+}
+
 function ballonMode(code: string | null): { label: string; on: boolean } | null {
   if (!code) return null
   const m = WATER_LABEL[code]
@@ -56,6 +82,12 @@ export default function TempsPanel({ pollMs = 5000, clientId, connected, consign
   const [error, setError] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
   const [sending, setSending] = useState<string | null>(null)
+  const [now, setNow] = useState<number>(() => Date.now())
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 15_000)
+    return () => clearInterval(id)
+  }, [])
 
   useEffect(() => {
     let alive = true
@@ -128,11 +160,34 @@ export default function TempsPanel({ pollMs = 5000, clientId, connected, consign
                   {p.modem} · {p.serial_number} · {p.reference}
                 </div>
               </div>
-              <span
-                className={styles.badge + ' ' + (p.isConnected ? styles.on : styles.off)}
-              >
-                {p.isConnected ? '● connectée' : '○ hors ligne'}
-              </span>
+              <div className={styles.cardHeadRight}>
+                <span
+                  className={
+                    styles.badge +
+                    ' ' +
+                    (p.isConnected ? styles.on : styles.off)
+                  }
+                >
+                  {p.isConnected ? '● connectée' : '○ hors ligne'}
+                </span>
+                {(() => {
+                  const min = ageMin(p.updatedAt, now)
+                  if (min === null) return null
+                  const f = freshness(min)
+                  return (
+                    <span
+                      className={styles.badge + ' ' + styles[f]}
+                      title={`dernière trame reçue à ${fmtStamp(p.updatedAt ?? '')}`}
+                    >
+                      {f === 'stale'
+                        ? `figée depuis ${fmtAge(min)}`
+                        : f === 'watch'
+                          ? `sans données depuis ${fmtAge(min)}`
+                          : `à jour · ${fmtAge(min)}`}
+                    </span>
+                  )
+                })()}
+              </div>
             </div>
 
             <div className={styles.stats}>
