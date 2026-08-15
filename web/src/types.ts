@@ -19,6 +19,7 @@ export interface Config {
   raw?: RawConfig
   box_since?: number | null
   cloud_since?: number | null
+  consignes?: Record<string, { requested: number; confirmed: boolean; ts?: string }>
 }
 
 export interface MsgEvent {
@@ -52,7 +53,15 @@ export interface SnapshotEvent {
   messages: MsgEvent[]
 }
 
-export type BridgeEvent = SnapshotEvent | MsgEvent | StatusEvent
+export interface ConsigneEvent {
+  kind: 'consigne'
+  zone: string
+  requested: number
+  confirmed: boolean
+  ts?: string
+}
+
+export type BridgeEvent = SnapshotEvent | MsgEvent | StatusEvent | ConsigneEvent
 
 export interface AldesThermostat {
   ThermostatId: string

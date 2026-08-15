@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getProducts, sendCommand } from '../api'
+import { getProducts, sendCommand, requestConsigne } from '../api'
 import type { AldesProduct } from '../types'
 import { fmtParis } from '../parisTime'
 import styles from './TempsPanel.module.css'
@@ -8,9 +8,7 @@ interface Props {
   pollMs?: number
   clientId?: string | null
   connected?: boolean
-  requested: Record<string, number>
-  confirmed: Record<string, boolean>
-  onRequest: (zoneId: string, value: number) => void
+  consignes?: Record<string, { requested: number; confirmed: boolean; ts?: string }>
 }
 
 const AIR_LABEL: Record<string, string> = {
@@ -53,7 +51,7 @@ function ballonMode(code: string | null): { label: string; on: boolean } | null 
   return { label: m, on: code !== 'L' }
 }
 
-export default function TempsPanel({ pollMs = 5000, clientId, connected, requested, confirmed, onRequest }: Props) {
+export default function TempsPanel({ pollMs = 5000, clientId, connected, consignes = {} }: Props) {
   const [products, setProducts] = useState<AldesProduct[]>([])
   const [error, setError] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
@@ -95,7 +93,7 @@ export default function TempsPanel({ pollMs = 5000, clientId, connected, request
     setSending(zone)
     try {
       await sendCommand(`devices/${clientId}/messages/devicebound`, payload, 1)
-      onRequest(t.ThermostatId, next)
+      await requestConsigne(t.ThermostatId, next)
     } catch (e) {
       alert(`échec envoi ${zone} : ${(e as Error).message}`)
     } finally {
@@ -202,8 +200,8 @@ export default function TempsPanel({ pollMs = 5000, clientId, connected, request
                   </tr>
                 )}
                 {ts.map((t) => {
-                  const req = requested[t.ThermostatId]
-                  const isPending = req !== undefined && !confirmed[t.ThermostatId]
+                  const entry = consignes[t.ThermostatId]
+                  const isPending = entry !== undefined && !entry.confirmed
                   return (
                     <tr key={t.ThermostatId}>
                       <td className={styles.zone}>{t.Name}</td>
@@ -230,7 +228,7 @@ export default function TempsPanel({ pollMs = 5000, clientId, connected, request
                         </div>
                         {isPending && (
                           <div className={styles.pending}>
-                            demandé {fmtDeg(req, 1)}
+                            demandé {fmtDeg(entry.requested, 1)}
                           </div>
                         )}
                       </td>

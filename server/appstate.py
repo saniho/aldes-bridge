@@ -108,7 +108,7 @@ class AppState:
         "evt_topic": "devices_MAC_AIR/messages/events",
     }
 
-    def __init__(self, real_host, real_port, events, mode_file=None, telemetry_file=None):
+    def __init__(self, real_host, real_port, events, mode_file=None, telemetry_file=None, consigne_file=None):
         self.events = events if events is not None else EventBus()
         self._lock = threading.Lock()
         self.real_host = real_host
@@ -120,6 +120,9 @@ class AppState:
         self._last_error = None
         self._raw = dict(AppState.DEFAULT_RAW)
         self.telemetry = {}
+        # Consignes thermostats demandees (en attente de confirmation box).
+        # zone (str "0".."9") -> {"requested": float, "confirmed": bool, "ts": iso}
+        self._consignes = {}
         # Horodatages de connexion (epoch secondes) pour afficher les durees en haut.
         self._box_since = None
         self._cloud_since = None
@@ -128,7 +131,10 @@ class AppState:
         # Persistance des telemetries captees : les dernieres valeurs restent
         # disponibles entre deux flux (et meme apres un redemarrage).
         self._telemetry_file = telemetry_file
+        # Persistance des consignes demandees (survit au redemarrage du conteneur).
+        self._consigne_file = consigne_file
         self._load_telemetry()
+        self._load_consignes()
 
     @property
     def mode(self):
@@ -205,6 +211,82 @@ class AppState:
             current["_upd_at"] = time.time()
             self.telemetry[pid] = current
             self._save_telemetry()
+            self._confirm_consignes_from(data)
+
+    def _load_consignes(self):
+        """Recharge les consignes demandees depuis consigne_file."""
+        path = self._consigne_file
+        if not path:
+            return
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            return
+        if isinstance(data, dict):
+            self._consignes = {k: v for k, v in data.items()
+                               if isinstance(v, dict) and "requested" in v}
+
+    def _save_consignes(self):
+        """Persiste les consignes demandees (a appeler sous self._lock)."""
+        path = self._consigne_file
+        if not path:
+            return
+        try:
+            os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+            tmp = path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(self._consignes, f)
+            os.replace(tmp, path)
+        except OSError:
+            pass
+
+    def request_consigne(self, zone, value):
+        """Enregistre une consigne demandee pour une zone (en attente box)."""
+        with self._lock:
+            prev = self._consignes.get(zone)
+            entry = {"requested": float(value), "confirmed": False, "ts": _iso()}
+            self._consignes[zone] = entry
+            self._save_consignes()
+        if prev is None or prev.get("requested") != entry["requested"]:
+            self.events.publish({
+                "kind": "consigne", "zone": zone,
+                "requested": entry["requested"], "confirmed": False, "ts": entry["ts"],
+            })
+
+    def _confirm_consignes_from(self, data):
+        """Confirme les consignes dont la box a rejoue la valeur dans une telemetrie.
+
+        A appeler sous self._lock : pour chaque zone dont une UsC<n> est presente
+        dans la trame, si elle correspond a une consigne demandee, on la marque
+        confirmee (la box a bien applique la valeur) et on persiste.
+        """
+        changed = []
+        for zone, entry in self._consignes.items():
+            if entry.get("confirmed"):
+                continue
+            try:
+                got = float(data.get("UsC%s" % zone))
+            except (TypeError, ValueError):
+                continue
+            if abs(got - entry["requested"]) < 0.01:
+                entry["confirmed"] = True
+                entry["ts"] = _iso()
+                changed.append(zone)
+        if not changed:
+            return
+        self._save_consignes()
+        if changed:
+            for zone in changed:
+                entry = self._consignes[zone]
+                self.events.publish({
+                    "kind": "consigne", "zone": zone,
+                    "requested": entry["requested"], "confirmed": True, "ts": entry["ts"],
+                })
+
+    def consignes_state(self):
+        with self._lock:
+            return {k: dict(v) for k, v in self._consignes.items()}
 
     def session_up(self, client_id):
         with self._lock:
@@ -276,4 +358,5 @@ class AppState:
                 "mode_file": self._mode_file,
                 "box_since": self._box_since,
                 "cloud_since": self._cloud_since,
+                "consignes": {k: dict(v) for k, v in self._consignes.items()},
             }
