@@ -29,7 +29,7 @@ function mergeConsignes(
 }
 
 const TABS: { id: View; label: string; title: string }[] = [
-  { id: 'temps', label: '🌡 températures', title: 'Températures / infos de la PAC' },
+  { id: 'temps', label: '🌡 infos aldes', title: 'Températures / infos de la PAC' },
   { id: 'commande', label: '📤 commande', title: 'Envoyer des commandes à la box' },
   { id: 'log', label: '📜 log', title: 'Trames MQTT en temps réel et historique' },
   { id: 'wrapper', label: '🔌 wrapper', title: 'Appels API du bridge (test interactif)' }
