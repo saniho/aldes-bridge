@@ -198,6 +198,14 @@ Une fois la box reconnectée (elle se réabonne périodiquement à
 `aldesiotsuite.azure-devices.net`), elle apparaît `connected: true` dans `/api/config`
 et les trames MQTT s'affichent dans la WebUI (onglet « flux »).
 
+> ⏳ **Patienter après (re)démarrage** : la box ne publie pas sa télémetrie dès sa
+> connexion. Elle l'envoie **par rafales**, espacées de plusieurs minutes à quelques
+> dizaines de minutes (d'abord les températures `MT*`/`UsC*`, puis les programmes).
+> Au démarrage du pont ou du conteneur, il faut donc **attendre la première rafale**
+> avant de voir des températures : `connected: true` ne signifie pas des données
+> fraîches. L'onglet « températures » l'indique via le badge de fraîcheur
+> (`à jour` / `sans données depuis X` / `figée depuis X`, basé sur `updatedAt`).
+
 ### Mise à jour
 
 ```bash
@@ -248,6 +256,9 @@ Mapping télémetrie → product (voir `server/aldes.py`) :
   Fuseau configurable via `ALDES_BOX_TZ` (ex. `Europe/Paris`).
 - `updatedAt` → horodatage **serveur** de la dernière mise à jour de la télémetrie
   (affiché « mise à jour » dans l'onglet températures, distinct du `dt` fourni par la box).
+  C'est lui qui pilote le badge de fraîcheur de l'UI : `à jour` (< 15 min),
+  `sans données depuis X` (15–45 min), `figée depuis X` (> 45 min) — rappel : après un
+  démarrage, la première télémetrie peut mettre plusieurs minutes à arriver.
 - Les dernières télémetries captées sont persistées dans `logs/telemetry.json`
   (volume monté) : les températures restent disponibles entre deux flux et après
   redémarrage du conteneur, jusqu'à l'arrivée d'un nouveau flux.
