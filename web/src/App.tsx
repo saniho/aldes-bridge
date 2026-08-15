@@ -3,14 +3,23 @@ import { useSse } from './hooks/useSse'
 import { getConfig, setMode, disconnect, clearHistory, getLogs } from './api'
 import type { BridgeEvent, Config, Mode, MsgEvent } from './types'
 import StatusBar from './components/StatusBar'
-import SendPanel from './components/SendPanel'
 import MessageStream from './components/MessageStream'
 import ModeDiagram from './components/ModeDiagram'
 import StatsBar from './components/StatsBar'
 import RawPanel from './components/RawPanel'
 import CommandBuilder from './components/CommandBuilder'
 import TempsPanel from './components/TempsPanel'
+import WrapperPanel from './components/WrapperPanel'
 import './App.css'
+
+type View = 'temps' | 'commande' | 'log' | 'wrapper'
+
+const TABS: { id: View; label: string; title: string }[] = [
+  { id: 'temps', label: '🌡 températures', title: 'Températures / infos de la PAC' },
+  { id: 'commande', label: '📤 commande', title: 'Envoyer des commandes à la box' },
+  { id: 'log', label: '📜 log', title: 'Trames MQTT en temps réel et historique' },
+  { id: 'wrapper', label: '🔌 wrapper', title: 'Appels API du bridge (test interactif)' }
+]
 
 export default function App() {
   const [config, setConfig] = useState<Config | null>(null)
@@ -18,8 +27,13 @@ export default function App() {
   const [theme, setTheme] = useState<'nuit' | 'jour'>(() => {
     return (localStorage.getItem('aldes-theme') as 'nuit' | 'jour') || 'nuit'
   })
-  const [view, setView] = useState<'flux' | 'temps'>(() => {
-    return (localStorage.getItem('aldes-view') as 'flux' | 'temps') || 'flux'
+  const [view, setView] = useState<View>(() => {
+    const stored = localStorage.getItem('aldes-view')
+    if (stored === 'flux') return 'log'
+    if (stored === 'temps' || stored === 'commande' || stored === 'log' || stored === 'wrapper') {
+      return stored
+    }
+    return 'log'
   })
   const [histOpen, setHistOpen] = useState(false)
   const [log, setLog] = useState<{
@@ -167,35 +181,31 @@ const { messages, lastSnapshot } = useMemo(() => {
         <h1>Aldes Bridge</h1>
         <div className="topRight">
           <div className="tabs" role="tablist">
-            <button
-              role="tab"
-              aria-selected={view === 'flux'}
-              className={'tab' + (view === 'flux' ? ' active' : '')}
-              onClick={() => setView('flux')}
-              title="Trames MQTT en temps réel"
-            >
-              🌊 flux
-            </button>
-            <button
-              role="tab"
-              aria-selected={view === 'temps'}
-              className={'tab' + (view === 'temps' ? ' active' : '')}
-              onClick={() => setView('temps')}
-              title="Températures connues (réel / consigne)"
-            >
-              🌡 températures
-            </button>
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                role="tab"
+                aria-selected={view === t.id}
+                className={'tab' + (view === t.id ? ' active' : '')}
+                onClick={() => setView(t.id)}
+                title={t.title}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
-          <button
-            className={'hist' + (histOpen ? ' active' : '')}
-            onClick={() => {
-              if (histOpen) setHistOpen(false)
-              else setHistOpen(true)
-            }}
-            title={histOpen ? 'Revenir au flux en temps réel' : 'Consulter le log persistant (à posteriori)'}
-          >
-            {histOpen ? '⚡ temps réel' : '🕘 historique'}
-          </button>
+          {view === 'log' && (
+            <button
+              className={'hist' + (histOpen ? ' active' : '')}
+              onClick={() => {
+                if (histOpen) setHistOpen(false)
+                else setHistOpen(true)
+              }}
+              title={histOpen ? 'Revenir au flux en temps réel' : 'Consulter le log persistant (à posteriori)'}
+            >
+              {histOpen ? '⚡ temps réel' : '🕘 historique'}
+            </button>
+          )}
           <button
             className="theme"
             onClick={() => setTheme((t) => (t === 'nuit' ? 'jour' : 'nuit'))}
@@ -224,50 +234,50 @@ const { messages, lastSnapshot } = useMemo(() => {
         connected={config?.connected ?? false}
       />
       <div className="layout">
-        <>
+        {view === 'temps' && (
           <div className="streamCol">
-            {view === 'temps' ? (
-              <TempsPanel />
-            ) : (
-              <>
-                {histOpen && (
-                  <div className="histbar">
-                    <span className="histLabel">
-                      🕘 historique — {log.events.length} trames affichées / {log.total} au total
-                    </span>
-                    <span className="histActions">
-                      <button
-                        disabled={log.loading || log.offset >= log.total}
-                        onClick={() => loadLog(log.offset, 'append')}
-                      >
-                        {log.loading ? 'chargement…' : '↕ charger antérieur'}
-                      </button>
-                      <button disabled={log.loading || log.offset === 0} onClick={() => loadLog(0, 'replace')}>
-                        ⤒ début
-                      </button>
-                    </span>
-                  </div>
-                )}
-                <MessageStream messages={shown} />
-              </>
+            <TempsPanel />
+          </div>
+        )}
+        {view === 'commande' && (
+          <div className="cmdCol">
+            <CommandBuilder
+              mode={config?.mode ?? null}
+              connected={config?.connected ?? false}
+              clientId={config?.client_id ?? null}
+              defaultTopic={config?.mode === 'raw' ? config?.raw?.cmd_topic ?? null : null}
+            />
+            {config?.mode === 'raw' && <RawPanel />}
+          </div>
+        )}
+        {view === 'log' && (
+          <div className="streamCol">
+            {histOpen && (
+              <div className="histbar">
+                <span className="histLabel">
+                  🕘 historique — {log.events.length} trames affichées / {log.total} au total
+                </span>
+                <span className="histActions">
+                  <button
+                    disabled={log.loading || log.offset >= log.total}
+                    onClick={() => loadLog(log.offset, 'append')}
+                  >
+                    {log.loading ? 'chargement…' : '↕ charger antérieur'}
+                  </button>
+                  <button disabled={log.loading || log.offset === 0} onClick={() => loadLog(0, 'replace')}>
+                    ⤒ début
+                  </button>
+                </span>
+              </div>
             )}
+            <MessageStream messages={shown} />
           </div>
-          <div className="side">
-          <CommandBuilder
-            mode={config?.mode ?? null}
-            connected={config?.connected ?? false}
-            clientId={config?.client_id ?? null}
-            defaultTopic={config?.mode === 'raw' ? config?.raw?.cmd_topic ?? null : null}
-          />
-          <SendPanel
-            mode={config?.mode ?? null}
-            connected={config?.connected ?? false}
-            clientId={config?.client_id ?? null}
-            defaultTopic={config?.mode === 'raw' ? config?.raw?.cmd_topic ?? null : null}
-          />
-          {config?.mode === 'raw' && <RawPanel />}
+        )}
+        {view === 'wrapper' && (
+          <div className="streamCol">
+            <WrapperPanel clientId={config?.client_id ?? null} />
           </div>
-        </>
+        )}
       </div>
     </div>
   )

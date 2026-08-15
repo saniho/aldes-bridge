@@ -89,3 +89,44 @@ export async function getProducts(): Promise<import('./types').AldesProduct[]> {
     await fetch('/aldesoc/v5/users/me/products')
   )
 }
+
+export interface ApiCallOptions {
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+  path: string
+  body?: unknown
+  contentType?: 'json' | 'form'
+}
+
+export interface ApiResult {
+  ok: boolean
+  status: number
+  statusText: string
+  ms: number
+  data: unknown
+}
+
+export async function apiCall(opts: ApiCallOptions): Promise<ApiResult> {
+  const started = performance.now()
+  const headers: Record<string, string> = {}
+  let body: BodyInit | undefined
+  if (opts.body !== undefined) {
+    if (opts.contentType === 'form') {
+      headers['content-type'] = 'application/x-www-form-urlencoded'
+      body = new URLSearchParams(
+        opts.body as Record<string, string>
+      ).toString()
+    } else {
+      headers['content-type'] = 'application/json'
+      body = JSON.stringify(opts.body)
+    }
+  }
+  const res = await fetch(opts.path, { method: opts.method, headers, body })
+  const ms = Math.round(performance.now() - started)
+  let data: unknown
+  try {
+    data = await res.json()
+  } catch {
+    data = await res.text()
+  }
+  return { ok: res.ok, status: res.status, statusText: res.statusText, ms, data }
+}
