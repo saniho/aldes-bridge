@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSse } from './hooks/useSse'
-import { getConfig, setMode, disconnect, clearHistory, getLogs } from './api'
-import type { BridgeEvent, Config, Mode, MsgEvent } from './types'
+import { getConfig, setMode, disconnect, clearHistory, getLogs, getConsignes } from './api'
+import type { BridgeEvent, Config, ConsigneEvent, Mode, MsgEvent } from './types'
 import StatusBar from './components/StatusBar'
 import MessageStream from './components/MessageStream'
 import ModeDiagram from './components/ModeDiagram'
@@ -13,6 +13,20 @@ import WrapperPanel from './components/WrapperPanel'
 import './App.css'
 
 type View = 'temps' | 'commande' | 'log' | 'wrapper'
+
+function mergeConsignes(
+  c: Record<string, { requested: number; confirmed: boolean; ts?: string }>
+): Record<string, { requested: number; confirmed: boolean; ts?: string }> {
+  const out: Record<string, { requested: number; confirmed: boolean; ts?: string }> = {}
+  for (const [k, v] of Object.entries(c)) {
+    out[k] = {
+      requested: Number(v.requested),
+      confirmed: Boolean(v.confirmed),
+      ts: typeof v.ts === 'string' ? v.ts : undefined
+    }
+  }
+  return out
+}
 
 const TABS: { id: View; label: string; title: string }[] = [
   { id: 'temps', label: '🌡 températures', title: 'Températures / infos de la PAC' },
@@ -36,8 +50,9 @@ export default function App() {
     return 'log'
   })
   const [histOpen, setHistOpen] = useState(false)
-  const [requested, setRequested] = useState<Record<string, number>>({})
-  const [confirmed, setConfirmed] = useState<Record<string, boolean>>({})
+  const [consignes, setConsignes] = useState<
+    Record<string, { requested: number; confirmed: boolean; ts?: string }>
+  >({})
   const [log, setLog] = useState<{
     events: BridgeEvent[]
     total: number
@@ -46,33 +61,6 @@ export default function App() {
   }>({ events: [], total: 0, offset: 0, loading: false })
 
   const LOG_PAGE = 200
-
-  const parseRequested = useCallback((msgs: MsgEvent[]): Record<string, number> => {
-    const map: Record<string, number> = {}
-    for (const m of msgs) {
-      const p = m.payload
-      if (!p) continue
-      const mm = p.match(/"method"\s*:\s*"changeConsigneC(\d{1,2})"\s*,\s*"params"\s*:\s*\["([^"]+)"\]/)
-      if (!mm) continue
-      const v = parseFloat(mm[2])
-      if (!Number.isNaN(v)) map[mm[1]] = v
-    }
-    return map
-  }, [])
-
-  const parseBoxTemps = useCallback((msgs: MsgEvent[]): Record<string, number> => {
-    const map: Record<string, number> = {}
-    for (const m of msgs) {
-      if (m.injected) continue
-      const p = m.payload
-      if (!p) continue
-      const mm = p.match(/"UsC(\d{1,2})"\s*:\s*([0-9.]+)/)
-      if (!mm) continue
-      const v = parseFloat(mm[2])
-      if (!Number.isNaN(v)) map[mm[1]] = v
-    }
-    return map
-  }, [])
 
   useEffect(() => {
     if (theme === 'jour') {
@@ -105,8 +93,10 @@ export default function App() {
           topics: cfg.topics ?? [],
           last_error: cfg.last_error ?? null,
           box_since: cfg.box_since ?? null,
-          cloud_since: cfg.cloud_since ?? null
+          cloud_since: cfg.cloud_since ?? null,
+          consignes: cfg.consignes ?? undefined
         })
+        if (cfg.consignes) setConsignes(mergeConsignes(cfg.consignes))
       } catch {
         /* on réessaiera au prochain tick */
       }
@@ -137,26 +127,30 @@ const { messages, lastSnapshot } = useMemo(() => {
     if (lastSnapshot) setConfig(lastSnapshot)
   }, [lastSnapshot])
 
-  const reqFromSse = useMemo(() => parseRequested(messages), [messages, parseRequested])
-  const boxTemps = useMemo(() => parseBoxTemps(messages), [messages, parseBoxTemps])
+  useEffect(() => {
+    if (lastSnapshot?.consignes) setConsignes(mergeConsignes(lastSnapshot.consignes))
+  }, [lastSnapshot])
 
   useEffect(() => {
-    setRequested((r) => ({ ...r, ...reqFromSse }))
-  }, [reqFromSse])
+    let alive = true
+    getConsignes()
+      .then((c) => {
+        if (alive) setConsignes(mergeConsignes(c))
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [])
 
   useEffect(() => {
-    if (Object.keys(boxTemps).length === 0) return
-    setConfirmed((c) => {
-      const next = { ...c }
-      for (const [zone, val] of Object.entries(boxTemps)) {
-        const req = reqFromSse[zone]
-        if (req !== undefined && Math.abs(req - val) < 0.01) {
-          next[zone] = true
-        }
+    for (const e of events) {
+      if (e.kind === 'consigne') {
+        const ce = e as ConsigneEvent
+        setConsignes((c) => ({ ...c, [ce.zone]: { requested: ce.requested, confirmed: ce.confirmed, ts: ce.ts } }))
       }
-      return next
-    })
-  }, [boxTemps, reqFromSse])
+    }
+  }, [events])
 
   const onMode = useCallback(async (m: Mode) => {
     const cur = config?.mode ?? m
@@ -289,12 +283,7 @@ const { messages, lastSnapshot } = useMemo(() => {
             <TempsPanel
               clientId={config?.client_id ?? null}
               connected={config?.connected ?? false}
-              requested={requested}
-              confirmed={confirmed}
-              onRequest={(zoneId, value) => {
-                setRequested((r) => ({ ...r, [zoneId]: value }))
-                setConfirmed((c) => ({ ...c, [zoneId]: false }))
-              }}
+              consignes={consignes}
             />
           </div>
         )}

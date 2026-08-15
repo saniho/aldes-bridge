@@ -30,6 +30,11 @@ class RawBody(BaseModel):
     evt_topic: str = ""
 
 
+class ConsigneBody(BaseModel):
+    zone: str
+    value: float
+
+
 def create_app(state, engine, web_dir):
     app = FastAPI(title="Aldes Bridge", docs_url=None, redoc_url=None)
     web_dir = os.path.abspath(web_dir)
@@ -126,6 +131,15 @@ def create_app(state, engine, web_dir):
     def api_send(body: SendBody):
         qos = body.qos if body.qos in (0, 1, 2) else 0
         return engine.inject(body.topic, body.payload, qos)
+
+    @app.get("/api/consigne")
+    def api_consigne_get():
+        return {"consignes": state.consignes_state()}
+
+    @app.post("/api/consigne")
+    def api_consigne_post(body: ConsigneBody):
+        state.request_consigne(body.zone, body.value)
+        return {"ok": True, "consignes": state.consignes_state()}
 
     @app.post("/api/disconnect")
     def api_disconnect():

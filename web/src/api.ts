@@ -65,6 +65,31 @@ export async function sendCommand(
   )
 }
 
+export interface ConsigneEntry {
+  requested: number
+  confirmed: boolean
+  ts?: string
+}
+
+export async function getConsignes(): Promise<Record<string, ConsigneEntry>> {
+  return json<{ consignes: Record<string, ConsigneEntry> }>(await fetch('/api/consigne')).then(
+    (r) => r.consignes
+  )
+}
+
+export async function requestConsigne(
+  zone: string,
+  value: number
+): Promise<Record<string, ConsigneEntry>> {
+  return json<{ consignes: Record<string, ConsigneEntry> }>(
+    await fetch('/api/consigne', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ zone, value })
+    })
+  ).then((r) => r.consignes)
+}
+
 export async function disconnect(): Promise<{ ok: boolean }> {
   return json<{ ok: boolean }>(await fetch('/api/disconnect', { method: 'POST' }))
 }

@@ -16,6 +16,7 @@ APP_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 DEFAULT_MODE_FILE = os.path.join(APP_ROOT, "logs", "mode.json")
 DEFAULT_TELEMETRY_FILE = os.path.join(APP_ROOT, "logs", "telemetry.json")
+DEFAULT_CONSIGNE_FILE = os.path.join(APP_ROOT, "logs", "consigne.json")
 
 
 def _default_web_dir():
@@ -47,6 +48,8 @@ def build_parser():
                     help="taille max (octets) du fichier de log avant rotation")
     ap.add_argument("--telemetry-file", default=os.environ.get("ALDES_TELEMETRY_FILE", DEFAULT_TELEMETRY_FILE),
                     help="persistance des dernieres telemetries capturees (JSON), vide pour desactiver")
+    ap.add_argument("--consigne-file", default=os.environ.get("ALDES_CONSIGNE_FILE", DEFAULT_CONSIGNE_FILE),
+                    help="persistance des consignes demandees (JSON), vide pour desactiver")
     return ap
 
 
@@ -67,7 +70,8 @@ def main(argv=None):
     events = EventBus(args.history_size, log=log)
     restored = events.restore_from_log(args.history_size)
     state = AppState(args.real_host, args.real_port, events,
-                     mode_file=args.mode_file, telemetry_file=args.telemetry_file)
+                     mode_file=args.mode_file, telemetry_file=args.telemetry_file,
+                     consigne_file=args.consigne_file)
     # Le mode persiste (mode.json) prime sur le mode CLI/env au redemarrage.
     state.set_mode(read_persisted_mode(args.mode_file) or args.mode)
 
