@@ -211,12 +211,18 @@
   transition: background 0.15s, border-color 0.15s;
   line-height: 1;
   padding: 0;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
-.stepBtn:hover:not(:disabled) {
-  background: var(--bg-card);
-  border-color: var(--out);
-  color: var(--out);
+@media (hover: hover) {
+  .stepBtn:hover:not(:disabled) {
+    background: var(--bg-card);
+    border-color: var(--out);
+    color: var(--out);
+  }
 }
 
 .stepBtn:disabled {

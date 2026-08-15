@@ -21,6 +21,25 @@ code {
   font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
 }
 
+button,
+[role='button'],
+input,
+select,
+a {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (hover: none) {
+  button:hover,
+  [role='button']:hover,
+  input:hover,
+  select:hover,
+  a:hover {
+    outline: none;
+  }
+}
+
 h1 {
   font-size: 18px;
   margin: 0;
