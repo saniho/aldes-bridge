@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { getProducts, sendCommand } from '../api'
-import type { AldesProduct, MsgEvent } from '../types'
+import type { AldesProduct } from '../types'
 import { fmtParis } from '../parisTime'
 import styles from './TempsPanel.module.css'
 
@@ -8,7 +8,9 @@ interface Props {
   pollMs?: number
   clientId?: string | null
   connected?: boolean
-  messages?: MsgEvent[]
+  requested: Record<string, number>
+  confirmed: Record<string, boolean>
+  onRequest: (zoneId: string, value: number) => void
 }
 
 const AIR_LABEL: Record<string, string> = {
@@ -51,62 +53,11 @@ function ballonMode(code: string | null): { label: string; on: boolean } | null 
   return { label: m, on: code !== 'L' }
 }
 
-function parseRequested(messages: MsgEvent[]): Record<string, number> {
-  const map: Record<string, number> = {}
-  for (const m of messages) {
-    const p = m.payload
-    if (!p) continue
-    const mm = p.match(/"method"\s*:\s*"changeConsigneC(\d{1,2})"\s*,\s*"params"\s*:\s*\["([^"]+)"\]/)
-    if (!mm) continue
-    const v = parseFloat(mm[2])
-    if (!Number.isNaN(v)) map[mm[1]] = v
-  }
-  return map
-}
-
-/** Détecte les mises à jour de température envoyées par la box (non-injectées) */
-function parseBoxTemps(messages: MsgEvent[]): Record<string, number> {
-  const map: Record<string, number> = {}
-  for (const m of messages) {
-    if (m.injected) continue
-    const p = m.payload
-    if (!p) continue
-    const mm = p.match(/"UsC(\d{1,2})"\s*:\s*([0-9.]+)/)
-    if (!mm) continue
-    const v = parseFloat(mm[2])
-    if (!Number.isNaN(v)) map[mm[1]] = v
-  }
-  return map
-}
-
-export default function TempsPanel({ pollMs = 5000, clientId, connected, messages }: Props) {
+export default function TempsPanel({ pollMs = 5000, clientId, connected, requested, confirmed, onRequest }: Props) {
   const [products, setProducts] = useState<AldesProduct[]>([])
   const [error, setError] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
-  const [requested, setRequested] = useState<Record<string, number>>({})
-  const [confirmed, setConfirmed] = useState<Record<string, boolean>>({})
   const [sending, setSending] = useState<string | null>(null)
-
-  const requestedFromSse = useMemo(() => parseRequested(messages ?? []), [messages])
-  const boxTemps = useMemo(() => parseBoxTemps(messages ?? []), [messages])
-
-  useEffect(() => {
-    setRequested((r) => ({ ...r, ...requestedFromSse }))
-  }, [requestedFromSse])
-
-  useEffect(() => {
-    if (Object.keys(boxTemps).length === 0) return
-    setConfirmed((c) => {
-      const next = { ...c }
-      for (const [zone, val] of Object.entries(boxTemps)) {
-        const req = requestedFromSse[zone]
-        if (req !== undefined && Math.abs(req - val) < 0.01) {
-          next[zone] = true
-        }
-      }
-      return next
-    })
-  }, [boxTemps, requestedFromSse])
 
   useEffect(() => {
     let alive = true
@@ -144,8 +95,7 @@ export default function TempsPanel({ pollMs = 5000, clientId, connected, message
     setSending(zone)
     try {
       await sendCommand(`devices/${clientId}/messages/devicebound`, payload, 1)
-      setRequested((r) => ({ ...r, [t.ThermostatId]: next }))
-      setConfirmed((c) => ({ ...c, [t.ThermostatId]: false }))
+      onRequest(t.ThermostatId, next)
     } catch (e) {
       alert(`échec envoi ${zone} : ${(e as Error).message}`)
     } finally {

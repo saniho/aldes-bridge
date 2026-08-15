@@ -36,6 +36,8 @@ export default function App() {
     return 'log'
   })
   const [histOpen, setHistOpen] = useState(false)
+  const [requested, setRequested] = useState<Record<string, number>>({})
+  const [confirmed, setConfirmed] = useState<Record<string, boolean>>({})
   const [log, setLog] = useState<{
     events: BridgeEvent[]
     total: number
@@ -44,6 +46,33 @@ export default function App() {
   }>({ events: [], total: 0, offset: 0, loading: false })
 
   const LOG_PAGE = 200
+
+  const parseRequested = useCallback((msgs: MsgEvent[]): Record<string, number> => {
+    const map: Record<string, number> = {}
+    for (const m of msgs) {
+      const p = m.payload
+      if (!p) continue
+      const mm = p.match(/"method"\s*:\s*"changeConsigneC(\d{1,2})"\s*,\s*"params"\s*:\s*\["([^"]+)"\]/)
+      if (!mm) continue
+      const v = parseFloat(mm[2])
+      if (!Number.isNaN(v)) map[mm[1]] = v
+    }
+    return map
+  }, [])
+
+  const parseBoxTemps = useCallback((msgs: MsgEvent[]): Record<string, number> => {
+    const map: Record<string, number> = {}
+    for (const m of msgs) {
+      if (m.injected) continue
+      const p = m.payload
+      if (!p) continue
+      const mm = p.match(/"UsC(\d{1,2})"\s*:\s*([0-9.]+)/)
+      if (!mm) continue
+      const v = parseFloat(mm[2])
+      if (!Number.isNaN(v)) map[mm[1]] = v
+    }
+    return map
+  }, [])
 
   useEffect(() => {
     if (theme === 'jour') {
@@ -107,6 +136,27 @@ const { messages, lastSnapshot } = useMemo(() => {
   useEffect(() => {
     if (lastSnapshot) setConfig(lastSnapshot)
   }, [lastSnapshot])
+
+  const reqFromSse = useMemo(() => parseRequested(messages), [messages, parseRequested])
+  const boxTemps = useMemo(() => parseBoxTemps(messages), [messages, parseBoxTemps])
+
+  useEffect(() => {
+    setRequested((r) => ({ ...r, ...reqFromSse }))
+  }, [reqFromSse])
+
+  useEffect(() => {
+    if (Object.keys(boxTemps).length === 0) return
+    setConfirmed((c) => {
+      const next = { ...c }
+      for (const [zone, val] of Object.entries(boxTemps)) {
+        const req = reqFromSse[zone]
+        if (req !== undefined && Math.abs(req - val) < 0.01) {
+          next[zone] = true
+        }
+      }
+      return next
+    })
+  }, [boxTemps, reqFromSse])
 
   const onMode = useCallback(async (m: Mode) => {
     const cur = config?.mode ?? m
@@ -239,7 +289,12 @@ const { messages, lastSnapshot } = useMemo(() => {
             <TempsPanel
               clientId={config?.client_id ?? null}
               connected={config?.connected ?? false}
-              messages={messages}
+              requested={requested}
+              confirmed={confirmed}
+              onRequest={(zoneId, value) => {
+                setRequested((r) => ({ ...r, [zoneId]: value }))
+                setConfirmed((c) => ({ ...c, [zoneId]: false }))
+              }}
             />
           </div>
         )}
