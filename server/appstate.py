@@ -6,9 +6,38 @@ import time
 from datetime import datetime, timezone
 
 from .events import EventBus
+from .mqtt import build_publish, parse_connect
 
 # Contexte de connexion : taggé par le thread qui gère une session box.
 _CONN_CTX = threading.local()
+
+
+def _atomic_write_json(path, data):
+    """Ecrit `data` sous forme JSON de facon atomique (tmp + os.replace).
+
+    Ne leve jamais (persistance best-effort) et ne casse pas le runtime.
+    """
+    if not path:
+        return
+    try:
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+        os.replace(tmp, path)
+    except OSError:
+        pass
+
+
+def _read_json(path, default=None):
+    """Lit un fichier JSON ; renvoie `default` si absent ou invalide."""
+    if not path:
+        return default
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return default
 
 
 def set_conn_ctx(session=None, host=None):
@@ -19,13 +48,7 @@ def set_conn_ctx(session=None, host=None):
 
 def read_persisted_mode(path):
     """Lit le mode persiste (JSON {"mode": ...}), None si absent/invalide."""
-    if not path:
-        return None
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    except (OSError, ValueError):
-        return None
+    data = _read_json(path)
     mode = data.get("mode") if isinstance(data, dict) else None
     return mode if mode in AppState.MODES else None
 
@@ -95,6 +118,43 @@ def emit_message(state, direction, mtype, topic=None, payload=None, qos=None, **
     state.events.publish(ev)
 
 
+def emit_connect(state, body):
+    """Journalise un CONNECT entrant (sans le mot de passe) et leve la session.
+
+    Partagé par bridge.py et proxy.py, qui traitaient jusque-là le même packet
+    (parse_connect + scrubbing password + emit_message + session_up) en double.
+    """
+    info = parse_connect(body)
+    clean = {k: v for k, v in info.items() if k not in ("password",)}
+    emit_message(state, "in", "CONNECT", payload=json.dumps(clean, ensure_ascii=False))
+    state.session_up(info.get("client_id"))
+
+
+class MQTTEndpoint:
+    """Base commune aux handlers bridge/proxy : injection d'un PUBLISH boxward.
+
+    Les sous-classes implementent `send_publish(data)` (envoi cadence par leur
+    propre verrou) ; `_inject_raw(topic, payload, qos)` construit, envoie,
+    journalise l'evenement (marque `injected`) et renvoie le resultat.
+    """
+
+    def _inject_raw(self, topic, payload, qos):
+        self._pkt_id = getattr(self, "_pkt_id", 0) + 1
+        pkt = build_publish(topic, payload, qos=qos, pkt_id=self._pkt_id)
+        self.send_publish(pkt)
+        emit_message(
+            self.state, "out", "PUBLISH",
+            topic=topic, payload=payload, qos=qos,
+            injected=True,
+            session=getattr(self, "session", None),
+            host=(self.addr[0] if getattr(self, "addr", None) else None),
+        )
+        return {"ok": True, "bytes": len(pkt)}
+
+    def send_publish(self, data):
+        raise NotImplementedError
+
+
 class AppState:
     MODES = ("proxy", "bridge", "raw")
 
@@ -159,44 +219,17 @@ class AppState:
 
     def _persist_mode(self):
         """Ecrit le mode courant dans mode_file (atomique, ne casse jamais le runtime)."""
-        path = self._mode_file
-        if not path:
-            return
-        try:
-            os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-            tmp = path + ".tmp"
-            with open(tmp, "w", encoding="utf-8") as f:
-                json.dump({"mode": self._mode}, f)
-            os.replace(tmp, path)
-        except OSError:
-            pass
+        _atomic_write_json(self._mode_file, {"mode": self._mode})
 
     def _load_telemetry(self):
         """Recharge les dernieres telemetries capturees depuis telemetry_file."""
-        path = self._telemetry_file
-        if not path:
-            return
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except (OSError, ValueError):
-            return
+        data = _read_json(self._telemetry_file)
         if isinstance(data, dict):
             self.telemetry = {k: v for k, v in data.items() if isinstance(v, dict)}
 
     def _save_telemetry(self):
         """Persiste les telemetries (a appeler sous self._lock)."""
-        path = self._telemetry_file
-        if not path:
-            return
-        try:
-            os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-            tmp = path + ".tmp"
-            with open(tmp, "w", encoding="utf-8") as f:
-                json.dump(self.telemetry, f)
-            os.replace(tmp, path)
-        except OSError:
-            pass
+        _atomic_write_json(self._telemetry_file, self.telemetry)
 
     def store_telemetry(self, pid, data):
         """Mes des champs d'une telemetrie T.ONE dans state.telemetry[pid].
@@ -215,31 +248,14 @@ class AppState:
 
     def _load_consignes(self):
         """Recharge les consignes demandees depuis consigne_file."""
-        path = self._consigne_file
-        if not path:
-            return
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except (OSError, ValueError):
-            return
+        data = _read_json(self._consigne_file)
         if isinstance(data, dict):
             self._consignes = {k: v for k, v in data.items()
                                if isinstance(v, dict) and "requested" in v}
 
     def _save_consignes(self):
         """Persiste les consignes demandees (a appeler sous self._lock)."""
-        path = self._consigne_file
-        if not path:
-            return
-        try:
-            os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-            tmp = path + ".tmp"
-            with open(tmp, "w", encoding="utf-8") as f:
-                json.dump(self._consignes, f)
-            os.replace(tmp, path)
-        except OSError:
-            pass
+        _atomic_write_json(self._consigne_file, self._consignes)
 
     def request_consigne(self, zone, value):
         """Enregistre une consigne demandee pour une zone (en attente box)."""

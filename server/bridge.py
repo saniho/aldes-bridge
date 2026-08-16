@@ -5,14 +5,14 @@ import threading
 
 from .mqtt import (
     MQTTReader, MQTTError, MQTT_TYPES,
-    parse_connect, parse_publish, parse_subscribe,
+    parse_publish_full, parse_subscribe,
     build_connack, build_suback, build_puback, build_pubrec, build_pubcomp,
-    build_pingresp, build_publish,
+    build_pingresp,
 )
-from .appstate import emit_message
+from .appstate import emit_message, emit_connect, MQTTEndpoint
 
 
-class BridgeHandler:
+class BridgeHandler(MQTTEndpoint):
     def __init__(self, state, sock, addr, session=None):
         self.state = state
         self.sock = sock
@@ -55,33 +55,18 @@ class BridgeHandler:
                 self.sock.sendall(data)
 
     def inject(self, topic, payload, qos):
-        self._pkt_id += 1
-        pkt = build_publish(topic, payload, qos=qos, pkt_id=self._pkt_id)
-        self._send(pkt)
-        emit_message(
-            self.state, "out", "PUBLISH",
-            topic=topic, payload=payload, qos=qos,
-            injected=True, session=self.session, host=(self.addr[0] if self.addr else None),
-        )
-        return {"ok": True, "bytes": len(pkt)}
+        return self._inject_raw(topic, payload, qos)
+
+    def send_publish(self, data):
+        self._send(data)
 
     # --- protocole ---
     def _handle(self, ptype, flags, body):
         if ptype == 1:  # CONNECT
-            info = parse_connect(body)
-            clean = {k: v for k, v in info.items() if k not in ("password",)}
-            emit_message(self.state, "in", "CONNECT", payload=json.dumps(clean, ensure_ascii=False))
-            self.state.session_up(info.get("client_id"))
+            emit_connect(self.state, body)
             self._send(build_connack(0))
         elif ptype == 3:  # PUBLISH
-            topic, o = parse_publish(body)
-            qos = (flags >> 1) & 3
-            if qos:
-                pkt_id = struct.unpack_from(">H", body, o)[0]
-                o += 2
-            else:
-                pkt_id = None
-            payload = body[o:]
+            topic, qos, pkt_id, payload = parse_publish_full(body, flags)
             emit_message(self.state, "in", "PUBLISH", topic=topic, payload=payload, qos=qos)
             if qos == 1:
                 self._send(build_puback(pkt_id))
