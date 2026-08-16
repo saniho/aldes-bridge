@@ -128,6 +128,25 @@ def parse_publish(payload):
     return topic, o
 
 
+def parse_publish_full(body, flags):
+    """Analyse complete d'un PUBLISH : (topic, qos, pkt_id, payload).
+
+    Decode le header QoS (flags), saute l'identifiant de packet pour QoS>0 et
+    isole le payload. Consensus des trois consommateurs (bridge/proxy/raw)
+    qui re-decodaient ce meme packet separement.
+    """
+    topic, o = parse_publish(body)
+    qos = (flags >> 1) & 0x3
+    if qos:
+        if o + 2 > len(body):
+            raise MQTTError("PUBLISH QoS sans identifiant de packet")
+        pkt_id = struct.unpack_from(">H", body, o)[0]
+        o += 2
+    else:
+        pkt_id = None
+    return topic, qos, pkt_id, body[o:]
+
+
 def parse_subscribe(payload):
     if len(payload) < 2:
         raise MQTTError("subscribe trop court")

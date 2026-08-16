@@ -134,15 +134,10 @@ class RawClient(threading.Thread):
     def _handle(self, pkt):
         ptype, flags, body, raw = pkt
         if ptype == 3:  # PUBLISH (telemetrie / reponse de la box)
-            topic, o = mqtt.parse_publish(body)
-            qos = (flags >> 1) & 0x3
-            off = o + (2 if qos else 0)
-            payload = body[off:] if off < len(body) else b""
+            topic, qos, pid, payload = mqtt.parse_publish_full(body, flags)
             if qos == 1:
-                pid = struct.unpack_from(">H", body, o)[0]
                 self._send(mqtt.build_puback(pid))
             elif qos == 2:
-                pid = struct.unpack_from(">H", body, o)[0]
                 self._send(mqtt.build_pubrec(pid))
             emit_message(self.state, "in", "PUBLISH", topic=topic, payload=payload, qos=qos)
         elif ptype == 5:  # PUBREC (pour nos PUBLISH QoS2)

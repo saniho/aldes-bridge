@@ -1,26 +1,25 @@
 """Mode proxy transparent : MITM entre la box et le vrai Azure IoT Hub + injection boxward."""
 import json
 import socket
-import struct
 import threading
 
 from .mqtt import (
     MQTTReader, MQTTError, MQTT_TYPES,
-    parse_connect, parse_publish, parse_subscribe, build_publish,
+    parse_publish_full, parse_subscribe,
 )
-from .appstate import emit_message
+from .appstate import emit_message, emit_connect, MQTTEndpoint
 from .tls import client_context, resolve
 
 
 RELAY_TIMEOUT = 180.0  # s ; silence >= 3 min d'un cote -> dechirure du relais
 
 
-class ProxyHandler:
+class ProxyHandler(MQTTEndpoint):
     """Relaye box <-> vrai Azure et permet d'injecter des trames PUBLISH vers la box."""
 
     def __init__(self, state, box_sock, addr, session=None):
-        self.state = state
         self.box_sock = box_sock
+        self.state = state
         self.addr = addr
         self.session = session
         self.real_sock = None
@@ -90,13 +89,10 @@ class ProxyHandler:
 
     def inject(self, topic, payload, qos):
         # En mode proxy, on force QoS 0 pour ne pas fuiter un PUBACT vers le vrai cloud.
-        qos = 0
-        self._pkt_id += 1
-        pkt = build_publish(topic, payload, qos=0, pkt_id=self._pkt_id)
-        self._send_box(pkt)
-        emit_message(self.state, "out", "PUBLISH", topic=topic, payload=payload, qos=0,
-                 injected=True, session=self.session, host=(self.addr[0] if self.addr else None))
-        return {"ok": True, "direction": "out", "qos": 0}
+        return self._inject_raw(topic, payload, 0)
+
+    def send_publish(self, data):
+        self._send_box(data)
 
     # --- relay box -> real ---
     def _forward_box_to_real(self):
@@ -123,14 +119,10 @@ class ProxyHandler:
 
     def _log_box(self, ptype, flags, body, raw):
         if ptype == 1:  # CONNECT
-            info = parse_connect(body)
-            clean = {k: v for k, v in info.items() if k not in ("password",)}
-            emit_message(self.state, "in", "CONNECT", payload=json.dumps(clean, ensure_ascii=False))
-            self.state.session_up(info.get("client_id"))
+            emit_connect(self.state, body)
         elif ptype == 3:  # PUBLISH box->real (telemetrie)
-            topic, o = parse_publish(body)
-            qos = (flags >> 1) & 3
-            emit_message(self.state, "in", "PUBLISH", topic=topic, payload=body[o:], qos=qos)
+            topic, qos, _pid, payload = parse_publish_full(body, flags)
+            emit_message(self.state, "in", "PUBLISH", topic=topic, payload=payload, qos=qos)
         elif ptype == 8:  # SUBSCRIBE : memoriser pour proposer les topics dans l'UI
             pkt_id, topics = parse_subscribe(body)
             for t, _q in topics:
@@ -156,9 +148,8 @@ class ProxyHandler:
             ptype, flags, body, raw = packet
             try:
                 if ptype == 3:  # PUBLISH real->box (commandes cloud)
-                    topic, o = parse_publish(body)
-                    qos = (flags >> 1) & 3
-                    emit_message(self.state, "out", "PUBLISH", topic=topic, payload=body[o:], qos=qos)
+                    topic, qos, _pid, payload = parse_publish_full(body, flags)
+                    emit_message(self.state, "out", "PUBLISH", topic=topic, payload=payload, qos=qos)
                 else:
                     emit_message(self.state, "out", MQTT_TYPES.get(ptype, "PTYPE_%d" % ptype))
             except Exception as exc:
