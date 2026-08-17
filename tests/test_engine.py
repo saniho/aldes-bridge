@@ -446,6 +446,72 @@ def test_stale_handler_does_not_reset_connected():
     print("  OK")
 
 
+def test_session_ids_unique_across_reconnects():
+    """Caracterisation : deux reconnexions reelles ont des ids de session distincts."""
+    print("== test_session_ids_unique_across_reconnects ==")
+    events = EventBus()
+    state = AppState("fake-host", 9999, events)
+    state.set_mode("bridge")
+    eng = Engine(state, mqtt_port=18901)
+    eng.start()
+    time.sleep(0.5)
+
+    tls1 = box_socket(18901)
+    tls1.sendall(build_connect("box-seq-1"))
+    assert read_packet(tls1)[0] == 2, "attendu CONNACK"
+    assert wait_state(state, "connected", True)
+    tls1.close()
+    assert wait_state(state, "connected", False)
+
+    tls2 = box_socket(18901)
+    tls2.sendall(build_connect("box-seq-2"))
+    assert read_packet(tls2)[0] == 2, "attendu CONNACK"
+    assert wait_state(state, "connected", True)
+    tls2.close()
+
+    connects = [e for e in events.snapshot()
+                if e.get("kind") == "message" and e.get("type") == "CONNECT"]
+    sids = [e.get("session") for e in connects if e.get("session") is not None]
+    assert len(sids) == 2, "attendu 2 sessions CONNECT: %s" % sids
+    assert all(isinstance(s, int) for s in sids), "session id doit etre un entier"
+    assert sids[0] != sids[1], "ids de session doivent etre distincts: %s" % sids
+
+    eng.stop()
+    time.sleep(0.3)
+    print("  OK")
+
+
+def test_session_registry_lifecycle():
+    """Unitaire du SessionRegistry (TDD) : prise de relai / stale / release."""
+    print("== test_session_registry_lifecycle ==")
+    from server.engine import SessionRegistry
+    reg = SessionRegistry()
+    assert reg.current is None
+
+    h1 = FakeConnHandler(None, None, None)
+    id1 = reg.register(h1)
+    assert isinstance(id1, int) and id1 >= 1
+    assert reg.current is h1
+
+    h2 = FakeConnHandler(None, None, None)
+    id2 = reg.register(h2)
+    assert id2 != id1, "ids de session distincts"
+    assert h1.stale is True, "la session remplacee doit etre marquee stale"
+    assert reg.current is h2
+
+    # l'ancienne session qui se termine ne retire pas la session vivante
+    assert reg.release(h1) is False
+    assert reg.current is h2
+
+    # la session vivante qui se termine fait le menage
+    assert reg.release(h2) is True
+    assert reg.current is None
+
+    # idempotence : une release supplementaire ne fait rien
+    assert reg.release(h2) is False
+    print("  OK")
+
+
 if __name__ == "__main__":
     test_bridge_inject()
     test_bridge_qos2()
