@@ -52,6 +52,9 @@ Un unique listener TLS sur le port 8883 sert les deux modes ; le choix du mode e
    WebUI / API HTTP :8080 : /api/* + SSE + rejeu API Aldes (intégration HA saniho-ha)
 ```
 
+> 📐 **Version Mermaid** (rendue nativement par GitHub) : [docs/flux-modes.md](docs/flux-modes.md) —
+> les flux des trois modes (proxy, bridge, raw) en diagrammes interactifs.
+
 Les deux modes partagent le même listener TLS et la même WebUI ; seule la destination
 **des trames** change (faux broker local vs relais vers Azure), d'où la bascule à chaud.
 
