@@ -302,8 +302,8 @@ python3 tests/test_mode_persist.py
 
 ## Notes / historique
 
-- Anciens scripts legacy : `dump_mqtt.py` (faux broker simple), `mqtt_proxy.py` (proxy promo initial),
-  `monitor_proxy.py`.
+- Les prototypes legacy (`dump_mqtt.py`, `mqtt_proxy.py`, `monitor_proxy.py`) ont été retirés — remplacés
+  par les modules `server/*` et `sshrun.py`.
 - `setup-dns.sh` configure le maskdns dnsmasq (voir « Installation complète sur une nouvelle machine »).
 - La box doit pointer vers cette machine (rediriger `aldesiotsuite.azure-devices.net:8883` vers le pont,
   dans le DNS ou le NAT) pour se connecter au pont — soit réellement au cloud.
