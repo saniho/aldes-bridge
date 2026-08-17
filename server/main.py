@@ -11,6 +11,7 @@ from .appstate import AppState, read_persisted_mode
 from .events import EventBus
 from .engine import Engine
 from .eventlog import EventLog
+from .aldes import capture_telemetry
 
 APP_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -72,6 +73,9 @@ def main(argv=None):
     state = AppState(args.real_host, args.real_port, events,
                      mode_file=args.mode_file, telemetry_file=args.telemetry_file,
                      consigne_file=args.consigne_file)
+    # Capture des telemetries : branchee ici pour decoupler appstate (plomberie
+    # d'evenements) de aldes (mapping metier). Appelee sur chaque PUBLISH entrant.
+    state.on_publish_in = capture_telemetry
     # Le mode persiste (mode.json) prime sur le mode CLI/env au redemarrage.
     state.set_mode(read_persisted_mode(args.mode_file) or args.mode)
 

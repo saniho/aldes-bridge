@@ -91,10 +91,12 @@ def decode_payload(payload):
 
 def emit_message(state, direction, mtype, topic=None, payload=None, qos=None, **extra):
     # Capte les telemetries T.ONE publiees par la box (direction "in") pour
-    # les re-exposer via l'API Aldes (server/aldes.py).
+    # les re-exposer via l'API Aldes : hook branche par main.py (decouplage
+    # appstate/infrastructure <-> aldes/metier, plus d'import par trame).
     if direction == "in" and mtype == "PUBLISH":
-        from .aldes import capture_telemetry
-        capture_telemetry(state, payload)
+        hook = getattr(state, "on_publish_in", None)
+        if hook is not None:
+            hook(state, payload)
     ev = {
         "kind": "message",
         "ts": _iso(),
@@ -158,6 +160,10 @@ class MQTTEndpoint:
 class AppState:
     MODES = ("proxy", "bridge", "raw")
 
+    # telemetry.json n'est qu'un cache de survie au redemarrage : inutile de le
+    # reecrire a chaque trame (2-3/min), au plus toutes les TELEMETRY_SAVE_INTERVAL s.
+    TELEMETRY_SAVE_INTERVAL = 30.0
+
     DEFAULT_RAW = {
         "enabled": False,
         "host": "127.0.0.1",
@@ -193,6 +199,11 @@ class AppState:
         self._telemetry_file = telemetry_file
         # Persistance des consignes demandees (survit au redemarrage du conteneur).
         self._consigne_file = consigne_file
+        # Hook appele sur chaque PUBLISH entrant (capture telemetrie). Branche par
+        # main.py sur server/aldes.py::capture_telemetry pour decoupler les modules.
+        self.on_publish_in = None
+        # Derniere persistance telemetrie (epoch) — throttle d'ecriture.
+        self._last_telemetry_save = 0.0
         self._load_telemetry()
         self._load_consignes()
 
@@ -243,8 +254,26 @@ class AppState:
             current["_pid"] = pid
             current["_upd_at"] = time.time()
             self.telemetry[pid] = current
-            self._save_telemetry()
+            self._maybe_save_telemetry()
             self._confirm_consignes_from(data)
+
+    def _maybe_save_telemetry(self):
+        """Persiste telemetry.json au plus toutes les TELEMETRY_SAVE_INTERVAL s.
+
+        A appeler sous self._lock. Le fichier ne sert que de cache pour survivre
+        a un redemarrage ; la box renvoie ses valeurs en continu, perdre les
+        dernieres secondes est sans consequence. persist_telemetry() force l'ecriture.
+        """
+        now = time.time()
+        if now - self._last_telemetry_save >= self.TELEMETRY_SAVE_INTERVAL:
+            self._save_telemetry()
+            self._last_telemetry_save = now
+
+    def persist_telemetry(self):
+        """Ecrit telemetry.json immediatement (flush, ex. a l'arret du processus)."""
+        with self._lock:
+            self._save_telemetry()
+            self._last_telemetry_save = time.time()
 
     def _load_consignes(self):
         """Recharge les consignes demandees depuis consigne_file."""

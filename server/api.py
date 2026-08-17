@@ -111,6 +111,11 @@ def create_app(state, engine, web_dir):
     async def _startup():
         state.events.attach_loop(asyncio.get_running_loop())
 
+    @app.on_event("shutdown")
+    async def _shutdown():
+        # Rattrape le throttle telemetrie : telemetry.json a jour a l'arret.
+        state.persist_telemetry()
+
     # --- API ---
     @app.get("/api/config", response_model=ConfigSnapshot)
     def api_config():
