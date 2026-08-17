@@ -17,6 +17,48 @@ from .proxy import ProxyHandler
 from .raw import RawClient
 
 
+class SessionRegistry:
+    """Garde la trace de la session MQTT vivante et de ses identifiants.
+
+    Centralise la logique de prise de relai entre connexions : quand une
+    nouvelle connexion arrive, elle devient la session courante et l'ancienne
+    est marquee `stale` — son nettoyage final (release) ne doit alors plus
+    toucher l'etat partage (course deconnexion/reconnexion de la box).
+    """
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._current = None
+        self._next_id = 1
+
+    def register(self, handler):
+        """Enregistre une nouvelle session : prend le relai de la precedente
+        (marquee stale). Renvoie un identifiant de session unique."""
+        with self._lock:
+            session_id = self._next_id
+            self._next_id += 1
+            old = self._current
+            self._current = handler
+        if old is not None:
+            old.stale = True
+        return session_id
+
+    @property
+    def current(self):
+        with self._lock:
+            return self._current
+
+    def release(self, handler):
+        """Fin de vie d'une session : True si `handler` etait encore la session
+        courante (elle est retiree), False si elle avait deja ete remplacee
+        (stale) — son teardown ne doit alors pas ecraser l'etat."""
+        with self._lock:
+            if self._current is handler:
+                self._current = None
+                return True
+        return False
+
+
 class Engine(threading.Thread):
     def __init__(self, state, mqtt_port=8883, bind="0.0.0.0"):
         super().__init__(daemon=True, name="engine")
@@ -29,14 +71,15 @@ class Engine(threading.Thread):
         self._raw = None  # RawClient actif (mode raw)
         self._mode_changed = threading.Event()
         self._sock = None
-        self._sessions = count(1)
+        self._sessions = SessionRegistry()
 
     def stop(self):
         self._stop_ev.set()
         self._mode_changed.set()
+        current = self._sessions.current
+        if current:
+            current.shutdown()
         with self._lock:
-            if self._current:
-                self._current.shutdown()
             if self._raw:
                 self._raw.stop()
         sock = self._sock
@@ -53,8 +96,7 @@ class Engine(threading.Thread):
 
     @property
     def current_handler(self):
-        with self._lock:
-            return self._current
+        return self._sessions.current
 
     def set_raw(self):
         """Re-configure le client raw en mode raw (appel par l'API)."""
@@ -131,27 +173,20 @@ class Engine(threading.Thread):
             self._sock = None
 
     def _handle(self, cs, addr):
-        session = next(self._sessions)
-        set_conn_ctx(session, addr[0])
         mode = self.state.mode
-        handler = BridgeHandler(self.state, cs, addr, session) if mode == "bridge" else ProxyHandler(self.state, cs, addr, session)
-        with self._lock:
-            old = self._current
-            self._current = handler
-        # Une nouvelle connexion rend l'ancien handler obsolete : son nettoyage
-        # final (session_down/cloud_down) ne doit pas ecraser l'etat de la
-        # session vivante (course a la deconnexion/reconnexion de la box).
-        if old is not None:
-            old.stale = True
+        handler = BridgeHandler(self.state, cs, addr) if mode == "bridge" else ProxyHandler(self.state, cs, addr)
+        # Prise de relai : devient la session courante, l'ancienne est stale.
+        session = self._sessions.register(handler)
+        handler.session = session
+        set_conn_ctx(session, addr[0])
         try:
             handler.run()
         finally:
-            with self._lock:
-                current = self._current is handler
-                if current:
-                    self._current = None
             clear_conn_ctx()
-            if current:
+            # Seule la session encore courante pose session_down : une session
+            # remplacee (stale) ne doit pas ecraser l'etat de la session vivante
+            # (course a la deconnexion/reconnexion de la box).
+            if self._sessions.release(handler):
                 self.state.session_down()
             try:
                 cs.close()
@@ -181,8 +216,7 @@ class Engine(threading.Thread):
                 raw.drop()
                 return {"ok": True, "session": "dropped"}
             return {"ok": True, "session": "none"}
-        with self._lock:
-            handler = self._current
+        handler = self._sessions.current
         if handler:
             handler.shutdown()
             return {"ok": True, "session": "dropped"}
