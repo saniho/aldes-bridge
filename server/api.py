@@ -252,7 +252,10 @@ def create_app(state, engine, web_dir):
 
     @app.patch("/aldesoc/v5/users/me/products/{modem}/updateThermostats")
     async def aldes_update_thermostats(modem: str, request: Request):
-        body = await request.json()
+        try:
+            body = await request.json()
+        except ValueError:
+            return JSONResponse(status_code=400, content={"error": "corps JSON invalide"})
         state.events.publish({
             "kind": "message", "type": "ALDES_WRITE",
             "topic": "devices/%s/messages/devicebound" % modem,
@@ -263,7 +266,10 @@ def create_app(state, engine, web_dir):
 
     @app.post("/aldesoc/v5/users/me/products/{modem}/commands")
     async def aldes_commands(modem: str, request: Request):
-        body = await request.json()
+        try:
+            body = await request.json()
+        except ValueError:
+            return JSONResponse(status_code=400, content={"error": "corps JSON invalide"})
         state.events.publish({
             "kind": "message", "type": "ALDES_WRITE",
             "topic": "devices/%s/messages/devicebound" % modem,

@@ -313,6 +313,25 @@ def test_write_endpoints_accepted():
     assert len(kinds) == 2
 
 
+def test_write_endpoints_reject_invalid_json():
+    import urllib.error as ue
+
+    state = make_state()
+    port = _start_web(state)
+    cases = (
+        ("PATCH", "/aldesoc/v5/users/me/products/ABCDEF123456/updateThermostats"),
+        ("POST", "/aldesoc/v5/users/me/products/ABCDEF123456/commands"),
+    )
+    for method, path in cases:
+        try:
+            _request(port, path, method, body="{pas du json")
+            raise AssertionError("devait etre rejete (400)")
+        except ue.HTTPError as e:
+            assert e.code == 400, "attendu 400, obtenu %d" % e.code
+            err = json.loads(e.read())
+            assert "error" in err
+
+
 if __name__ == "__main__":
     import traceback
     failures = 0
