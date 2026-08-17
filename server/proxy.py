@@ -5,6 +5,7 @@ import threading
 
 from .mqtt import (
     MQTTReader, MQTTError, MQTT_TYPES,
+    PT_CONNECT, PT_PUBLISH, PT_SUBSCRIBE, PT_PINGREQ,
     parse_publish_full, parse_subscribe,
 )
 from .appstate import emit_message, emit_connect, MQTTEndpoint
@@ -118,17 +119,17 @@ class ProxyHandler(MQTTEndpoint):
         self._teardown()
 
     def _log_box(self, ptype, flags, body, raw):
-        if ptype == 1:  # CONNECT
+        if ptype == PT_CONNECT:
             emit_connect(self.state, body)
-        elif ptype == 3:  # PUBLISH box->real (telemetrie)
+        elif ptype == PT_PUBLISH:  # telemetrie
             topic, qos, _pid, payload = parse_publish_full(body, flags)
             emit_message(self.state, "in", "PUBLISH", topic=topic, payload=payload, qos=qos)
-        elif ptype == 8:  # SUBSCRIBE : memoriser pour proposer les topics dans l'UI
+        elif ptype == PT_SUBSCRIBE:  # memoriser pour proposer les topics dans l'UI
             pkt_id, topics = parse_subscribe(body)
             for t, _q in topics:
                 self.state.add_topic(t)
             emit_message(self.state, "in", "SUBSCRIBE", payload=json.dumps(topics, ensure_ascii=False))
-        elif ptype == 12:
+        elif ptype == PT_PINGREQ:
             pass
         elif ptype in MQTT_TYPES:
             emit_message(self.state, "in", MQTT_TYPES[ptype])
@@ -147,7 +148,7 @@ class ProxyHandler(MQTTEndpoint):
                 break
             ptype, flags, body, raw = packet
             try:
-                if ptype == 3:  # PUBLISH real->box (commandes cloud)
+                if ptype == PT_PUBLISH:  # commandes cloud
                     topic, qos, _pid, payload = parse_publish_full(body, flags)
                     emit_message(self.state, "out", "PUBLISH", topic=topic, payload=payload, qos=qos)
                 else:

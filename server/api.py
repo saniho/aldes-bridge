@@ -35,6 +35,74 @@ class ConsigneBody(BaseModel):
     value: float
 
 
+# --- Modèles de réponse (contrat de l'API, schema OpenAPI) ---
+class ConsigneEntry(BaseModel):
+    requested: float
+    confirmed: bool
+    ts: str
+
+
+class RawConfig(BaseModel):
+    enabled: bool
+    host: str
+    port: int
+    tls: bool
+    client_id: str
+    cmd_topic: str
+    evt_topic: str
+
+
+class ConfigSnapshot(BaseModel):
+    mode: str
+    connected: bool
+    client_id: str | None = None
+    topics: list[str] = []
+    last_error: str | None = None
+    raw: RawConfig
+    mode_file: str | None = None
+    box_since: float | None = None
+    cloud_since: float | None = None
+    consignes: dict[str, ConsigneEntry] = {}
+
+
+class StateSnapshot(BaseModel):
+    config: ConfigSnapshot
+    messages: list[dict] = []
+
+
+class LogPage(BaseModel):
+    total: int
+    limit: int
+    offset: int
+    events: list[dict] = []
+
+
+class SendResult(BaseModel):
+    ok: bool
+    error: str | None = None
+    topic: str | None = None
+    qos: int | None = None
+    bytes: int | None = None
+
+
+class ConsigneList(BaseModel):
+    consignes: dict[str, ConsigneEntry] = {}
+
+
+class ModeResult(BaseModel):
+    mode: str
+    takeEffect: str
+
+
+class OkResult(BaseModel):
+    ok: bool
+
+
+class DisconnectResult(BaseModel):
+    ok: bool
+    session: str | None = None
+
+
 def create_app(state, engine, web_dir):
     app = FastAPI(title="Aldes Bridge", docs_url=None, redoc_url=None)
     web_dir = os.path.abspath(web_dir)
@@ -44,15 +112,15 @@ def create_app(state, engine, web_dir):
         state.events.attach_loop(asyncio.get_running_loop())
 
     # --- API ---
-    @app.get("/api/config")
+    @app.get("/api/config", response_model=ConfigSnapshot)
     def api_config():
         return state.snapshot()
 
-    @app.get("/api/state")
+    @app.get("/api/state", response_model=StateSnapshot)
     def api_state():
         return {"config": state.snapshot(), "messages": state.events.snapshot()}
 
-    @app.get("/api/logs")
+    @app.get("/api/logs", response_model=LogPage)
     def api_logs(limit: int = 200, offset: int = 0):
         """Lecture a posteriori du log disque persistant (plus recent d'abord)."""
         limit = max(1, min(limit, 1000))
@@ -99,7 +167,7 @@ def create_app(state, engine, web_dir):
             },
         )
 
-    @app.post("/api/mode")
+    @app.post("/api/mode", response_model=ModeResult)
     def api_mode(body: ModeBody):
         try:
             mode = state.set_mode(body.mode)
@@ -108,11 +176,11 @@ def create_app(state, engine, web_dir):
         engine.set_mode(mode)
         return {"mode": mode, "takeEffect": "next-connect"}
 
-    @app.get("/api/raw")
+    @app.get("/api/raw", response_model=RawConfig)
     def api_raw_get():
         return state.raw_config()
 
-    @app.post("/api/raw")
+    @app.post("/api/raw", response_model=RawConfig)
     def api_raw_set(body: RawBody):
         fields = {
             "host": body.host,
@@ -127,25 +195,25 @@ def create_app(state, engine, web_dir):
         engine.set_raw()
         return state.raw_config()
 
-    @app.post("/api/send")
+    @app.post("/api/send", response_model=SendResult)
     def api_send(body: SendBody):
         qos = body.qos if body.qos in (0, 1, 2) else 0
         return engine.inject(body.topic, body.payload, qos)
 
-    @app.get("/api/consigne")
+    @app.get("/api/consigne", response_model=ConsigneList)
     def api_consigne_get():
         return {"consignes": state.consignes_state()}
 
-    @app.post("/api/consigne")
+    @app.post("/api/consigne", response_model=ConsigneList)
     def api_consigne_post(body: ConsigneBody):
         state.request_consigne(body.zone, body.value)
         return {"ok": True, "consignes": state.consignes_state()}
 
-    @app.post("/api/disconnect")
+    @app.post("/api/disconnect", response_model=DisconnectResult)
     def api_disconnect():
         return engine.disconnect()
 
-    @app.post("/api/clear")
+    @app.post("/api/clear", response_model=OkResult)
     def api_clear():
         state.events.clear()
         return {"ok": True}
