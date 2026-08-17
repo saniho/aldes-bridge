@@ -512,6 +512,47 @@ def test_session_registry_lifecycle():
     print("  OK")
 
 
+def test_raw_pending_thread_safety():
+    """Point 6 : _pending doit etre protege par un verrou dedie. Sans lui,
+    teardown() qui itere pendant qu'une injection ajoute/retire leve
+    RuntimeError (dictionnaire modifie pendant iteration) et tue le thread
+    rawclient. Ici l'acces concurrent se fait SOUS _pending_lock."""
+    print("== test_raw_pending_thread_safety ==")
+    from server.raw import RawClient
+    events = EventBus()
+    state = AppState("fake-host", 9999, events)
+    raw = RawClient(state, {
+        "host": "127.0.0.1", "port": 1883, "tls": False,
+        "client_id": "raw-pending", "cmd_topic": "t/cmd", "evt_topic": "t/evt",
+    })
+    raw._pending = {i: threading.Event() for i in range(2000)}
+    errs = []
+
+    def teardown():
+        try:
+            raw._teardown()
+        except Exception as exc:
+            errs.append(exc)
+
+    def mutator():
+        try:
+            for i in range(5000):
+                with raw._pending_lock:
+                    raw._pending[5000 + i] = threading.Event()
+                    raw._pending.pop(5000 + i, None)
+        except Exception as exc:
+            errs.append(exc)
+
+    t1 = threading.Thread(target=teardown)
+    t2 = threading.Thread(target=mutator)
+    t1.start()
+    t2.start()
+    t1.join(timeout=10)
+    t2.join(timeout=10)
+    assert not errs, "course sur _pending: %r" % errs
+    print("  OK")
+
+
 if __name__ == "__main__":
     test_bridge_inject()
     test_bridge_qos2()

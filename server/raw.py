@@ -24,7 +24,8 @@ class RawClient(threading.Thread):
         self._stop = threading.Event()
         self._sock = None
         self._reader = None
-        self._send_lock = threading.Lock()
+        self._send_lock = threading.Lock()  # serialise envoi + cycle de vie du socket
+        self._pending_lock = threading.Lock()  # protege le dict _pending (inject/teardown/reader)
         self._pkt = 0
         self._pending = {}  # pkt_id -> threading.Event() (PUBACK / PUBCOMP)
 
@@ -35,7 +36,9 @@ class RawClient(threading.Thread):
 
     def drop(self):
         """Ferme la session courante sans tuer la boucle de reconnexion."""
-        sock = self._sock
+        with self._send_lock:
+            sock = self._sock
+            self._sock = None
         if sock is not None:
             try:
                 sock.close()
@@ -82,7 +85,8 @@ class RawClient(threading.Thread):
 
         self._sock = s
         self._reader = reader
-        self._pending.clear()
+        with self._pending_lock:
+            self._pending.clear()
         set_conn_ctx("raw", cfg.get("host"))
         self.state.session_up(cfg["client_id"])
 
@@ -106,10 +110,10 @@ class RawClient(threading.Thread):
         return True
 
     def _send(self, data):
-        sock = self._sock
-        if sock is None:
-            return False
         with self._send_lock:
+            sock = self._sock
+            if sock is None:
+                return False
             try:
                 sock.sendall(data)
                 return True
@@ -117,11 +121,13 @@ class RawClient(threading.Thread):
                 return False
 
     def _teardown(self):
-        sock, self._sock = self._sock, None
-        self._reader = None
-        for ev in self._pending.values():
-            ev.set()
-        self._pending.clear()
+        with self._send_lock:
+            sock, self._sock = self._sock, None
+            self._reader = None
+        with self._pending_lock:
+            for ev in self._pending.values():
+                ev.set()
+            self._pending.clear()
         if sock is not None:
             try:
                 sock.close()
@@ -145,7 +151,8 @@ class RawClient(threading.Thread):
             self._send(mqtt.build_pubrel(pid))
         elif ptype in (mqtt.PT_PUBACK, mqtt.PT_PUBCOMP):  # leve l'attente
             pid = struct.unpack_from(">H", body, 0)[0]
-            evt = self._pending.pop(pid, None)
+            with self._pending_lock:
+                evt = self._pending.pop(pid, None)
             if evt:
                 evt.set()
         elif ptype == mqtt.PT_PUBREL:
@@ -170,14 +177,17 @@ class RawClient(threading.Thread):
         evt = None
         if qos:
             evt = threading.Event()
-            self._pending[pid] = evt
+            with self._pending_lock:
+                self._pending[pid] = evt
         ok = self._send(mqtt.build_publish(topic, payload, qos=qos, pkt_id=pid))
         if not ok:
-            self._pending.pop(pid, None)
+            with self._pending_lock:
+                self._pending.pop(pid, None)
             return {"ok": False, "error": "envoi impossible"}
         if evt is not None:
             evt.wait(2)
-            self._pending.pop(pid, None)
+            with self._pending_lock:
+                self._pending.pop(pid, None)
         emit_message(self.state, "out", "PUBLISH", topic=topic, payload=payload, qos=qos, injected=True)
         return {"ok": True, "topic": topic, "qos": qos, "bytes": len(payload.encode("utf-8"))}
 
