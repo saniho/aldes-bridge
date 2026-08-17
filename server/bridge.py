@@ -5,6 +5,8 @@ import threading
 
 from .mqtt import (
     MQTTReader, MQTTError, MQTT_TYPES,
+    PT_CONNECT, PT_PUBLISH, PT_PUBREL, PT_SUBSCRIBE, PT_PINGREQ, PT_DISCONNECT,
+    QOS_AT_LEAST_ONCE, QOS_EXACTLY_ONCE,
     parse_publish_full, parse_subscribe,
     build_connack, build_suback, build_puback, build_pubrec, build_pubcomp,
     build_pingresp,
@@ -62,32 +64,32 @@ class BridgeHandler(MQTTEndpoint):
 
     # --- protocole ---
     def _handle(self, ptype, flags, body):
-        if ptype == 1:  # CONNECT
+        if ptype == PT_CONNECT:
             emit_connect(self.state, body)
             self._send(build_connack(0))
-        elif ptype == 3:  # PUBLISH
+        elif ptype == PT_PUBLISH:
             topic, qos, pkt_id, payload = parse_publish_full(body, flags)
             emit_message(self.state, "in", "PUBLISH", topic=topic, payload=payload, qos=qos)
-            if qos == 1:
+            if qos == QOS_AT_LEAST_ONCE:
                 self._send(build_puback(pkt_id))
-            elif qos == 2:
+            elif qos == QOS_EXACTLY_ONCE:
                 # QoS2 : on ne repond qu'avec un PUBREC ; le PUBCOMP viendra apres le PUBREL.
                 self._send(build_pubrec(pkt_id))
-        elif ptype == 6:  # PUBREL (fin du handshake QoS2) -> PUBCOMP
+        elif ptype == PT_PUBREL:
             if len(body) >= 2:
                 pkt_id = struct.unpack_from(">H", body)[0]
             else:
                 pkt_id = 0
             self._send(build_pubcomp(pkt_id))
-        elif ptype == 8:  # SUBSCRIBE
+        elif ptype == PT_SUBSCRIBE:
             pkt_id, topics = parse_subscribe(body)
             for t, _q in topics:
                 self.state.add_topic(t)
             emit_message(self.state, "in", "SUBSCRIBE", payload=json.dumps(topics, ensure_ascii=False))
             self._send(build_suback(pkt_id, [min(q, 2) for _, q in topics]))
-        elif ptype == 12:  # PINGREQ
+        elif ptype == PT_PINGREQ:
             self._send(build_pingresp())
-        elif ptype == 14:  # DISCONNECT
+        elif ptype == PT_DISCONNECT:
             return False
         else:
             emit_message(self.state, "in", MQTT_TYPES.get(ptype, "PTYPE_%d" % ptype))

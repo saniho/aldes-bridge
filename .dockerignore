@@ -1,11 +1,10 @@
+# Contexte de build : exclure ce qui n'est pas necessaire (ou secret).
 .git
-.gitignore
-**/__pycache__
-**/*.pyc
-node_modules
+logs/
 web/node_modules
 web/dist
-.tests
-*.key
-*.crt
-*.log
+__pycache__/
+*.pyc
+.pytest_cache/
+deploy.sh
+sshrun.py

@@ -64,7 +64,7 @@ class RawClient(threading.Thread):
         try:
             s.sendall(mqtt.build_connect(cfg["client_id"], keepalive=self.KEEPALIVE))
             pkt = reader.read_packet()
-            if pkt is None or pkt[0] != 2 or (pkt[3][2] if len(pkt[3]) > 2 else -1) != 0:
+            if pkt is None or pkt[0] != mqtt.PT_CONNACK or (pkt[3][2] if len(pkt[3]) > 2 else -1) != 0:
                 self.state.set_error("raw: CONNACK refuse")
                 s.close()
                 return False
@@ -133,22 +133,22 @@ class RawClient(threading.Thread):
     # -- lecture d'un packet entrant ---
     def _handle(self, pkt):
         ptype, flags, body, raw = pkt
-        if ptype == 3:  # PUBLISH (telemetrie / reponse de la box)
+        if ptype == mqtt.PT_PUBLISH:  # telemetrie / reponse de la box
             topic, qos, pid, payload = mqtt.parse_publish_full(body, flags)
-            if qos == 1:
+            if qos == mqtt.QOS_AT_LEAST_ONCE:
                 self._send(mqtt.build_puback(pid))
-            elif qos == 2:
+            elif qos == mqtt.QOS_EXACTLY_ONCE:
                 self._send(mqtt.build_pubrec(pid))
             emit_message(self.state, "in", "PUBLISH", topic=topic, payload=payload, qos=qos)
-        elif ptype == 5:  # PUBREC (pour nos PUBLISH QoS2)
+        elif ptype == mqtt.PT_PUBREC:  # pour nos PUBLISH QoS2
             pid = struct.unpack_from(">H", body, 0)[0]
             self._send(mqtt.build_pubrel(pid))
-        elif ptype in (4, 7):  # PUBACK / PUBCOMP -> leve l'attente
+        elif ptype in (mqtt.PT_PUBACK, mqtt.PT_PUBCOMP):  # leve l'attente
             pid = struct.unpack_from(">H", body, 0)[0]
             evt = self._pending.pop(pid, None)
             if evt:
                 evt.set()
-        elif ptype == 6:  # PUBREL
+        elif ptype == mqtt.PT_PUBREL:
             pid = struct.unpack_from(">H", body, 0)[0]
             self._send(mqtt.build_pubcomp(pid))
 
@@ -166,7 +166,7 @@ class RawClient(threading.Thread):
         with self._lock_pkt():
             self._pkt += 1
             pid = self._pkt
-        qos = qos if qos in (1, 2) else 1
+        qos = qos if qos in (mqtt.QOS_AT_LEAST_ONCE, mqtt.QOS_EXACTLY_ONCE) else mqtt.QOS_AT_LEAST_ONCE
         evt = None
         if qos:
             evt = threading.Event()
