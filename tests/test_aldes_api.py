@@ -91,6 +91,44 @@ def test_store_tracks_server_update_time():
     assert p2["updatedAt"]
 
 
+def test_telemetry_persist_throttled_and_flush():
+    import os
+    import tempfile
+
+    d = tempfile.mkdtemp()
+    tf = os.path.join(d, "telemetry.json")
+    state = AppState("h", 8883, EventBus(), telemetry_file=tf)
+    # Premiere capture -> ecriture immediate (derniere sauvegarde = epoch 0).
+    capture_telemetry(state, json.dumps({"productid": "P_TONE", "MT0": 21.5}))
+    with open(tf) as f:
+        assert json.load(f)["P_TONE"]["MT0"] == 21.5
+    # Dans la fenetre de throttle, la fusion suivante ne reecrit PAS le fichier.
+    state._last_telemetry_save = time.time()
+    capture_telemetry(state, json.dumps({"productid": "P_TONE", "UAM": 3}))
+    with open(tf) as f:
+        assert "UAM" not in json.load(f)["P_TONE"]
+    # ... mais l'etat en memoire est a jour.
+    assert state.telemetry["P_TONE"]["UAM"] == 3
+    # Flush explicite -> le fichier rattrape l'etat.
+    state.persist_telemetry()
+    with open(tf) as f:
+        assert json.load(f)["P_TONE"]["UAM"] == 3
+
+
+def test_emit_message_calls_on_publish_in_hook():
+    from server.appstate import emit_message
+
+    state = make_state()
+    seen = []
+    state.on_publish_in = lambda st, payload: seen.append(payload)
+    emit_message(state, "in", "PUBLISH", topic="dev/t", payload=b"hello")
+    assert seen == [b"hello"]
+    # Sans hook, emit_message reste inoffensif (et ne capte pas).
+    state.on_publish_in = None
+    emit_message(state, "in", "PUBLISH", topic="dev/t", payload=b"x")
+    assert len(seen) == 1
+
+
 def test_decode_payload_skips_binary_header():
     from server.appstate import decode_payload
     raw = b"\x00F" + json.dumps({"productid": "X"}).encode()
