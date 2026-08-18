@@ -230,22 +230,7 @@ const { messages, lastSnapshot } = useMemo(() => {
   return (
     <div className="app">
       <header className="top">
-        <h1>Aldes Bridge</h1>
-        <div className="topRight">
-          <div className="tabs" role="tablist">
-            {TABS.map((t) => (
-              <button
-                key={t.id}
-                role="tab"
-                aria-selected={view === t.id}
-                className={'tab' + (view === t.id ? ' active' : '')}
-                onClick={() => setView(t.id)}
-                title={t.title}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
+        <div className="topLeft">
           <div className="moreWrap">
             <button
               className={'burger' + (moreOpen ? ' active' : '') + (view === 'log' || view === 'wrapper' ? ' on' : '')}
@@ -271,6 +256,23 @@ const { messages, lastSnapshot } = useMemo(() => {
                 ))}
               </div>
             )}
+          </div>
+          <h1>Aldes Bridge</h1>
+        </div>
+        <div className="topRight">
+          <div className="tabs" role="tablist">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                role="tab"
+                aria-selected={view === t.id}
+                className={'tab' + (view === t.id ? ' active' : '')}
+                onClick={() => setView(t.id)}
+                title={t.title}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
           {view === 'log' && (
             <button
