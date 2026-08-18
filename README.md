@@ -324,4 +324,6 @@ Ce projet est distribué sous la licence **MIT** — voir [LICENSE](LICENSE).
 - `setup-dns.sh` configure le maskdns dnsmasq (voir « Installation complète sur une nouvelle machine »).
 - La box doit pointer vers cette machine (rediriger `aldesiotsuite.azure-devices.net:8883` vers le pont,
   dans le DNS ou le NAT) pour se connecter au pont — soit réellement au cloud.
-- Mode **bridge** : la box ne "répond" pas de vrai AWS; les __commandes__ vers la box passent par `devices/<boxid>/messages/devicebound`.
+- En mode **bridge**, la box ne parle plus au cloud Azure (le pont joue le rôle d'Azure) ;
+  en mode **proxy**, elle y reste réellement connectée. Dans les deux cas, les __commandes__
+  vers la box passent par `devices/<boxid>/messages/devicebound`.
