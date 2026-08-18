@@ -199,19 +199,10 @@ h1 {
   color: var(--accent-fg);
 }
 
-.theme {
-  background: transparent;
-  border: 1px solid var(--border-strong);
-  color: var(--text-muted);
-  border-radius: 6px;
-  padding: 4px 10px;
-  cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
-}
-
-.theme:hover {
-  border-color: var(--text-soft);
-  color: var(--text);
+.moreSep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border-strong);
 }
 
 .layout {
