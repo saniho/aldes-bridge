@@ -29,6 +29,18 @@ const WATER_LABEL: Record<string, string> = {
   N: 'Boost'
 }
 
+const QUICK_AIR: { code: string; label: string }[] = [
+  { code: 'B', label: 'B · Confort' },
+  { code: 'C', label: 'C · Éco' },
+  { code: 'X', label: 'X · Boost' },
+  { code: 'A', label: 'A · Arrêt' }
+]
+
+const QUICK_WATER: { code: string; label: string }[] = [
+  { code: 'M', label: 'M · On' },
+  { code: 'L', label: 'L · Off' }
+]
+
 function fmtDeg(v: number | null, digits = 1): string {
   return v === null || v === undefined ? '—' : v.toFixed(digits) + ' °C'
 }
@@ -133,6 +145,20 @@ export default function TempsPanel({ pollMs = 5000, clientId, connected, consign
     }
   }
 
+  const quickMode = async (code: string, water: boolean) => {
+    if (!canSend) return
+    const key = (water ? 'w:' : 'a:') + code
+    const payload = JSON.stringify({ id: 1, jsonrpc: '2.0', method: 'changeMode', params: [code] })
+    setSending(key)
+    try {
+      await sendCommand(`devices/${clientId}/messages/devicebound`, payload, 1)
+    } catch (e) {
+      alert(`échec envoi ${key} : ${(e as Error).message}`)
+    } finally {
+      setSending(null)
+    }
+  }
+
   if (failed && products.length === 0) {
     return (
       <div className={styles.panel}>
@@ -188,6 +214,39 @@ export default function TempsPanel({ pollMs = 5000, clientId, connected, consign
                   )
                 })()}
               </div>
+            </div>
+
+            <div className={styles.quick}>
+              <span className={styles.quickLabel}>Air</span>
+              {QUICK_AIR.map((q) => (
+                <button
+                  key={q.code}
+                  className={
+                    styles.quickBtn +
+                    (p.indicator.current_air_mode === q.code ? ' ' + styles.active : '')
+                  }
+                  onClick={() => quickMode(q.code, false)}
+                  disabled={!canSend || sending !== null}
+                  title={`changeMode ["${q.code}"]`}
+                >
+                  {q.label}
+                </button>
+              ))}
+              <span className={styles.quickLabel + ' ' + styles.quickSep}>ECS</span>
+              {QUICK_WATER.map((q) => (
+                <button
+                  key={q.code}
+                  className={
+                    styles.quickBtn +
+                    (p.indicator.current_water_mode === q.code ? ' ' + styles.active : '')
+                  }
+                  onClick={() => quickMode(q.code, true)}
+                  disabled={!canSend || sending !== null}
+                  title={`changeMode ["${q.code}"]`}
+                >
+                  {q.label}
+                </button>
+              ))}
             </div>
 
             <div className={styles.stats}>

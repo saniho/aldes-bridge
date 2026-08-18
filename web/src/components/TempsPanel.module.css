@@ -93,6 +93,68 @@
   margin-bottom: 12px;
 }
 
+.quick {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  padding: 8px;
+  background: var(--bg-node);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.quickLabel {
+  font-size: 11px;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.quickSep {
+  margin-left: 6px;
+}
+
+.quickBtn {
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+@media (hover: hover) {
+  .quickBtn:hover:not(:disabled) {
+    background: var(--bg-card);
+    border-color: var(--out);
+    color: var(--out);
+  }
+}
+
+.quickBtn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.quickBtn.active {
+  border-color: var(--line-green);
+  color: var(--green);
+  background: var(--bg-card);
+}
+
+.quickBtn.active:disabled {
+  opacity: 0.7;
+}
+
 .stat {
   background: var(--bg-node);
   border: 1px solid var(--border);
