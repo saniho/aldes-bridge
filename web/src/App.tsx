@@ -263,6 +263,15 @@ const { messages, lastSnapshot } = useMemo(() => {
                 >
                   {theme === 'nuit' ? '☀️ passer en mode jour' : '🌙 passer en mode nuit'}
                 </button>
+                <div className="moreSep" role="separator" />
+                <button
+                  role="menuitem"
+                  className="moreItem danger"
+                  onClick={onClear}
+                  title="Vider le log persistant"
+                >
+                  🗑 vider le log
+                </button>
               </div>
             )}
           </div>
@@ -295,9 +304,6 @@ const { messages, lastSnapshot } = useMemo(() => {
               {histOpen ? '⚡ temps réel' : '🕘 historique'}
             </button>
           )}
-          <button className="clear" onClick={onClear}>
-            vider
-          </button>
         </div>
       </header>
       <StatusBar

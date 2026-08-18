@@ -69,21 +69,6 @@ h1 {
   margin-left: auto;
 }
 
-.clear {
-  background: transparent;
-  border: 1px solid var(--border-strong);
-  color: var(--text-muted);
-  border-radius: 6px;
-  padding: 4px 12px;
-  cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
-}
-
-.clear:hover {
-  border-color: var(--text-soft);
-  color: var(--text);
-}
-
 .hist {
   background: transparent;
   border: 1px solid var(--border-strong);
@@ -203,6 +188,15 @@ h1 {
   height: 1px;
   margin: 4px 6px;
   background: var(--border-strong);
+}
+
+.moreItem.danger {
+  color: #ef4444;
+}
+
+.moreItem.danger:hover {
+  background: var(--bg-node);
+  color: #f87171;
 }
 
 .layout {
