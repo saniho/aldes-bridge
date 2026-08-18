@@ -254,6 +254,15 @@ const { messages, lastSnapshot } = useMemo(() => {
                     {m.label}
                   </button>
                 ))}
+                <div className="moreSep" role="separator" />
+                <button
+                  role="menuitem"
+                  className="moreItem"
+                  onClick={() => setTheme((t) => (t === 'nuit' ? 'jour' : 'nuit'))}
+                  title={theme === 'nuit' ? 'Passer en mode jour' : 'Passer en mode nuit'}
+                >
+                  {theme === 'nuit' ? '☀️ passer en mode jour' : '🌙 passer en mode nuit'}
+                </button>
               </div>
             )}
           </div>
@@ -286,13 +295,6 @@ const { messages, lastSnapshot } = useMemo(() => {
               {histOpen ? '⚡ temps réel' : '🕘 historique'}
             </button>
           )}
-          <button
-            className="theme"
-            onClick={() => setTheme((t) => (t === 'nuit' ? 'jour' : 'nuit'))}
-            title={theme === 'nuit' ? 'Passer en mode jour' : 'Passer en mode nuit'}
-          >
-            {theme === 'nuit' ? '☀️ jour' : '🌙 nuit'}
-          </button>
           <button className="clear" onClick={onClear}>
             vider
           </button>
