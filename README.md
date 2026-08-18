@@ -1,5 +1,11 @@
 # Aldes Bridge
 
+> ⚠️ **Avis de non-responsabilité** : ce projet est un projet **indépendant** et **sans aucun lien**
+> avec Aldes. Il n'est ni approuvé, ni sponsorisé, ni affilié à Aldes ou à ses filiales.
+> Il est fourni « en l'état » et **utilisé à vos propres risques** : aucun support, aucune garantie.
+> L'usage de ce pont peut perturber le fonctionnement normal de votre équipement Aldes
+> (et potentiellement le cloud Aldes) — assurez-vous de comprendre les risques avant de l'utiliser.
+
 Pont MQTT over TLS pour intercepter, analyser **et commander** une box **Aldes Connect**
 (qui remonte vers Azure IoT Hub), avec une Web UI React.
 
@@ -299,6 +305,10 @@ python3 tests/test_engine.py
 python3 tests/test_aldes_api.py
 python3 tests/test_mode_persist.py
 ```
+
+## Licence
+
+Ce projet est distribué sous la licence **MIT** — voir [LICENSE](LICENSE).
 
 ## Notes / historique
 
