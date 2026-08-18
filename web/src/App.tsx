@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSse } from './hooks/useSse'
 import { getConfig, setMode, disconnect, clearHistory, getLogs, getConsignes } from './api'
 import type { BridgeEvent, Config, ConsigneEvent, Mode, MsgEvent } from './types'
@@ -28,11 +28,14 @@ function mergeConsignes(
   return out
 }
 
-const TABS: { id: View; label: string; title: string; secondary?: boolean }[] = [
+const TABS: { id: View; label: string; title: string }[] = [
   { id: 'temps', label: '🌡 infos aldes', title: 'Températures / infos de la PAC' },
-  { id: 'commande', label: '📤 commande', title: 'Envoyer des commandes à la box' },
-  { id: 'log', label: 'log', title: 'Trames MQTT en temps réel et historique', secondary: true },
-  { id: 'wrapper', label: 'wrapper', title: 'Appels API du bridge (test interactif)', secondary: true }
+  { id: 'commande', label: '📤 commande', title: 'Envoyer des commandes à la box' }
+]
+
+const MORE: { id: View; label: string; title: string }[] = [
+  { id: 'log', label: '📜 log', title: 'Trames MQTT en temps réel et historique' },
+  { id: 'wrapper', label: '🔌 wrapper', title: 'Appels API du bridge (test interactif)' }
 ]
 
 export default function App() {
@@ -50,6 +53,7 @@ export default function App() {
     return 'log'
   })
   const [histOpen, setHistOpen] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
   const [consignes, setConsignes] = useState<
     Record<string, { requested: number; confirmed: boolean; ts?: string }>
   >({})
@@ -77,6 +81,10 @@ export default function App() {
 
   useEffect(() => {
     if (histOpen) setHistOpen(false)
+  }, [view])
+
+  useEffect(() => {
+    if (moreOpen) setMoreOpen(false)
   }, [view])
 
   useEffect(() => {
@@ -225,20 +233,44 @@ const { messages, lastSnapshot } = useMemo(() => {
         <h1>Aldes Bridge</h1>
         <div className="topRight">
           <div className="tabs" role="tablist">
-            {TABS.map((t, i) => (
-              <Fragment key={t.id}>
-                {t.secondary && i > 0 && !TABS[i - 1].secondary && <span className="tabSep" role="separator" />}
-                <button
-                  role="tab"
-                  aria-selected={view === t.id}
-                  className={'tab' + (view === t.id ? ' active' : '') + (t.secondary ? ' secondary' : '')}
-                  onClick={() => setView(t.id)}
-                  title={t.title}
-                >
-                  {t.label}
-                </button>
-              </Fragment>
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                role="tab"
+                aria-selected={view === t.id}
+                className={'tab' + (view === t.id ? ' active' : '')}
+                onClick={() => setView(t.id)}
+                title={t.title}
+              >
+                {t.label}
+              </button>
             ))}
+          </div>
+          <div className="moreWrap">
+            <button
+              className={'burger' + (moreOpen ? ' active' : '') + (view === 'log' || view === 'wrapper' ? ' on' : '')}
+              onClick={() => setMoreOpen((o) => !o)}
+              title="Ouvrir les outils"
+              aria-expanded={moreOpen}
+              aria-haspopup="menu"
+            >
+              ☰
+            </button>
+            {moreOpen && (
+              <div className="moreMenu" role="menu">
+                {MORE.map((m) => (
+                  <button
+                    key={m.id}
+                    role="menuitem"
+                    className={'moreItem' + (view === m.id ? ' active' : '')}
+                    onClick={() => setView(m.id)}
+                    title={m.title}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           {view === 'log' && (
             <button
