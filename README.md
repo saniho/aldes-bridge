@@ -303,11 +303,15 @@ et en preset « Change consigne C0 » dans « Envoyer une commande MQTT ».
 
 ## Tests
 
+Suite pytest couvrant le moteur, le rejeu de l'API Aldes, le bus d'événements et la
+persistance du mode — voir [docs/tests.md](docs/tests.md).
+
 ```bash
-python3 tests/test_engine.py
-python3 tests/test_aldes_api.py
-python3 tests/test_mode_persist.py
+python3 -m pytest                 # toute la suite
+python3 -m pytest --cov=server    # avec couverture
 ```
+
+Le badge de couverture est mis à jour automatiquement par le CI à chaque push sur `main`.
 
 ## Licence
 
