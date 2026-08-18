@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Installer les dépendances
+        run: |
+          pip install --quiet -r requirements.txt
+          pip install --quiet pytest pytest-cov coverage-badge
+
+      - name: Lancer les tests avec couverture
+        run: |
+          python3 -m pytest --cov=server --cov-report=term-missing \
+            --cov-report=xml:coverage.xml --cov-report=html:htmlcov
+
+      - name: Rapport de couverture (XML + HTML)
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: |
+            coverage.xml
+            htmlcov/
+          if-no-files-found: error
+
+      - name: Générer le badge de couverture
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          python3 -m coverage_badge -f -o docs/coverage.svg
+
+      - name: Committer le badge mis à jour
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: 'docs: maj badge de couverture [skip ci]'
+          file_pattern: docs/coverage.svg
+          commit_user_name: github-actions[bot]
+          commit_user_email: 41898282+github-actions[bot]@users.noreply.github.com

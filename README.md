@@ -1,5 +1,8 @@
 # Aldes Bridge
 
+![CI](https://github.com/saniho/aldes-bridge/actions/workflows/ci.yml/badge.svg)
+![Coverage](docs/coverage.svg)
+
 > ⚠️ **Avis de non-responsabilité** : ce projet est un projet **indépendant** et **sans aucun lien**
 > avec Aldes. Il n'est ni approuvé, ni sponsorisé, ni affilié à Aldes ou à ses filiales.
 > Il est fourni « en l'état » et **utilisé à vos propres risques** : aucun support, aucune garantie.
