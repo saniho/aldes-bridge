@@ -128,26 +128,66 @@ h1 {
   color: var(--accent-fg);
 }
 
-.tabSep {
-  align-self: stretch;
-  width: 1px;
-  margin: 4px 2px;
-  background: var(--border-strong);
+.moreWrap {
+  position: relative;
 }
 
-.tab.secondary {
-  opacity: 0.55;
-  color: var(--text-faint);
-  font-size: 12px;
-}
-
-.tab.secondary:hover {
-  opacity: 1;
+.burger {
+  background: transparent;
+  border: 1px solid var(--border-strong);
   color: var(--text-muted);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: border-color 0.15s, color 0.15s;
 }
 
-.tab.secondary.active {
-  opacity: 1;
+.burger:hover,
+.burger.active {
+  border-color: var(--text-soft);
+  color: var(--text);
+}
+
+.burger.on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.moreMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.moreItem {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 13px;
+  text-align: left;
+  transition: background 0.15s, color 0.15s;
+}
+
+.moreItem:hover {
+  background: var(--bg-node);
+  color: var(--text);
+}
+
+.moreItem.active {
   background: var(--accent);
   color: var(--accent-fg);
 }
