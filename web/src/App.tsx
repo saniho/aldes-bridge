@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { useSse } from './hooks/useSse'
 import { getConfig, setMode, disconnect, clearHistory, getLogs, getConsignes } from './api'
 import type { BridgeEvent, Config, ConsigneEvent, Mode, MsgEvent } from './types'
@@ -28,11 +28,11 @@ function mergeConsignes(
   return out
 }
 
-const TABS: { id: View; label: string; title: string }[] = [
+const TABS: { id: View; label: string; title: string; secondary?: boolean }[] = [
   { id: 'temps', label: '🌡 infos aldes', title: 'Températures / infos de la PAC' },
   { id: 'commande', label: '📤 commande', title: 'Envoyer des commandes à la box' },
-  { id: 'log', label: '📜 log', title: 'Trames MQTT en temps réel et historique' },
-  { id: 'wrapper', label: '🔌 wrapper', title: 'Appels API du bridge (test interactif)' }
+  { id: 'log', label: 'log', title: 'Trames MQTT en temps réel et historique', secondary: true },
+  { id: 'wrapper', label: 'wrapper', title: 'Appels API du bridge (test interactif)', secondary: true }
 ]
 
 export default function App() {
@@ -225,17 +225,19 @@ const { messages, lastSnapshot } = useMemo(() => {
         <h1>Aldes Bridge</h1>
         <div className="topRight">
           <div className="tabs" role="tablist">
-            {TABS.map((t) => (
-              <button
-                key={t.id}
-                role="tab"
-                aria-selected={view === t.id}
-                className={'tab' + (view === t.id ? ' active' : '')}
-                onClick={() => setView(t.id)}
-                title={t.title}
-              >
-                {t.label}
-              </button>
+            {TABS.map((t, i) => (
+              <Fragment key={t.id}>
+                {t.secondary && i > 0 && !TABS[i - 1].secondary && <span className="tabSep" role="separator" />}
+                <button
+                  role="tab"
+                  aria-selected={view === t.id}
+                  className={'tab' + (view === t.id ? ' active' : '') + (t.secondary ? ' secondary' : '')}
+                  onClick={() => setView(t.id)}
+                  title={t.title}
+                >
+                  {t.label}
+                </button>
+              </Fragment>
             ))}
           </div>
           {view === 'log' && (
