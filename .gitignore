@@ -18,6 +18,13 @@ logs/
 
 # Tests artifacts
 .pytest_cache/
+.coverage
+
+# Playwright (E2E BDD)
+web/.features-gen/
+web/test-results/
+web/playwright-report/
+web/.playwright/
 
 # Secrets / local
 *.key
