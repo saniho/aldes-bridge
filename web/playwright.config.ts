@@ -16,7 +16,7 @@ const BASE_URL = `http://127.0.0.1:${WEB_PORT}`
 export default defineConfig({
   testDir,
   fullyParallel: true,
-  reporter: [['list']],
+  reporter: [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: BASE_URL,
     trace: 'on-first-retry'
