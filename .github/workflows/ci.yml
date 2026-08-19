@@ -26,8 +26,17 @@ jobs:
         run: npm ci --no-audit --no-fund
         working-directory: web
 
+      - name: Mettre à jour apt (runner Azure)
+        run: |
+          sudo apt-get update -o Acquire::http::No-Cache=true --allow-releaseinfo-change
+          sudo apt-get install -y --no-install-recommends \
+            libnspr4 libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 \
+            libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 \
+            libxrandr2 libgbm1 libpango-1.0-0 libcairo2 libasound2 \
+            libatspi2.0-0 fonts-liberation xdg-utils
+
       - name: Installer Chromium
-        run: npx playwright install chromium --with-deps
+        run: npx playwright install chromium
         working-directory: web
 
       - name: Lancer les tests E2E (Playwright BDD)
