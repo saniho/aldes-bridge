@@ -9,7 +9,7 @@ interface Props {
   onDisconnect: () => void
 }
 
-const MODES: Mode[] = ['proxy', 'bridge', 'listen']
+const MODES: Mode[] = ['proxy', 'bridge', 'listen', 'raw']
 
 function fmtDur(sinceEpochS: number | null | undefined, nowMs: number): string | null {
   if (!sinceEpochS) return null
