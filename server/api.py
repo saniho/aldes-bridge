@@ -223,6 +223,30 @@ def create_app(state, engine, web_dir):
         state.events.clear()
         return {"ok": True}
 
+    # --- Injection de test (E2E) : pousse un message synthetique dans le bus SSE
+    # sans avoir besoin d'une box connectee. Utilise uniquement par les tests E2E.
+    from pydantic import BaseModel as _BM
+
+    class _TestInjectBody(_BM):
+        topic: str = "test/msg"
+        payload: str = '{"test":true}'
+        qos: int = 0
+
+    @app.post("/api/test/inject", response_model=OkResult)
+    def api_test_inject(body: _TestInjectBody = _TestInjectBody()):
+        state.events.publish({
+            "kind": "message",
+            "ts": _iso(),
+            "direction": "in",
+            "type": "PUBLISH",
+            "mode": state.mode,
+            "topic": body.topic,
+            "payload": body.payload,
+            "qos": body.qos,
+            "injected": True,
+        })
+        return {"ok": True}
+
     # --- Rejeu de l'API Aldes pour l'integration HA "saniho-ha" ---
     # La box est reliee au bridge en mode bridge/proxy : ses telemetries sont
     # capturees (appstate.capture_telemetry) puis re-exposees ici au format

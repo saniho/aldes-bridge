@@ -54,6 +54,46 @@ When('je choisis le mode {texte} dans le sélecteur', async ({ page }, mode: str
   await page.locator(`select:has(option[value="${mode}"])`).selectOption(mode)
 })
 
+When('je clique sur l\'onglet {texte}', async ({ page }, label: string) => {
+  await page.getByRole('tab', { name: label, exact: false }).click()
+})
+
+When('je clique sur le menu burger', async ({ page }) => {
+  await page.locator('button.burger').click()
+})
+
+When('je bascule le thème', async ({ page }) => {
+  const moreMenu = page.locator('.moreMenu')
+  if (!(await moreMenu.isVisible().catch(() => false))) {
+    await page.locator('button.burger').click()
+  }
+  await expect(moreMenu).toBeVisible({ timeout: 5000 })
+  await page.getByText('passer en mode').click()
+})
+
+When('je clique sur {texte}', async ({ page }, label: string) => {
+  await page.getByRole('button', { name: label, exact: false }).click()
+})
+
+When('des messages MQTT sont injectés', async ({ page }) => {
+  const res = await page.request.post('/api/test/inject', {
+    data: { topic: 'aldes/test', payload: '{"test":true}', qos: 0 }
+  })
+  expect(res.ok()).toBeTruthy()
+})
+
+When('je tape {texte} dans la recherche', async ({ page }, text: string) => {
+  await page.locator('input[placeholder="rechercher…"]').fill(text)
+})
+
+When('je sélectionne le filtre de direction {texte}', async ({ page }, label: string) => {
+  await page.locator('select').nth(1).selectOption({ label })
+})
+
+When('je sélectionne le filtre de type {texte}', async ({ page }, label: string) => {
+  await page.locator('select').nth(2).selectOption({ label })
+})
+
 // ---------------------------------------------------------------------------
 //  Then : vérifications mode
 // ---------------------------------------------------------------------------
@@ -98,6 +138,57 @@ Then('le mode {texte} est actif côté API', async ({ page }, mode: string) => {
 })
 
 // ---------------------------------------------------------------------------
+//  Then : vérifications navigation
+// ---------------------------------------------------------------------------
+
+Then('l\'onglet {texte} est actif', async ({ page }, label: string) => {
+  await expect(page.getByRole('tab', { name: label, exact: false })).toHaveAttribute(
+    'aria-selected',
+    'true'
+  )
+})
+
+Then('aucun onglet n\'est actif', async ({ page }) => {
+  const tabs = page.getByRole('tab')
+  const count = await tabs.count()
+  for (let i = 0; i < count; i++) {
+    await expect(tabs.nth(i)).toHaveAttribute('aria-selected', 'false')
+  }
+})
+
+Then('le menu burger est ouvert', async ({ page }) => {
+  await expect(page.locator('.moreMenu')).toBeVisible()
+})
+
+Then('le menu burger est fermé', async ({ page }) => {
+  await expect(page.locator('.moreMenu')).not.toBeVisible()
+})
+
+// ---------------------------------------------------------------------------
+//  Then : vérifications thème
+// ---------------------------------------------------------------------------
+
+Then('la WebUI est en mode nuit', async ({ page }) => {
+  await expect(page.locator('html')).not.toHaveAttribute('data-theme', 'jour')
+})
+
+Then('la WebUI est en mode jour', async ({ page }) => {
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'jour')
+})
+
+// ---------------------------------------------------------------------------
+//  Then : vérifications déconnexion
+// ---------------------------------------------------------------------------
+
+Then('le bouton déconnecter est visible', async ({ page }) => {
+  await expect(page.getByRole('button', { name: /déconnecter/i })).toBeVisible()
+})
+
+Then('le bouton déconnecter n\'est pas visible', async ({ page }) => {
+  await expect(page.getByRole('button', { name: /déconnecter/i })).not.toBeVisible()
+})
+
+// ---------------------------------------------------------------------------
 //  Then : vérifications messages
 // ---------------------------------------------------------------------------
 
@@ -109,6 +200,29 @@ Then('le compteur de messages affiche {texte}', async ({ page }, text: string) =
   await expect(page.getByText(text)).toBeVisible({ timeout: 10000 })
 })
 
+Then('le compteur de messages affiche au moins une valeur', async ({ page }) => {
+  const countEl = page.locator('[class*="count"]').first()
+  await expect(countEl).toBeVisible({ timeout: 10000 })
+  const text = await countEl.textContent()
+  if (!/^\d+\s*\/\s*\d+$/.test(text?.trim() ?? '')) {
+    throw new Error(`Counter "${text}" does not match N / N pattern`)
+  }
+  const filtered = parseInt(text!.split('/')[0].trim(), 10)
+  if (filtered < 1) throw new Error(`Expected ≥1 message, got ${filtered}`)
+})
+
 Then('un texte par défaut est affiché dans les messages', async ({ page }) => {
   await expect(page.getByText('aucun message')).toBeVisible({ timeout: 10000 })
+})
+
+Then('un message est affiché dans le flux', async ({ page }) => {
+  await expect(page.getByText('aldes/test')).toBeVisible({ timeout: 10000 })
+})
+
+Then('le badge BLOQUÉ est visible', async ({ page }) => {
+  await expect(page.getByText('BLOQUÉ')).toBeVisible({ timeout: 10000 })
+})
+
+Then('la légende affiche {texte}', async ({ page }, text: string) => {
+  await expect(page.getByText(text, { exact: false })).toBeVisible({ timeout: 10000 })
 })
