@@ -143,7 +143,8 @@ export default function MessageStream({ messages }: Props) {
               styles.msg +
               ' ' +
               (m.direction === 'out' ? styles['out'] : styles['in']) +
-              (m.injected ? ' ' + styles['injected'] : '')
+              (m.injected ? ' ' + styles['injected'] : '') +
+              (m.blocked ? ' ' + styles['blocked'] : '')
             }
           >
             <div className={styles.head}>
@@ -157,6 +158,7 @@ export default function MessageStream({ messages }: Props) {
               )}
               {m.host && <span className={styles.host}>{m.host}</span>}
               {m.injected && <span className={styles.badge}>INJECTÉ</span>}
+              {m.blocked && <span className={styles.badge + ' ' + styles.badgeBlock}>BLOQUÉ</span>}
               <span className={styles.qos}>{m.qos !== undefined ? `qos${m.qos}` : ''}</span>
               {m.payload && (
                 <button

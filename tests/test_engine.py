@@ -289,6 +289,86 @@ def test_proxy_relay_inject():
     print("  OK")
 
 
+def test_listen_blocks_cloud():
+    """Mode listen : la telemetrie box -> Azure est relayee, mais les PUBLISH
+    Azure -> box (commandes devicebound) sont bloques : journalises (blocked=True),
+    acquittes cote Azure (PUBACK / PUBREC+PUBCOMP) et jamais livres a la box."""
+    print("== test_listen_blocks_cloud ==")
+    fake = FakeRealBroker(18897)
+    fake.start()
+    time.sleep(0.3)
+
+    events = EventBus()
+    state = AppState("127.0.0.1", 18897, events)
+    state.set_mode("listen")
+    eng = Engine(state, mqtt_port=18898)
+    eng.start()
+    time.sleep(0.5)
+
+    tls = box_socket(18898)
+    tls.sendall(build_connect("box-listen"))
+    assert read_packet(tls)[0] == 2, "attendu CONNACK (relaye du fake Azure)"
+    assert wait_state(state, "connected", True), "snapshot=%s" % state.snapshot()
+
+    tls.sendall(build_subscribe(1, [("dev/box/messages/devicebound/#", 1)]))
+    assert read_packet(tls)[0] == 9, "attendu SUBACK (relaye)"
+
+    # telemetrie box -> Azure : relayee comme en proxy
+    tls.sendall(build_publish("dev/box/messages/telemetry", '{"t":21}', qos=0))
+    time.sleep(0.5)
+    assert 3 in fake.received, "telemetrie non relayee vers le cloud"
+
+    # le cloud repond par un PUBLISH devicebound QoS1 (pkt_id 42) :
+    # ListenHandler doit le bloquer — jamais envoye a la box — et l'acquitter.
+    fake.conn.sendall(build_publish("dev/box/messages/devicebound/1", '{"cmd":"off"}', qos=1, pkt_id=42))
+    time.sleep(0.5)
+
+    # la box ne doit RIEN recevoir (ni la commande, ni un acquittement parasite)
+    tls.settimeout(1.0)
+    try:
+        pkt = read_packet(tls)
+    except (MQTTError, OSError):
+        pkt = None
+    assert pkt is None, "la box ne doit pas recevoir la commande bloquee: %r" % (pkt,)
+
+    # le bridge doit avoir acquitte cote Azure : PUBACK (type 4) recu par le fake
+    assert 4 in fake.received, "le bridge doit acquitter la commande cote Azure (PUBACK)"
+
+    # commande devicebound QoS2 (pkt_id 43) : PUBREC puis PUBCOMP, jamais a la box
+    fake.conn.sendall(build_publish("dev/box/messages/devicebound/2", '{"cmd":"warm"}', qos=2, pkt_id=43))
+    time.sleep(0.3)
+    assert 5 in fake.received, "le bridge doit repondre PUBREC (QoS2)"
+    fake.conn.sendall(build_pubrel(43))
+    time.sleep(0.3)
+    assert 7 in fake.received, "le bridge doit repondre PUBCOMP apres PUBREL"
+    tls.settimeout(1.0)
+    try:
+        pkt = read_packet(tls)
+    except (MQTTError, OSError):
+        pkt = None
+    assert pkt is None, "la box ne doit pas recevoir le QoS2 bloque: %r" % (pkt,)
+
+    # les commandes bloquees doivent etre journalisees avec blocked=True
+    msgs = [e for e in events.snapshot()
+            if e.get("kind") == "message" and e["type"] == "PUBLISH" and e["direction"] == "out"]
+    blocked = [m for m in msgs if m.get("blocked")]
+    assert len(blocked) >= 2, "commandes bloquees non journalisees: %d" % len(blocked)
+    assert blocked[-1].get("topic") == "dev/box/messages/devicebound/2", blocked[-1]
+    import json as _json
+    assert _json.loads(blocked[-1]["payload"]) == {"cmd": "warm"}, blocked[-1]
+
+    # la telemetrie (direction in) ne doit PAS etre marquee blocked
+    allpub = [e for e in events.snapshot()
+              if e.get("kind") == "message" and e["type"] == "PUBLISH"]
+    up = [m for m in allpub if m["direction"] == "in" and m.get("blocked")]
+    assert not up, "la telemetrie ne doit pas etre marquee blocked"
+
+    tls.close()
+    eng.stop()
+    fake.sock.close()
+    print("  OK")
+
+
 def test_proxy_silent_azure_death():
     print("== test_proxy_silent_azure_death ==")
     fake = FakeRealBroker(18891)
@@ -557,6 +637,7 @@ if __name__ == "__main__":
     test_bridge_inject()
     test_bridge_qos2()
     test_proxy_relay_inject()
+    test_listen_blocks_cloud()
     test_proxy_silent_azure_death()
     test_raw_native()
     print("TOUS LES TESTS PASSENT")

@@ -19,6 +19,16 @@ def test_set_mode_persists():
     assert read_persisted_mode(mf) == "raw"
 
 
+def test_listen_mode_persists():
+    d = tempfile.mkdtemp()
+    mf = os.path.join(d, "mode.json")
+    s = AppState("h", 8883, EventBus(), mode_file=mf)
+    s.set_mode("listen")
+    assert os.path.isfile(mf)
+    assert read_persisted_mode(mf) == "listen"
+    assert "listen" in AppState.MODES
+
+
 def test_mode_change_overwrites():
     d = tempfile.mkdtemp()
     mf = os.path.join(d, "mode.json")

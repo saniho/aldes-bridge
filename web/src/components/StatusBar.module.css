@@ -30,6 +30,10 @@
   background: var(--green);
 }
 
+.listen {
+  background: #0ea5e9;
+}
+
 .raw {
   background: #8b5cf6;
 }

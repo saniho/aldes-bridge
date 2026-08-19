@@ -113,6 +113,11 @@
   border-color: var(--line-inj);
 }
 
+.msg.blocked {
+  border-color: var(--line-block);
+  border-left-color: var(--line-block);
+}
+
 .badge {
   background: var(--green);
   color: var(--badge-fg);
@@ -122,6 +127,11 @@
   border-radius: 4px;
   padding: 1px 5px;
   margin-left: 4px;
+}
+
+.badgeBlock {
+  background: #ef4444;
+  color: #ffffff;
 }
 
 .head {

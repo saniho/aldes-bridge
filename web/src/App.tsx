@@ -167,7 +167,9 @@ const { messages, lastSnapshot } = useMemo(() => {
         ? `Passer en mode bridge ?\n\nLa box ne passera plus par le cloud Azure (chemin : box → bridge uniquement).`
         : m === 'raw'
           ? `Passer en mode natif (broker) ?\n\nLe bridge se connectera en client MQTT au broker configuré (box <-> broker <-> bridge).`
-          : `Passer en mode proxy ?\n\nLa box rejoindra à nouveau le cloud Azure via le bridge.`
+          : m === 'listen'
+            ? `Passer en mode listen ?\n\nLa télémétrie de la box remonte vers Azure, mais les commandes Azure → box seront bloquées (visibles dans le log, jamais transmises à la box).`
+            : `Passer en mode proxy ?\n\nLa box rejoindra à nouveau le cloud Azure via le bridge.`
     const hint = cur === m ? ` (déjà en mode ${m})` : ''
     if (!window.confirm(msg + hint)) return
     try {

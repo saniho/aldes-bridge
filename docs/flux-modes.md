@@ -1,7 +1,7 @@
 # Flux des modes — diagrammes Mermaid
 
-Schémas interactifs (rendus nativement par GitHub) des trois modes du pont :
-**proxy**, **bridge** et **raw**. L'ancien schéma ASCII vit dans le README.
+Schémas interactifs (rendus nativement par GitHub) des quatre modes du pont :
+**proxy**, **bridge**, **listen** et **raw**. L'ancien schéma ASCII vit dans le README.
 
 ## Vue d'ensemble
 
@@ -21,9 +21,10 @@ flowchart LR
     DNS -->|"aldesiotsuite.azure-devices.net → IP du pont"| Bridge
     Box <-->|"MQTT/TLS 8883"| Bridge
     Bridge -->|"proxy : relais MITM"| Azure
-    Bridge -.->|"bridge : décroché du cloud"| Azure
+        Bridge -.->|"bridge : décroché du cloud"| Azure
     Box -.->|"raw : la box reste sur le broker"| Broker
     Broker <-->|"raw : le pont est client MQTT"| Bridge
+    Bridge -.->|"listen : remontée seule (commandes bloquées)"| Azure
     Bridge ---|"HTTP 8080 / SSE"| UI
     Bridge ---|"API Aldes rejouée"| HA
 ```
@@ -121,6 +122,45 @@ flowchart LR
     Broker -->|"événements (evt_topic)"| Bridge2
     Bridge2 -->|"commandes (cmd_topic)"| Broker
 ```
+
+## Mode listen — remontée seule (écoute du cloud)
+
+Comme le proxy, la box rejoint Azure via le pont : la **télémétrie remonte** vers le
+cloud à l'identique. Mais les **PUBLISH venant d'Azure** (commandes devicebound) sont
+**bloqués** : observés et journalisés (`blocked=True`, badge « BLOQUÉ » dans la WebUI),
+acquittés côté Azure pour éviter des retries, **jamais livrés à la box**. Les autres
+trames cloud→box (CONNACK, SUBACK, PINGRESP, PUBACK/PUBREC/PUBCOMP des télémetries)
+sont relayées pour garder la session MQTT de la box vivante.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Boite as 📦 Box Aldes
+    participant Bridge as ⚙️ Aldes Bridge (listen)
+    participant Azure as ☁️ Azure IoT Hub
+
+    Note over Boite,Azure: "Session établie comme en proxy — le cloud croit parler à la box"
+    loop Télémetries (par rafales, 2-3/min)
+        Boite->>Bridge: PUBLISH (télémetrie T.ONE)
+        Bridge->>Azure: PUBLISH (relais QoS0)
+        Bridge-->>Bridge: capture → rejeu API Aldes (telemetry.json)
+    end
+    Note over Azure,Bridge: "Les commandes cloud → box sont bloquées au passage"
+    Azure->>Bridge: PUBLISH (devicebound, QoS1)
+    Bridge-->>Azure: PUBACK (accusé de réception, rien n'est livré)
+    Bridge-->>Bridge: journalisation blocked=True (badge BLOQUÉ)
+    opt Injection locale (WebUI / HA)
+        Bridge-->>Boite: PUBLISH (devicebound, QoS0) — commande injectée
+    end
+```
+
+Points clés :
+
+- les commandes cloud→box sont **acquittées côté Azure** (QoS1 → PUBACK, QoS2 →
+  PUBREC puis PUBCOMP à la réception du PUBREL) mais **jamais transmises** à la box ;
+- l'injection locale (WebUI / API) reste possible en **QoS0** comme en proxy ;
+- le mode sert à **observer** ce que le cloud voudrait envoyer sans l'appliquer —
+  pratique pour tester la sûreté d'une intégration HA sans commande réelle.
 
 ## Glossaire
 

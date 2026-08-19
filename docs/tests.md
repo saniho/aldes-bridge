@@ -27,7 +27,7 @@ workflow GitHub Actions `.github/workflows/ci.yml` à chaque push sur `main`.
 
 ## Les fichiers
 
-### `tests/test_engine.py` — moteur (modes bridge / proxy / raw)
+### `tests/test_engine.py` — moteur (modes bridge / proxy / listen / raw)
 
 Simule la box et Azure avec de faux pairs :
 
@@ -39,12 +39,18 @@ Simule la box et Azure avec de faux pairs :
 - `box_socket` / `read_packet` — helpers pour jouer le rôle de la box côté client.
 
 Cas couverts : injection de commande en bridge (`test_bridge_inject`), QoS2
-(`test_bridge_qos2`), relai + injection en proxy (`test_proxy_relay_inject`), coupure
+(`test_bridge_qos2`), relai + injection en proxy (`test_proxy_relay_inject`),
+blocage des commandes cloud en listen (`test_listen_blocks_cloud`), coupure
 silencieuse d'Azure (`test_proxy_silent_azure_death`), mode raw (`test_raw_native`),
 stale handler (`test_stale_handler_does_not_reset_connected`), identité de session
 (`test_session_ids_unique_across_reconnects`), cycle de vie du `SessionRegistry`
 (`test_session_registry_lifecycle`) et thread-safety de `_pending` (point 6,
 `test_raw_pending_thread_safety`).
+
+`test_listen_blocks_cloud` vérifie le mode listen : la télémétrie box→Azure est
+relayée, mais les PUBLISH cloud→box (QoS1 et QoS2) sont acquittés côté Azure
+(PUBACK / PUBREC+PUBCOMP) sans jamais être livrés à la box, et journalisés
+`blocked=True`.
 
 ### `tests/test_aldes_api.py` — rejeu de l'API Aldes
 
@@ -65,6 +71,6 @@ Vérifie la sécurité thread du bus : publication/lecture/rotation concurrentes
 
 Le mode choisi via la WebUI est rejoué au redémarrage : écriture/écrasement,
 relecture au démarrage, fichier manquant/invalide toléré (`test_set_mode_persists`,
-`test_mode_change_overwrites`, `test_restart_uses_persisted_mode`,
-`test_missing_or_invalid_file_returns_none`, `test_no_mode_file_no_crash`,
-`test_snapshot_exposes_mode_file`).
+`test_listen_mode_persists`, `test_mode_change_overwrites`,
+`test_restart_uses_persisted_mode`, `test_missing_or_invalid_file_returns_none`,
+`test_no_mode_file_no_crash`, `test_snapshot_exposes_mode_file`).
