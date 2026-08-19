@@ -24,6 +24,17 @@ const LABEL: Record<string, string> = {
   '14': 'DISCONNECT'
 }
 
+// Chemin affiche pour chaque trame : source → destination, en tenant compte du
+// mode actif et des marqueurs. Bloques = intercepteres par le pont (jamais
+// livres a la box) ; injectes = envoyes par la WebUI directement vers la box.
+function pathLabel(m: MsgEvent): string {
+  if (m.blocked) return 'Azure → ⛔ bloqué'
+  if (m.injected) return 'WebUI → box'
+  if (m.mode === 'raw') return m.direction === 'in' ? 'broker → pont' : 'pont → broker'
+  if (m.mode === 'bridge') return m.direction === 'in' ? 'box → pont' : 'pont → box'
+  return m.direction === 'in' ? 'box → Azure' : 'Azure → box'
+}
+
 export default function MessageStream({ messages }: Props) {
   const boxRef = useRef<HTMLDivElement>(null)
   const [search, setSearch] = useState('')
@@ -90,8 +101,10 @@ export default function MessageStream({ messages }: Props) {
     <div className={styles.wrap}>
       <div className={styles.header}>
         <span className={styles.legend}>
-          <span className={styles.in}>▲ box → cloud</span>
-          <span className={styles.out}>▼ cloud → box</span>
+          <span className={styles.in}>▲ remontée</span>
+          <span className={styles.out}>▼ descente</span>
+          <span className={styles.blockedLegend}>⛔ bloquée</span>
+          <span className={styles.injLegend}>injectée</span>
         </span>
         <span className={styles.count}>
           {filtered.length} / {messages.length}
@@ -106,8 +119,8 @@ export default function MessageStream({ messages }: Props) {
         />
         <select value={dir} onChange={(e) => setDir(e.target.value as 'all' | 'in' | 'out')}>
           <option value="all">tous sens</option>
-          <option value="in">box → cloud</option>
-          <option value="out">cloud → box</option>
+          <option value="in">▲ remontée</option>
+          <option value="out">▼ descente</option>
         </select>
         <select value={type} onChange={(e) => setType(e.target.value)}>
           <option value="all">tous types</option>
@@ -152,7 +165,7 @@ export default function MessageStream({ messages }: Props) {
                 {fmtParis(m.ts)}
               </span>
               <span className={styles.kind}>{LABEL[m.type] ?? m.type}</span>
-              <span className={styles.dir}>{m.direction === 'out' ? 'box' : 'cloud'}</span>
+              <span className={styles.dir}>{pathLabel(m)}</span>
               {m.session !== undefined && m.session !== null && (
                 <span className={styles.sess}>#{m.session}</span>
               )}

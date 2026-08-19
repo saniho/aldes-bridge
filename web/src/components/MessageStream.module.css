@@ -54,8 +54,17 @@
 
 .legend {
   display: flex;
-  gap: 16px;
-  font-size: 12px;
+  gap: 14px;
+  font-size: 11px;
+  align-items: center;
+}
+
+.blockedLegend {
+  color: #ef4444;
+}
+
+.injLegend {
+  color: var(--green);
 }
 
 .count {
@@ -152,6 +161,10 @@
 .dir {
   font-size: 11px;
   opacity: 0.8;
+  background: var(--bg-chip);
+  border-radius: 4px;
+  padding: 0 6px;
+  font-variant-numeric: tabular-nums;
 }
 
 .qos {
