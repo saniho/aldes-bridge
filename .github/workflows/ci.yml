@@ -26,9 +26,8 @@ jobs:
         run: npm ci --no-audit --no-fund
         working-directory: web
 
-      - name: Mettre à jour apt (runner Azure)
+      - name: Installer les dépendances système Chromium
         run: |
-          sudo apt-get update -o Acquire::http::No-Cache=true --allow-releaseinfo-change
           sudo apt-get install -y --no-install-recommends \
             libnspr4 libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 \
             libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 \
