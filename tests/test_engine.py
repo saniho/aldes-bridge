@@ -370,6 +370,16 @@ def test_listen_blocks_cloud():
     up = [m for m in allpub if m["direction"] == "in" and m.get("blocked")]
     assert not up, "la telemetrie ne doit pas etre marquee blocked"
 
+    # l'injection locale (WebUI) reste AUTORISEE en mode listen : livree a la box
+    res = eng.inject("dev/box/messages/devicebound/9", '{"cmd":"local"}', 1)
+    assert res["ok"], res
+    ptype, flags, body, _ = read_packet(tls)
+    assert ptype == 3, "la commande locale doit etre livree a la box"
+    from server.mqtt import parse_publish
+    topic, o = parse_publish(body)
+    assert topic == "dev/box/messages/devicebound/9"
+    assert body[o:].decode() == '{"cmd":"local"}', "injection listen livree telle quelle"
+
     tls.close()
     eng.stop()
     fake.sock.close()
