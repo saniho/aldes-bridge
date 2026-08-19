@@ -103,6 +103,13 @@ class FakeRealBroker(threading.Thread):
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.bind(("127.0.0.1", port))
         self.sock.listen(4)
+        # Un seul ecrivain a la fois sur le socket TLS (sendall concurrent sur un
+        # objet SSL depuis 2 threads corrompt l'etat et peut segfaulter a la fin).
+        self._send_lock = threading.Lock()
+
+    def _send(self, data):
+        with self._send_lock:
+            self.conn.sendall(data)
 
     def run(self):
         self.sock.settimeout(8)
@@ -125,20 +132,20 @@ class FakeRealBroker(threading.Thread):
             ptype, flags, body, raw = pkt
             self.received.append(ptype)
             if ptype == 1:
-                tls.sendall(b"\x20\x02\x00\x00")  # CONNACK
+                self._send(b"\x20\x02\x00\x00")  # CONNACK
             elif ptype == 8:
                 import struct as _s
                 pid = _s.unpack_from(">H", body, 0)[0]
                 codes = bytes([0]) * ((len(body) - 2) // 3)
-                tls.sendall(b"\x90" + bytes([len(codes) + 2]) + _s.pack(">H", pid) + codes)
+                self._send(b"\x90" + bytes([len(codes) + 2]) + _s.pack(">H", pid) + codes)
             elif ptype == 3:
                 # renvoie un PUBLISH de confirmation sur le meme topic (simule le cloud)
                 topic, o = 0, 0
                 from server.mqtt import parse_publish
                 topic, o = parse_publish(body)
-                tls.sendall(build_publish(topic, "{\"cloud\":\"reply\"}", qos=0))
+                self._send(build_publish(topic, "{\"cloud\":\"reply\"}", qos=0))
             elif ptype == 12:
-                tls.sendall(b"\xD0\x00")
+                self._send(b"\xD0\x00")
         tls.close()
 
     def kill(self):
@@ -320,7 +327,7 @@ def test_listen_blocks_cloud():
 
     # le cloud repond par un PUBLISH devicebound QoS1 (pkt_id 42) :
     # ListenHandler doit le bloquer — jamais envoye a la box — et l'acquitter.
-    fake.conn.sendall(build_publish("dev/box/messages/devicebound/1", '{"cmd":"off"}', qos=1, pkt_id=42))
+    fake._send(build_publish("dev/box/messages/devicebound/1", '{"cmd":"off"}', qos=1, pkt_id=42))
     time.sleep(0.5)
 
     # la box ne doit RIEN recevoir (ni la commande, ni un acquittement parasite)
@@ -335,10 +342,10 @@ def test_listen_blocks_cloud():
     assert 4 in fake.received, "le bridge doit acquitter la commande cote Azure (PUBACK)"
 
     # commande devicebound QoS2 (pkt_id 43) : PUBREC puis PUBCOMP, jamais a la box
-    fake.conn.sendall(build_publish("dev/box/messages/devicebound/2", '{"cmd":"warm"}', qos=2, pkt_id=43))
+    fake._send(build_publish("dev/box/messages/devicebound/2", '{"cmd":"warm"}', qos=2, pkt_id=43))
     time.sleep(0.3)
     assert 5 in fake.received, "le bridge doit repondre PUBREC (QoS2)"
-    fake.conn.sendall(build_pubrel(43))
+    fake._send(build_pubrel(43))
     time.sleep(0.3)
     assert 7 in fake.received, "le bridge doit repondre PUBCOMP apres PUBREL"
     tls.settimeout(1.0)
