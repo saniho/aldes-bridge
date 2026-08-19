@@ -9,6 +9,7 @@ interface Props {
 
 export default function ModeDiagram({ mode, connected, clientId }: Props) {
   const bridge = mode === 'bridge'
+  const listen = mode === 'listen'
   const raw = mode === 'raw'
 
   return (
@@ -61,16 +62,16 @@ export default function ModeDiagram({ mode, connected, clientId }: Props) {
         ) : (
           <>
             {/* BRIDGE */}
-            <div className={styles.node + ' ' + (bridge ? styles.highlight : '')}>
+            <div className={styles.node + ' ' + (bridge || listen ? styles.highlight : '')}>
               <span className={styles.icon}>⚙️</span>
               <span className={styles.name}>Aldes Bridge</span>
-              <span className={styles.sub}>{bridge ? 'mode bridge' : 'mode proxy'}</span>
+              <span className={styles.sub}>{bridge ? 'mode bridge' : listen ? 'mode listen' : 'mode proxy'}</span>
             </div>
 
-            {/* BRIDGE -> AZURE (only in proxy) */}
+            {/* BRIDGE -> AZURE (proxy & listen) */}
             <div className={styles.seg + (bridge ? styles.off : styles.live)}>
               <span className={styles.arrow}>▶</span>
-              <span className={styles.seglab}>{bridge ? 'inactif' : 'relai'}</span>
+              <span className={styles.seglab}>{bridge ? 'inactif' : listen ? 'relai télémétrie' : 'relai'}</span>
             </div>
 
             {/* AZURE */}
@@ -78,7 +79,7 @@ export default function ModeDiagram({ mode, connected, clientId }: Props) {
               <span className={styles.icon}>☁️</span>
               <span className={styles.name}>Azure</span>
               <span className={styles.sub}>
-                {bridge ? 'décroché' : 'IoT Hub'}
+                {bridge ? 'décroché' : listen ? 'écoute seule' : 'IoT Hub'}
               </span>
             </div>
           </>
@@ -98,6 +99,14 @@ export default function ModeDiagram({ mode, connected, clientId }: Props) {
             se connecte au broker configuré. On lit les <em>événements</em> de la box (topic{' '}
             <code>evt_topic</code>) et on envoie des <em>commandes</em> (topic{' '}
             <code>cmd_topic</code>).
+          </>
+        ) : listen ? (
+          <>
+            <strong>Listen</strong> : comme le proxy, la box rejoint Azure via le bridge et
+            sa <em>télémétrie remonte</em> vers le cloud. Mais les commandes{' '}
+            <strong>Azure → box</strong> sont <strong>bloquées</strong> : observées et
+            journalisées, jamais transmises à la box. L‘injection locale depuis la WebUI
+            reste possible.
           </>
         ) : (
           <>

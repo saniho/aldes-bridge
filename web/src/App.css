@@ -27,6 +27,7 @@
   --line-in: #2563eb55;
   --line-out: #f59e0b55;
   --line-inj: #22c55e99;
+  --line-block: #ef4444bb;
 
   --green: #22c55e;
   --green-bg: #86efac;
@@ -67,6 +68,7 @@ html[data-theme='jour'] {
   --line-in: #2563eb40;
   --line-out: #b453095e;
   --line-inj: #16a34a7a;
+  --line-block: #dc2626bb;
 
   --green: #16a34a;
   --green-bg: #16a34a;

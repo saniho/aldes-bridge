@@ -1,4 +1,4 @@
-export type Mode = 'proxy' | 'bridge' | 'raw'
+export type Mode = 'proxy' | 'bridge' | 'listen' | 'raw'
 
 export interface RawConfig {
   enabled: boolean
@@ -31,6 +31,7 @@ export interface MsgEvent {
   payload?: string | null
   qos?: number
   injected?: boolean
+  blocked?: boolean
   mode: Mode
   session?: number | string | null
   host?: string | null

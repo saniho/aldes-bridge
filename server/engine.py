@@ -14,6 +14,7 @@ from .tls import server_context
 from .appstate import set_conn_ctx, clear_conn_ctx
 from .bridge import BridgeHandler
 from .proxy import ProxyHandler
+from .listen import ListenHandler
 from .raw import RawClient
 
 
@@ -174,7 +175,12 @@ class Engine(threading.Thread):
 
     def _handle(self, cs, addr):
         mode = self.state.mode
-        handler = BridgeHandler(self.state, cs, addr) if mode == "bridge" else ProxyHandler(self.state, cs, addr)
+        if mode == "bridge":
+            handler = BridgeHandler(self.state, cs, addr)
+        elif mode == "listen":
+            handler = ListenHandler(self.state, cs, addr)
+        else:
+            handler = ProxyHandler(self.state, cs, addr)
         # Prise de relai : devient la session courante, l'ancienne est stale.
         session = self._sessions.register(handler)
         handler.session = session

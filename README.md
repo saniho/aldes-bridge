@@ -18,8 +18,12 @@ Deux modes (bascule possible à chaud depuis la Web UI, appliquée à la prochai
   tout en affichant/sniffant chaque trame, et permet d'injecter des commandes vers la box (QoS0).
 - **bridge** — faux broker : la box se connecte au pont qui joue le rôle d'Azure ; messages observés,
   commandes injectées en QoS1 ; *aucune* communication avec le vrai cloud.
+- **listen** — remontée seule : la box rejoint Azure comme en proxy (télémétrie relayée), mais les
+  commandes **cloud → box sont bloquées** (observées, journalisées, jamais livrées) ; l'injection
+  locale WebUI reste possible.
+- **raw** — client MQTT natif : le pont se connecte en client au broker local configuré.
 
-Un unique listener TLS sur le port 8883 sert les deux modes ; le choix du mode est dans `AppState`
+Un unique listener TLS sur le port 8883 sert les modes proxy/bridge/listen ; le choix du mode est dans `AppState`
 
 ### Schéma — Principe du bridge et du proxy
 
@@ -62,9 +66,9 @@ Un unique listener TLS sur le port 8883 sert les deux modes ; le choix du mode e
 ```
 
 > 📐 **Version Mermaid** (rendue nativement par GitHub) : [docs/flux-modes.md](docs/flux-modes.md) —
-> les flux des trois modes (proxy, bridge, raw) en diagrammes interactifs.
+> les flux des quatre modes (proxy, bridge, listen, raw) en diagrammes interactifs.
 
-Les deux modes partagent le même listener TLS et la même WebUI ; seule la destination
+Les modes partagent le même listener TLS et la même WebUI ; seule la destination
 **des trames** change (faux broker local vs relais vers Azure), d'où la bascule à chaud.
 
 ## Stack
@@ -233,7 +237,7 @@ git pull
 | GET | `/api/config` | mode actuel |
 | GET | `/api/state` | config + derniers messages (snapshot) |
 | GET | `/api/events` | flux SSE (snapshot initial puis messages/status temps réel) |
-| POST | `/api/mode` | `{"mode":"proxy"\|"bridge"}` — effet à la prochaine connexion |
+| POST | `/api/mode` | `{"mode":"proxy"\|"bridge"\|"listen"\|"raw"}` — effet à la prochaine connexion |
 | POST | `/api/send` | `{"topic","payload","qos"}` — injecte une commande vers la box |
 | POST | `/api/disconnect` | force la session (pour appliquer le mode tout de suite) |
 | POST | `/api/clear` | vide l'historique affiché |
@@ -293,7 +297,7 @@ et en preset « Change consigne C0 » dans « Envoyer une commande MQTT ».
 
 ## Paramètres CLI (`python3 -m server.main --help`)
 
-- `--mode proxy|bridge` (défaut `bridge`, ou env `ALDES_MODE`) — mode initial, changeable depuis la WebUI
+- `--mode proxy|bridge|listen|raw` (défaut `bridge`, ou env `ALDES_MODE`) — mode initial, changeable depuis la WebUI
 - `--mode-file logs/mode.json` — persistance du mode : un changement fait via la WebUI est
   rejoué au redémarrage du conteneur (le fichier persistant prime sur `--mode`/`ALDES_MODE`)
 - `--bind 0.0.0.0`, `--mqtt-port 8883`, `--web-port 8080`

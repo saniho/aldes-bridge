@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Point d'entree Aldes Bridge.
 
-Le mode (proxy | bridge) s'active par defaut ici mais est surtout changeable depuis
-la Web UI (POST /api/mode). Le listener MQTT/TLS reste identique pour les deux modes.
+Le mode (proxy | bridge | listen | raw) s'active par defaut ici mais est surtout
+changeable depuis la Web UI (POST /api/mode). Le listener MQTT/TLS reste identique
+pour les modes proxy/bridge/listen (la box se connecte au bridge).
 """
 import argparse
 import os
@@ -30,7 +31,7 @@ def _default_web_dir():
 
 def build_parser():
     ap = argparse.ArgumentParser(prog="aldes-bridge", description="Bridge Aldes (proxy MITM / faux broker) + WebUI.")
-    ap.add_argument("--mode", choices=["proxy", "bridge", "raw"],
+    ap.add_argument("--mode", choices=["proxy", "bridge", "listen", "raw"],
                     default=os.environ.get("ALDES_MODE", "bridge"),
                     help="mode initial (changeable depuis la WebUI)")
     ap.add_argument("--mode-file", default=DEFAULT_MODE_FILE,

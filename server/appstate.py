@@ -158,7 +158,7 @@ class MQTTEndpoint:
 
 
 class AppState:
-    MODES = ("proxy", "bridge", "raw")
+    MODES = ("proxy", "bridge", "listen", "raw")
 
     # telemetry.json n'est qu'un cache de survie au redemarrage : inutile de le
     # reecrire a chaque trame (2-3/min), au plus toutes les TELEMETRY_SAVE_INTERVAL s.
