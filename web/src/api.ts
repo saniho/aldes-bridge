@@ -109,6 +109,39 @@ export async function getLogs(limit: number, offset: number): Promise<LogPage> {
   return json<LogPage>(await fetch(`/api/logs?limit=${limit}&offset=${offset}`))
 }
 
+export async function getHistoryKeys(): Promise<import('./types').HistoryKey[]> {
+  return json<{ keys: import('./types').HistoryKey[] }>(await fetch('/api/history/keys')).then(
+    (r) => r.keys
+  )
+}
+
+export async function getHistorySeries(
+  key: string,
+  start?: number,
+  end?: number,
+  bucket?: number
+): Promise<import('./types').HistoryPoint[]> {
+  const qs = new URLSearchParams({ key })
+  if (start !== undefined) qs.set('start', String(start))
+  if (end !== undefined) qs.set('end', String(end))
+  if (bucket !== undefined) qs.set('bucket', String(bucket))
+  return json<{ samples: import('./types').HistoryPoint[] }>(
+    await fetch(`/api/history/series?${qs}`)
+  ).then((r) => r.samples)
+}
+
+export async function getHistoryTable(
+  start?: number,
+  end?: number,
+  limit = 500,
+  offset = 0
+): Promise<import('./types').HistoryTablePage> {
+  const qs = new URLSearchParams({ limit: String(limit), offset: String(offset) })
+  if (start !== undefined) qs.set('start', String(start))
+  if (end !== undefined) qs.set('end', String(end))
+  return json<import('./types').HistoryTablePage>(await fetch(`/api/history/table?${qs}`))
+}
+
 export async function getProducts(): Promise<import('./types').AldesProduct[]> {
   return json<import('./types').AldesProduct[]>(
     await fetch('/aldesoc/v5/users/me/products')

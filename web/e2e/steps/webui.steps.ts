@@ -75,11 +75,24 @@ When('je clique sur {texte}', async ({ page }, label: string) => {
   await page.getByRole('button', { name: label, exact: false }).click()
 })
 
+When('je clique sur l\'item de menu {texte}', async ({ page }, label: string) => {
+  await page.getByRole('menuitem', { name: label, exact: false }).click()
+})
+
 When('des messages MQTT sont injectés', async ({ page }) => {
   const res = await page.request.post('/api/test/inject', {
     data: { topic: 'aldes/test', payload: '{"test":true}', qos: 0 }
   })
   expect(res.ok()).toBeTruthy()
+})
+
+When('des télémétries numériques sont injectées', async ({ page }) => {
+  for (const v of [21.5, 21.8, 22.1]) {
+    const res = await page.request.post('/api/test/inject', {
+      data: { topic: 'aldes/telemetry', payload: `{"Text":${v},"MT0":24.0}`, qos: 0 }
+    })
+    expect(res.ok()).toBeTruthy()
+  }
 })
 
 When('je tape {texte} dans la recherche', async ({ page }, text: string) => {
@@ -237,4 +250,18 @@ Then('les versions UI et Backend sont affichées', async ({ page }) => {
   if (!/Backend v\d+\.\d+\.\d+/.test(text)) {
     throw new Error(`Version Backend non affichée dans "${text}"`)
   }
+})
+
+// ---------------------------------------------------------------------------
+//  Then : vérifications historique
+// ---------------------------------------------------------------------------
+
+Then('le panneau historique est visible', async ({ page }) => {
+  await expect(page.getByText('Historique des valeurs')).toBeVisible({ timeout: 10000 })
+})
+
+Then('une valeur historique est affichée', async ({ page }) => {
+  await expect(page.getByLabel('Capteur')).toBeVisible({ timeout: 10000 })
+  const chart = page.locator('.recharts-wrapper').first()
+  await expect(chart).toBeVisible({ timeout: 15000 })
 })

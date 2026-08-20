@@ -11,6 +11,8 @@ services:
       - ./logs:/app/logs
     environment:
       - ALDES_MODE=bridge
+      # rétention de l'historisation SQLite des valeurs (jours) ; la base vit dans logs/ (volume monté)
+      - ALDES_HISTORY_DAYS=90
     # app = python3 -m server.main [--mode ${ALDES_MODE} --mqtt-port 8883 --web-port 8080 --real-host aldesiotsuite.azure-devices.net]
     # Le mode changé depuis la WebUI est persisté dans logs/mode.json (volume monté) et
     # rejoué au redémarrage du conteneur, en priorité sur ALDES_MODE.

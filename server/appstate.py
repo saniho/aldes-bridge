@@ -175,7 +175,7 @@ class AppState:
         "evt_topic": "devices_MAC_AIR/messages/events",
     }
 
-    def __init__(self, real_host, real_port, events, mode_file=None, telemetry_file=None, consigne_file=None):
+    def __init__(self, real_host, real_port, events, mode_file=None, telemetry_file=None, consigne_file=None, history=None):
         self.events = events if events is not None else EventBus()
         self._lock = threading.Lock()
         self.real_host = real_host
@@ -200,6 +200,9 @@ class AppState:
         self._telemetry_file = telemetry_file
         # Persistance des consignes demandees (survit au redemarrage du conteneur).
         self._consigne_file = consigne_file
+        # Base d'historisation des valeurs (HistoryDB ou None). Remplie par
+        # main.py ; branchee ici pour capter telemetries + connexions.
+        self.history = history
         # Version de l'UI servie (mise a jour par create_app depuis web_dir).
         self.ui_version = "dev"
         self.server_version = SERVER_VERSION
@@ -260,6 +263,8 @@ class AppState:
             self.telemetry[pid] = current
             self._maybe_save_telemetry()
             self._confirm_consignes_from(data)
+        if self.history is not None:
+            self.history.record_telemetry(data)
 
     def _maybe_save_telemetry(self):
         """Persiste telemetry.json au plus toutes les TELEMETRY_SAVE_INTERVAL s.
@@ -347,6 +352,8 @@ class AppState:
         self.events.publish({
             "kind": "status", "connected": True, "client_id": client_id, "ts": _iso(),
         })
+        if self.history is not None:
+            self.history.record_status("box", True)
 
     def session_down(self):
         with self._lock:
@@ -357,6 +364,8 @@ class AppState:
         self.events.publish({
             "kind": "status", "connected": False, "client_id": None, "ts": _iso(),
         })
+        if self.history is not None:
+            self.history.record_status("box", False)
 
     def cloud_up(self):
         """Connexion du leg bridge -> Azure IoT Hub etablie (mode proxy)."""
@@ -365,6 +374,8 @@ class AppState:
         self.events.publish({
             "kind": "status", "cloud_connected": True, "ts": _iso(),
         })
+        if self.history is not None:
+            self.history.record_status("cloud", True)
 
     def cloud_down(self):
         with self._lock:
@@ -372,6 +383,8 @@ class AppState:
         self.events.publish({
             "kind": "status", "cloud_connected": False, "ts": _iso(),
         })
+        if self.history is not None:
+            self.history.record_status("cloud", False)
 
     def set_error(self, message):
         with self._lock:
@@ -410,4 +423,5 @@ class AppState:
                 "consignes": {k: dict(v) for k, v in self._consignes.items()},
                 "server_version": self.server_version,
                 "ui_version": self.ui_version,
+                "history_days": self.history.retention_days if self.history is not None else None,
             }

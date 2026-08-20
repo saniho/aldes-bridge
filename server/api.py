@@ -66,6 +66,7 @@ class ConfigSnapshot(BaseModel):
     consignes: dict[str, ConsigneEntry] = {}
     server_version: str = "dev"
     ui_version: str = "dev"
+    history_days: int | None = None
 
 
 class StateSnapshot(BaseModel):
@@ -227,6 +228,39 @@ def create_app(state, engine, web_dir):
         state.events.clear()
         return {"ok": True}
 
+    # --- Historisation des valeurs (SQLite) ---
+    def _history():
+        h = getattr(state, "history", None)
+        if h is None:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=503, detail="historique non activé")
+        return h
+
+    @app.get("/api/history/keys")
+    def api_history_keys():
+        h = _history()
+        return {"keys": h.keys()}
+
+    @app.get("/api/history/series")
+    def api_history_series(
+        key: str,
+        start: float | None = None,
+        end: float | None = None,
+        bucket: float | None = None,
+    ):
+        h = _history()
+        return {"key": key, "samples": h.series(key, start=start, end=end, bucket=bucket)}
+
+    @app.get("/api/history/table")
+    def api_history_table(
+        start: float | None = None,
+        end: float | None = None,
+        limit: int = 500,
+        offset: int = 0,
+    ):
+        h = _history()
+        return h.table(start=start, end=end, limit=limit, offset=offset)
+
     # --- Injection de test (E2E) : pousse un message synthetique dans le bus SSE
     # sans avoir besoin d'une box connectee. Utilise uniquement par les tests E2E.
     from pydantic import BaseModel as _BM
@@ -249,6 +283,10 @@ def create_app(state, engine, web_dir):
             "qos": body.qos,
             "injected": True,
         })
+        # Simule une vraie telemetrie : alimente aussi l'historique (E2E).
+        h = getattr(state, "history", None)
+        if h is not None:
+            h.record_telemetry(body.payload)
         return {"ok": True}
 
     # --- Rejeu de l'API Aldes pour l'integration HA "saniho-ha" ---

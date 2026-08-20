@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react'
 import { useSse } from './hooks/useSse'
 import { getConfig, setMode, disconnect, clearHistory, getLogs, getConsignes } from './api'
 import type { BridgeEvent, Config, ConsigneEvent, Mode, MsgEvent } from './types'
@@ -12,7 +12,9 @@ import TempsPanel from './components/TempsPanel'
 import WrapperPanel from './components/WrapperPanel'
 import './App.css'
 
-type View = 'temps' | 'commande' | 'log' | 'wrapper'
+const HistoryPanel = lazy(() => import('./components/HistoryPanel'))
+
+type View = 'temps' | 'commande' | 'log' | 'wrapper' | 'historique'
 
 function mergeConsignes(
   c: Record<string, { requested: number; confirmed: boolean; ts?: string }>
@@ -35,7 +37,8 @@ const TABS: { id: View; label: string; title: string }[] = [
 
 const MORE: { id: View; label: string; title: string }[] = [
   { id: 'log', label: '📜 log', title: 'Trames MQTT en temps réel et historique' },
-  { id: 'wrapper', label: '🔌 wrapper', title: 'Appels API du bridge (test interactif)' }
+  { id: 'wrapper', label: '🔌 wrapper', title: 'Appels API du bridge (test interactif)' },
+  { id: 'historique', label: '📊 historique', title: 'Historique des valeurs (télémétries & connexions)' }
 ]
 
 export default function App() {
@@ -47,7 +50,13 @@ export default function App() {
   const [view, setView] = useState<View>(() => {
     const stored = localStorage.getItem('aldes-view')
     if (stored === 'flux') return 'log'
-    if (stored === 'temps' || stored === 'commande' || stored === 'log' || stored === 'wrapper') {
+    if (
+      stored === 'temps' ||
+      stored === 'commande' ||
+      stored === 'log' ||
+      stored === 'wrapper' ||
+      stored === 'historique'
+    ) {
       return stored
     }
     return 'log'
@@ -104,7 +113,8 @@ export default function App() {
           cloud_since: cfg.cloud_since ?? null,
           consignes: cfg.consignes ?? undefined,
           server_version: cfg.server_version ?? 'dev',
-          ui_version: cfg.ui_version ?? 'dev'
+          ui_version: cfg.ui_version ?? 'dev',
+          history_days: cfg.history_days ?? null
         })
         if (cfg.consignes) setConsignes(mergeConsignes(cfg.consignes))
       } catch {
@@ -237,7 +247,7 @@ const { messages, lastSnapshot } = useMemo(() => {
         <div className="topLeft">
           <div className="moreWrap">
             <button
-              className={'burger' + (moreOpen ? ' active' : '') + (view === 'log' || view === 'wrapper' ? ' on' : '')}
+              className={'burger' + (moreOpen ? ' active' : '') + (view === 'log' || view === 'wrapper' || view === 'historique' ? ' on' : '')}
               onClick={() => setMoreOpen((o) => !o)}
               title="Ouvrir les outils"
               aria-expanded={moreOpen}
@@ -375,6 +385,15 @@ const { messages, lastSnapshot } = useMemo(() => {
         {view === 'wrapper' && (
           <div className="streamCol">
             <WrapperPanel clientId={config?.client_id ?? null} />
+          </div>
+        )}
+        {view === 'historique' && (
+          <div className="streamCol">
+            <Suspense
+              fallback={<div className="histLabel" style={{ padding: 12 }}>chargement…</div>}
+            >
+              <HistoryPanel historyDays={config?.history_days ?? null} />
+            </Suspense>
           </div>
         )}
       </div>

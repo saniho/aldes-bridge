@@ -22,6 +22,7 @@ export interface Config {
   consignes?: Record<string, { requested: number; confirmed: boolean; ts?: string }>
   server_version?: string
   ui_version?: string
+  history_days?: number | null
 }
 
 export interface MsgEvent {
@@ -85,6 +86,29 @@ export interface AldesIndicator {
   hors_gel: boolean
   settings?: { people?: number | null }
   thermostats: AldesThermostat[]
+}
+
+export interface HistoryKey {
+  key: string
+  kind: string
+  samples: number
+  last_ts: number | null
+}
+
+export interface HistoryPoint {
+  ts: number
+  value?: number
+  min?: number
+  max?: number
+  avg?: number
+  n?: number
+}
+
+export interface HistoryTablePage {
+  total: number
+  limit: number
+  offset: number
+  samples: Array<{ ts: number; kind: string; key: string; value: number }>
 }
 
 export interface AldesProduct {

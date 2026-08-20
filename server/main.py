@@ -12,6 +12,7 @@ from .appstate import AppState, read_persisted_mode
 from .events import EventBus
 from .engine import Engine
 from .eventlog import EventLog
+from .history import HistoryDB
 from .aldes import capture_telemetry
 
 APP_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -19,6 +20,8 @@ APP_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_MODE_FILE = os.path.join(APP_ROOT, "logs", "mode.json")
 DEFAULT_TELEMETRY_FILE = os.path.join(APP_ROOT, "logs", "telemetry.json")
 DEFAULT_CONSIGNE_FILE = os.path.join(APP_ROOT, "logs", "consigne.json")
+DEFAULT_HISTORY_FILE = os.path.join(APP_ROOT, "logs", "history.db")
+DEFAULT_HISTORY_DAYS = 90
 
 
 def _default_web_dir():
@@ -27,6 +30,33 @@ def _default_web_dir():
         if os.path.isdir(p) and os.path.exists(os.path.join(p, "index.html")):
             return p
     return os.path.join(APP_ROOT, "dist")
+
+
+def _backfill_history(history, log, n=10000):
+    """Rejoue les événements du log persistant dans la base d'historisation.
+
+    Ne reprend que les trames utiles (PUBLISH boxward + status de connexion) et
+    les plus récentes dans la fenêtre de rétention. Best-effort : ne lève jamais.
+    """
+    try:
+        events = log.tail_oldest_first(n)
+    except Exception:
+        return 0
+    kept = 0
+    for ev in events:
+        try:
+            kind = ev.get("kind")
+            if kind == "message" and ev.get("type") == "PUBLISH" and ev.get("direction") == "in":
+                kept += history.record_telemetry(ev.get("payload") or "")
+            elif kind == "status" and "connected" in ev:
+                history.record_status("box", bool(ev["connected"]))
+                kept += 1
+            elif kind == "status" and "cloud_connected" in ev:
+                history.record_status("cloud", bool(ev["cloud_connected"]))
+                kept += 1
+        except Exception:
+            continue
+    return kept
 
 
 def build_parser():
@@ -52,6 +82,13 @@ def build_parser():
                     help="persistance des dernieres telemetries capturees (JSON), vide pour desactiver")
     ap.add_argument("--consigne-file", default=os.environ.get("ALDES_CONSIGNE_FILE", DEFAULT_CONSIGNE_FILE),
                     help="persistance des consignes demandees (JSON), vide pour desactiver")
+    ap.add_argument("--history-file", default=os.environ.get("ALDES_HISTORY_FILE", DEFAULT_HISTORY_FILE),
+                    help="base SQLite d'historisation des valeurs, vide pour desactiver")
+    ap.add_argument("--history-days", type=int,
+                    default=int(os.environ.get("ALDES_HISTORY_DAYS", DEFAULT_HISTORY_DAYS)),
+                    help="retention de l'historique en jours (defaut %d)" % DEFAULT_HISTORY_DAYS)
+    ap.add_argument("--no-history-backfill", action="store_true",
+                    help="ne pas rejouer le log persistant dans l'historique au demarrage")
     return ap
 
 
@@ -71,9 +108,16 @@ def main(argv=None):
         log = EventLog(args.log_file, max_bytes=args.log_max)
     events = EventBus(args.history_size, log=log)
     restored = events.restore_from_log(args.history_size)
+
+    history = None
+    if args.history_file:
+        history = HistoryDB(args.history_file, retention_days=args.history_days)
+        if log is not None and not args.no_history_backfill:
+            _backfill_history(history, log)
+
     state = AppState(args.real_host, args.real_port, events,
                      mode_file=args.mode_file, telemetry_file=args.telemetry_file,
-                     consigne_file=args.consigne_file)
+                     consigne_file=args.consigne_file, history=history)
     # Capture des telemetries : branchee ici pour decoupler appstate (plomberie
     # d'evenements) de aldes (mapping metier). Appelee sur chaque PUBLISH entrant.
     state.on_publish_in = capture_telemetry
