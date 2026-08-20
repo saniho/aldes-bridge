@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 from pydantic import BaseModel
 
 from .appstate import _iso
+from .version import read_ui_version
 
 
 class SendBody(BaseModel):
@@ -63,6 +64,8 @@ class ConfigSnapshot(BaseModel):
     box_since: float | None = None
     cloud_since: float | None = None
     consignes: dict[str, ConsigneEntry] = {}
+    server_version: str = "dev"
+    ui_version: str = "dev"
 
 
 class StateSnapshot(BaseModel):
@@ -106,6 +109,7 @@ class DisconnectResult(BaseModel):
 def create_app(state, engine, web_dir):
     app = FastAPI(title="Aldes Bridge", docs_url=None, redoc_url=None)
     web_dir = os.path.abspath(web_dir)
+    state.ui_version = read_ui_version(web_dir)
 
     @app.on_event("startup")
     async def _startup():

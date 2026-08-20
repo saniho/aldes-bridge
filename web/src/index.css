@@ -203,6 +203,15 @@ h1 {
   color: #f87171;
 }
 
+.moreVersion {
+  padding: 6px 12px;
+  font-size: 0.72rem;
+  color: var(--text-faint);
+  white-space: nowrap;
+  user-select: none;
+  cursor: default;
+}
+
 .layout {
   display: block;
   padding: 12px 16px;

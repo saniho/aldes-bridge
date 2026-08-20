@@ -226,3 +226,15 @@ Then('le badge BLOQUÉ est visible', async ({ page }) => {
 Then('la légende affiche {texte}', async ({ page }, text: string) => {
   await expect(page.getByText(text, { exact: false })).toBeVisible({ timeout: 10000 })
 })
+
+Then('les versions UI et Backend sont affichées', async ({ page }) => {
+  const versionEl = page.locator('.moreVersion')
+  await expect(versionEl).toBeVisible({ timeout: 10000 })
+  const text = (await versionEl.textContent()) ?? ''
+  if (!/UI v\d+\.\d+\.\d+/.test(text)) {
+    throw new Error(`Version UI non affichée dans "${text}"`)
+  }
+  if (!/Backend v\d+\.\d+\.\d+/.test(text)) {
+    throw new Error(`Version Backend non affichée dans "${text}"`)
+  }
+})

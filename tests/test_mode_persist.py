@@ -71,6 +71,30 @@ def test_snapshot_exposes_mode_file():
     assert s.snapshot()["mode_file"] == mf
 
 
+def test_snapshot_exposes_versions():
+    s = AppState("h", 8883, EventBus())
+    snap = s.snapshot()
+    assert snap["server_version"]
+    assert snap["ui_version"] == "dev"
+    s.ui_version = "1.2.3"
+    assert s.snapshot()["ui_version"] == "1.2.3"
+
+
+def test_read_ui_version(tmp_path):
+    from server.version import read_ui_version
+
+    d = tmp_path / "web"
+    d.mkdir()
+    # fichier absent -> dev
+    assert read_ui_version(str(d)) == "dev"
+    # fichier present -> version lue
+    (d / "version.json").write_text('{"ui": "0.2.0"}', encoding="utf-8")
+    assert read_ui_version(str(d)) == "0.2.0"
+    # JSON invalide -> dev
+    (d / "version.json").write_text("pas du json", encoding="utf-8")
+    assert read_ui_version(str(d)) == "dev"
+
+
 if __name__ == "__main__":
     import traceback
     failures = 0

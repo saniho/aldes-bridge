@@ -20,6 +20,8 @@ export interface Config {
   box_since?: number | null
   cloud_since?: number | null
   consignes?: Record<string, { requested: number; confirmed: boolean; ts?: string }>
+  server_version?: string
+  ui_version?: string
 }
 
 export interface MsgEvent {

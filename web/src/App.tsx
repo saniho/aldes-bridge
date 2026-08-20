@@ -102,7 +102,9 @@ export default function App() {
           last_error: cfg.last_error ?? null,
           box_since: cfg.box_since ?? null,
           cloud_since: cfg.cloud_since ?? null,
-          consignes: cfg.consignes ?? undefined
+          consignes: cfg.consignes ?? undefined,
+          server_version: cfg.server_version ?? 'dev',
+          ui_version: cfg.ui_version ?? 'dev'
         })
         if (cfg.consignes) setConsignes(mergeConsignes(cfg.consignes))
       } catch {
@@ -274,6 +276,9 @@ const { messages, lastSnapshot } = useMemo(() => {
                 >
                   🗑 vider le log
                 </button>
+                <div className="moreVersion" title="Versions du bridge">
+                  UI v{config?.ui_version ?? 'dev'} · Backend v{config?.server_version ?? 'dev'}
+                </div>
               </div>
             )}
           </div>

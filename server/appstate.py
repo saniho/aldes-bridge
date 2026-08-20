@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 
 from .events import EventBus
 from .mqtt import build_publish, parse_connect
+from .version import SERVER_VERSION
 
 # Contexte de connexion : taggé par le thread qui gère une session box.
 _CONN_CTX = threading.local()
@@ -199,6 +200,9 @@ class AppState:
         self._telemetry_file = telemetry_file
         # Persistance des consignes demandees (survit au redemarrage du conteneur).
         self._consigne_file = consigne_file
+        # Version de l'UI servie (mise a jour par create_app depuis web_dir).
+        self.ui_version = "dev"
+        self.server_version = SERVER_VERSION
         # Hook appele sur chaque PUBLISH entrant (capture telemetrie). Branche par
         # main.py sur server/aldes.py::capture_telemetry pour decoupler les modules.
         self.on_publish_in = None
@@ -404,4 +408,6 @@ class AppState:
                 "box_since": self._box_since,
                 "cloud_since": self._cloud_since,
                 "consignes": {k: dict(v) for k, v in self._consignes.items()},
+                "server_version": self.server_version,
+                "ui_version": self.ui_version,
             }
