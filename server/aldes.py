@@ -132,7 +132,7 @@ def _utc_iso(value):
 def _num(value, default=None):
     try:
         f = float(value)
-        return f
+        return int(f) if f == int(f) else f
     except (TypeError, ValueError):
         return default
 
