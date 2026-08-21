@@ -4,10 +4,11 @@ import json
 import os
 import urllib.parse
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel
 
+from .aldes import build_products, make_token
 from .appstate import _iso
 from .version import read_ui_version
 
@@ -232,7 +233,6 @@ def create_app(state, engine, web_dir):
     def _history():
         h = getattr(state, "history", None)
         if h is None:
-            from fastapi import HTTPException
             raise HTTPException(status_code=503, detail="historique non activé")
         return h
 
@@ -249,6 +249,10 @@ def create_app(state, engine, web_dir):
         bucket: float | None = None,
     ):
         h = _history()
+        if start is not None and end is not None and start >= end:
+            raise HTTPException(status_code=400, detail="start doit être inférieur à end")
+        if bucket is not None and bucket <= 0:
+            raise HTTPException(status_code=400, detail="bucket doit être supérieur à 0")
         return {"key": key, "samples": h.series(key, start=start, end=end, bucket=bucket)}
 
     @app.get("/api/history/table")
@@ -259,13 +263,13 @@ def create_app(state, engine, web_dir):
         offset: int = 0,
     ):
         h = _history()
+        if start is not None and end is not None and start >= end:
+            raise HTTPException(status_code=400, detail="start doit être inférieur à end")
         return h.table(start=start, end=end, limit=limit, offset=offset)
 
     # --- Injection de test (E2E) : pousse un message synthetique dans le bus SSE
     # sans avoir besoin d'une box connectee. Utilise uniquement par les tests E2E.
-    from pydantic import BaseModel as _BM
-
-    class _TestInjectBody(_BM):
+    class _TestInjectBody(BaseModel):
         topic: str = "test/msg"
         payload: str = '{"test":true}'
         qos: int = 0
@@ -290,10 +294,6 @@ def create_app(state, engine, web_dir):
         return {"ok": True}
 
     # --- Rejeu de l'API Aldes pour l'integration HA "saniho-ha" ---
-    # La box est reliee au bridge en mode bridge/proxy : ses telemetries sont
-    # capturees (appstate.capture_telemetry) puis re-exposees ici au format
-    # consomme par custom_components/aldes.
-    from .aldes import build_products, make_token
 
     @app.post("/oauth2/token")
     async def aldes_token(request: Request):

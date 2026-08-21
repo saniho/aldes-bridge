@@ -6,7 +6,9 @@ changeable depuis la Web UI (POST /api/mode). Le listener MQTT/TLS reste identiq
 pour les modes proxy/bridge/listen (la box se connecte au bridge).
 """
 import argparse
+import logging
 import os
+import sys
 
 from .appstate import AppState, read_persisted_mode
 from .events import EventBus
@@ -16,6 +18,7 @@ from .history import HistoryDB
 from .aldes import capture_telemetry
 
 APP_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_log = logging.getLogger("aldes-backfill")
 
 DEFAULT_MODE_FILE = os.path.join(APP_ROOT, "logs", "mode.json")
 DEFAULT_TELEMETRY_FILE = os.path.join(APP_ROOT, "logs", "telemetry.json")
@@ -40,7 +43,8 @@ def _backfill_history(history, log, n=10000):
     """
     try:
         events = log.tail_oldest_first(n)
-    except Exception:
+    except Exception as exc:
+        _log.warning("backfill: impossible de lire le log: %s", exc)
         return 0
     kept = 0
     for ev in events:
@@ -54,7 +58,8 @@ def _backfill_history(history, log, n=10000):
             elif kind == "status" and "cloud_connected" in ev:
                 history.record_status("cloud", bool(ev["cloud_connected"]))
                 kept += 1
-        except Exception:
+        except Exception as exc:
+            _log.debug("backfill: evenement ignore: %s", exc)
             continue
     return kept
 
@@ -86,7 +91,7 @@ def build_parser():
                     help="base SQLite d'historisation des valeurs, vide pour desactiver")
     ap.add_argument("--history-days", type=int,
                     default=int(os.environ.get("ALDES_HISTORY_DAYS", DEFAULT_HISTORY_DAYS)),
-                    help="retention de l'historique en jours (defaut %d)" % DEFAULT_HISTORY_DAYS)
+                    help="retention de l'historique en jours (défaut %d)" % DEFAULT_HISTORY_DAYS)
     ap.add_argument("--no-history-backfill", action="store_true",
                     help="ne pas rejouer le log persistant dans l'historique au demarrage")
     return ap
@@ -98,7 +103,6 @@ def main(argv=None):
     try:
         import uvicorn
     except ImportError:
-        import sys
         sys.stderr.write("Paquet manquant: fastapi + uvicorn. Installez avec:\n"
                          "  pip install fastapi 'uvicorn[standard]'\n")
         raise SystemExit(2)

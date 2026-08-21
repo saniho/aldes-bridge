@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { sendCommand } from '../api'
 import type { Mode } from '../types'
+import { FNS, topicFor, withPropBag } from './commandBuilderData'
+import {
+  ConsigneSection, ModeSection, BallonSection, AirSection,
+  VacancesSection, CmoSection, CustomSection
+} from './CommandFormSections'
 import styles from './SendPanel.module.css'
 
 interface Props {
@@ -8,80 +13,6 @@ interface Props {
   connected: boolean
   clientId: string | null
   defaultTopic?: string | null
-}
-
-const MODES: { code: string; label: string }[] = [
-  { code: 'V', label: 'V · Quotidien' },
-  { code: 'X', label: 'X · Boost' },
-  { code: 'Y', label: 'Y · Invités' },
-  { code: 'Z', label: 'Z · Programme' },
-  { code: 'H', label: 'H · Hors-gel' },
-  { code: 'E', label: 'E · Auto' },
-  { code: 'A', label: 'A · Arrêt' },
-  { code: 'B', label: 'B · Chaud (Heat)' },
-  { code: 'F', label: 'F · Froid (Cool)' }
-]
-
-const FNS: { id: string; label: string }[] = [
-  { id: 'consigne', label: 'changeConsigneC<n> — consigne par zone (réel cloud)' },
-  { id: 'ballon', label: 'changeMode — ballon eau chaude On/Off' },
-  { id: 'air', label: 'changeMode — rafraîchissement air (confort/prog C/prog D/arrêt)' },
-  { id: 'mode', label: 'changeMode — mode' },
-  { id: 'vacances', label: 'changeMode — vacances (W)' },
-  { id: 'cmo', label: 'changeCMO — override 0/1' },
-  { id: 'custom', label: 'JSON libre (personnalisé)' }
-]
-
-const ZONES: { id: string; label: string }[] = [
-  { id: 'C0', label: 'C0 · Zone 1 (principale)' },
-  { id: 'C1', label: 'C1 · Zone 2' },
-  { id: 'C2', label: 'C2 · Zone 3' },
-  { id: 'C3', label: 'C3 · Zone 4' },
-  { id: 'C4', label: 'C4 · Zone 5' },
-  { id: 'C5', label: 'C5 · Zone 6' },
-  { id: 'C6', label: 'C6 · Zone 7' },
-  { id: 'C7', label: 'C7 · Zone 8' },
-  { id: 'C8', label: 'C8 · Zone 9' },
-  { id: 'C9', label: 'C9 · Zone 10' }
-]
-
-function topicFor(clientId: string): string {
-  return `devices/${clientId}/messages/devicebound`
-}
-
-function randHex(n: number): string {
-  let s = ''
-  for (let i = 0; i < n; i++) s += Math.floor(Math.random() * 16).toString(16)
-  return s
-}
-
-function randomUUID(): string {
-  return (
-    `${randHex(8)}-${randHex(4)}-4${randHex(3)}-` +
-    `${(8 + Math.floor(Math.random() * 4)).toString(16)}${randHex(3)}-` +
-    `${randHex(12)}`
-  )
-}
-
-function withPropBag(base: string, clientId: string | null): string {
-  const m = base.match(/^devices\/([^/]+)\/messages\/devicebound$/)
-  const id = m ? m[1] : clientId ?? ''
-  const mid = randomUUID()
-  const to = encodeURIComponent(`/devices/${id}/messages/deviceBound`)
-  return `${base}/%24.mid=${mid}&%24.to=${to}&iothub-ack=full`
-}
-
-function utcStamp(d: Date): string {
-  const p = (n: number) => String(n).padStart(2, '0')
-  return (
-    `${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}` +
-    `${p(d.getUTCHours())}${p(d.getUTCMinutes())}${p(d.getUTCSeconds())}Z`
-  )
-}
-
-function dateInputValue(d: Date): string {
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
 }
 
 export default function CommandBuilder({ connected, clientId, defaultTopic }: Props) {
@@ -141,8 +72,8 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
       return wrap('changeMode', JSON.stringify([airMode]))
     }
     if (fn === 'vacances') {
-      const s = vacStart ? utcStamp(new Date(vacStart)) : ''
-      const e = vacEnd ? utcStamp(new Date(vacEnd)) : ''
+      const s = vacStart ? new Date(vacStart).toISOString().replace(/[-:T]/g, '').slice(0, 15) + 'Z' : ''
+      const e = vacEnd ? new Date(vacEnd).toISOString().replace(/[-:T]/g, '').slice(0, 15) + 'Z' : ''
       if (!s || !e) return null
       return wrap('changeMode', JSON.stringify([`W${s}${e}`]))
     }
@@ -191,190 +122,33 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
         <label>Fonction</label>
         <select value={fn} onChange={(e) => setFn(e.target.value)}>
           {FNS.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.label}
-            </option>
+            <option key={f.id} value={f.id}>{f.label}</option>
           ))}
         </select>
       </div>
 
       {fn === 'consigne' && (
-        <>
-          <div className={styles.row}>
-            <label>Zone</label>
-            <select
-              value={consZoneFree ? '__free' : consZone}
-              onChange={(e) => {
-                if (e.target.value === '__free') {
-                  setConsZoneFree(true)
-                } else {
-                  setConsZoneFree(false)
-                  setConsZone(e.target.value)
-                }
-              }}
-            >
-              {ZONES.map((z) => (
-                <option key={z.id} value={z.id}>
-                  {z.label}
-                </option>
-              ))}
-              <option value="__free">Personnalisé…</option>
-            </select>
-            {consZoneFree && (
-              <input
-                value={consZone}
-                onChange={(e) => setConsZone(e.target.value)}
-                placeholder="ex. C3"
-                spellCheck={false}
-              />
-            )}
-          </div>
-          <div className={styles.row}>
-            <label>Consigne °C</label>
-            <input
-              type="number"
-              step="0.5"
-              value={consTemp}
-              onChange={(e) => setConsTemp(e.target.value)}
-            />
-          </div>
-          <div className={styles.hint}>
-            <span>
-              <code>changeConsigneC0..C9</code> · params en chaîne <code>{'["21"]'}</code> — format
-              réellement utilisé par le cloud Aldes (C0 = zone principale)
-            </span>
-          </div>
-        </>
+        <ConsigneSection
+          consZone={consZone} consZoneFree={consZoneFree} consTemp={consTemp}
+          onZoneChange={setConsZone} onZoneFreeChange={setConsZoneFree} onTempChange={setConsTemp}
+        />
       )}
-
       {fn === 'mode' && (
-        <>
-          <div className={styles.row}>
-            <label>Mode</label>
-            <select
-              value={modeFree ? '__free' : modeSel}
-              onChange={(e) => {
-                if (e.target.value === '__free') {
-                  setModeFree(true)
-                  setCustomCode('')
-                } else {
-                  setModeFree(false)
-                  setModeSel(e.target.value)
-                }
-              }}
-            >
-              {MODES.map((m) => (
-                <option key={m.code} value={m.code}>
-                  {m.label}
-                </option>
-              ))}
-              <option value="__free">Personnalisé…</option>
-            </select>
-          </div>
-          {modeFree && (
-            <div className={styles.row}>
-              <label>Code</label>
-              <input
-                value={customCode}
-                onChange={(e) => setCustomCode(e.target.value)}
-                placeholder="ex. V, X, W…"
-                spellCheck={false}
-              />
-            </div>
-          )}
-        </>
+        <ModeSection
+          modeSel={modeSel} modeFree={modeFree} customCode={customCode}
+          onModeChange={setModeSel} onFreeChange={setModeFree} onCustomCodeChange={setCustomCode}
+        />
       )}
-
-      {fn === 'ballon' && (
-        <>
-          <div className={styles.row}>
-            <label>Ballon eau chaude</label>
-            <select value={ballon} onChange={(e) => setBallon(e.target.value)}>
-              <option value="on">On · production d'eau chaude</option>
-              <option value="off">Off · arrêt</option>
-            </select>
-          </div>
-          <div className={styles.hint}>
-            <span>
-              envoie <code>changeMode</code> <code>{'["M"]'}</code> (On) ou <code>{'["L"]'}</code> (Off)
-            </span>
-          </div>
-        </>
-      )}
-
-      {fn === 'air' && (
-        <>
-          <div className={styles.row}>
-            <label>Rafraîchissement air</label>
-            <select value={airMode} onChange={(e) => setAirMode(e.target.value)}>
-              <option value="B">B · Confort</option>
-              <option value="C">C · Éco</option>
-              <option value="D">D · Auto 1</option>
-              <option value="E">E · Auto 2</option>
-              <option value="F">F · Froid confort</option>
-              <option value="G">G · Froid boost</option>
-              <option value="H">H · Froid auto 1</option>
-              <option value="I">I · Froid auto 2</option>
-              <option value="A">A · Arrêt</option>
-            </select>
-          </div>
-          <div className={styles.hint}>
-            <span>
-              envoie <code>changeMode</code> avec le code sélectionné (ex: <code>{'["B"]'}</code> confort, <code>{'["C"]'}</code> éco, <code>{'["A"]'}</code> arrêt)
-            </span>
-          </div>
-        </>
-      )}
-
+      {fn === 'ballon' && <BallonSection ballon={ballon} onBallonChange={setBallon} />}
+      {fn === 'air' && <AirSection airMode={airMode} onAirModeChange={setAirMode} />}
       {fn === 'vacances' && (
-        <>
-          <div className={styles.row}>
-            <label>Début</label>
-            <input type="datetime-local" value={vacStart} onChange={(e) => setVacStart(e.target.value)} />
-          </div>
-          <div className={styles.row}>
-            <label>Fin</label>
-            <input type="datetime-local" value={vacEnd} onChange={(e) => setVacEnd(e.target.value)} />
-          </div>
-          <div className={styles.hint}>
-            <button
-              type="button"
-              onClick={() => {
-                const now = new Date()
-                const later = new Date(now.getTime() + 7 * 86400000)
-                setVacStart(dateInputValue(now))
-                setVacEnd(dateInputValue(later))
-              }}
-            >
-              +7 jours
-            </button>
-            <span>envoie <code>W…Z…Z</code> (UTC)</span>
-          </div>
-        </>
+        <VacancesSection
+          vacStart={vacStart} vacEnd={vacEnd}
+          onStartChange={setVacStart} onEndChange={setVacEnd}
+        />
       )}
-
-      {fn === 'cmo' && (
-        <div className={styles.row}>
-          <label>Valeur</label>
-          <select value={cmo} onChange={(e) => setCmo(e.target.value)}>
-            <option value="1">1 · ON (override)</option>
-            <option value="0">0 · OFF</option>
-          </select>
-        </div>
-      )}
-
-      {fn === 'custom' && (
-        <div className={styles.row}>
-          <label>JSON</label>
-          <textarea
-            value={json}
-            onChange={(e) => setJson(e.target.value)}
-            rows={4}
-            spellCheck={false}
-            placeholder='{"method":"...","params":[...]}'
-          />
-        </div>
-      )}
+      {fn === 'cmo' && <CmoSection cmo={cmo} onCmoChange={setCmo} />}
+      {fn === 'custom' && <CustomSection json={json} onJsonChange={setJson} />}
 
       <div className={styles.row}>
         <label>Topic</label>
