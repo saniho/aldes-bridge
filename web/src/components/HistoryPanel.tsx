@@ -10,6 +10,7 @@ import {
 } from 'recharts'
 import { getHistoryKeys, getHistorySeries, getHistoryTable } from '../api'
 import type { HistoryKey, HistoryPoint } from '../types'
+import { FAMILY_ORDER, getKeyMeta } from '../historyLabels'
 import styles from './HistoryPanel.module.css'
 
 interface Props {
@@ -124,6 +125,21 @@ export default function HistoryPanel({ historyDays }: Props) {
     [series]
   )
 
+  const groups = useMemo(() => {
+    const famRank = new Map<string, number>(FAMILY_ORDER.map((f, i) => [f, i]))
+    const map = new Map<string, HistoryKey[]>()
+    for (const k of keys) {
+      const family = getKeyMeta(k.key).family
+      if (!map.has(family)) map.set(family, [])
+      map.get(family)!.push(k)
+    }
+    return [...map.entries()].sort(
+      (a, b) =>
+        (famRank.get(a[0]) ?? FAMILY_ORDER.length) -
+        (famRank.get(b[0]) ?? FAMILY_ORDER.length)
+    )
+  }, [keys])
+
   return (
     <div className={styles.wrap}>
       <div className={styles.head}>
@@ -143,10 +159,17 @@ export default function HistoryPanel({ historyDays }: Props) {
             <option value="" disabled>
               — capteur —
             </option>
-            {keys.map((k) => (
-              <option key={k.key} value={k.key}>
-                {k.key} · {k.kind} ({k.samples})
-              </option>
+            {groups.map(([family, ks]) => (
+              <optgroup key={family} label={family}>
+                {ks.map((k) => {
+                  const meta = getKeyMeta(k.key)
+                  return (
+                    <option key={k.key} value={k.key}>
+                      {k.key} — {meta.label}
+                    </option>
+                  )
+                })}
+              </optgroup>
             ))}
           </select>
           <div className={styles.seg}>
