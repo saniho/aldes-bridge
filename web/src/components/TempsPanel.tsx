@@ -32,7 +32,12 @@ const WATER_LABEL: Record<string, string> = {
 const QUICK_AIR: { code: string; label: string }[] = [
   { code: 'B', label: 'B · Confort' },
   { code: 'C', label: 'C · Éco' },
-  { code: 'X', label: 'X · Boost' },
+  { code: 'D', label: 'D · Auto 1' },
+  { code: 'E', label: 'E · Auto 2' },
+  { code: 'F', label: 'F · Froid conf.' },
+  { code: 'G', label: 'G · Froid boost' },
+  { code: 'H', label: 'H · Froid a1' },
+  { code: 'I', label: 'I · Froid a2' },
   { code: 'A', label: 'A · Arrêt' }
 ]
 

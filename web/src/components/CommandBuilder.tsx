@@ -307,17 +307,20 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
           <div className={styles.row}>
             <label>Rafraîchissement air</label>
             <select value={airMode} onChange={(e) => setAirMode(e.target.value)}>
-              <option value="F">Confort · mode confort</option>
-              <option value="H">Progr C · programme rafraîchissement C</option>
-              <option value="I">Progr D · programme rafraîchissement D</option>
-              <option value="A">Arrêt</option>
+              <option value="B">B · Confort</option>
+              <option value="C">C · Éco</option>
+              <option value="D">D · Auto 1</option>
+              <option value="E">E · Auto 2</option>
+              <option value="F">F · Froid confort</option>
+              <option value="G">G · Froid boost</option>
+              <option value="H">H · Froid auto 1</option>
+              <option value="I">I · Froid auto 2</option>
+              <option value="A">A · Arrêt</option>
             </select>
           </div>
           <div className={styles.hint}>
             <span>
-              envoie <code>changeMode</code> <code>{'["F"]'}</code> (confort),{' '}
-              <code>{'["H"]'}</code> (Progr C), <code>{'["I"]'}</code> (Progr D),{' '}
-              <code>{'["A"]'}</code> (arrêt)
+              envoie <code>changeMode</code> avec le code sélectionné (ex: <code>{'["B"]'}</code> confort, <code>{'["C"]'}</code> éco, <code>{'["A"]'}</code> arrêt)
             </span>
           </div>
         </>
