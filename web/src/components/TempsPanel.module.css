@@ -93,12 +93,16 @@
   margin-bottom: 12px;
 }
 
+.quickGroup {
+  margin-bottom: 12px;
+}
+
 .quick {
   display: flex;
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
-  margin-bottom: 12px;
+  margin-bottom: 6px;
   padding: 8px;
   background: var(--bg-node);
   border: 1px solid var(--border);
@@ -112,9 +116,7 @@
   letter-spacing: 0.04em;
 }
 
-.quickSep {
-  margin-left: 6px;
-}
+
 
 .quickBtn {
   padding: 4px 10px;
