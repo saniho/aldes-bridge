@@ -31,7 +31,7 @@ La création d'un tag Git `vX.Y.Z` publie également les tags d'image `X.Y.Z` et
 tag SHA permet de verrouiller exactement le code exécuté :
 
 ```text
-ghcr.io/saniho/aldes-bridge:0.3.0
+ghcr.io/saniho/aldes-bridge:0.3.1
 ghcr.io/saniho/aldes-bridge:sha-<commit>
 ```
 
@@ -95,7 +95,7 @@ spec:
         - name: ghcr-aldes-bridge
       containers:
         - name: aldes-bridge
-          image: ghcr.io/saniho/aldes-bridge:0.3.0
+          image: ghcr.io/saniho/aldes-bridge:0.3.1
           imagePullPolicy: IfNotPresent
           env:
             - name: ALDES_MODE
