@@ -34,7 +34,7 @@ export default function ProfileSelector({ currentProfile, onProfileChanged }: Pr
     }
   }
 
-  if (profiles.length <= 1) return null
+  if (profiles.length === 0) return null
 
   return (
     <div className="profileSelector" title="Changer le type d'appareil Aldes">
