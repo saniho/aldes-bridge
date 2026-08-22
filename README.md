@@ -107,6 +107,12 @@ docker compose up -d --build
 - MQTT/TLS : `0.0.0.0:8883` (la box s'y connecte)
 - WebUI/API : `0.0.0.0:8080`
 
+### Kubernetes / K3s
+
+Le bridge et sa redirection DNS peuvent être déployés directement dans un
+cluster Kubernetes, sans machine virtuelle dédiée. Voir le
+[guide de déploiement Kubernetes](docs/kubernetes.md).
+
 ### Sans Docker (dev)
 
 ```bash
