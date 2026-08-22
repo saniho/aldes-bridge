@@ -170,6 +170,24 @@ export async function setProfile(profileId: string): Promise<import('./types').D
   ).then((r) => r.profile)
 }
 
+export async function getAppConfig(): Promise<import('./types').AppConfig> {
+  return json<{ settings: import('./types').AppConfig }>(
+    await fetch('/api/settings')
+  ).then((r) => r.settings)
+}
+
+export async function setAppConfig(
+  cfg: Partial<import('./types').AppConfig>
+): Promise<import('./types').AppConfig> {
+  return json<{ settings: import('./types').AppConfig }>(
+    await fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(cfg)
+    })
+  ).then((r) => r.settings)
+}
+
 export interface ApiCallOptions {
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   path: string

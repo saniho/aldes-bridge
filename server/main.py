@@ -11,6 +11,7 @@ import os
 import sys
 
 from .appstate import AppState, read_persisted_mode, read_persisted_profile
+from .config import ConfigStore
 from .device_profile import load_profile
 from .events import EventBus
 from .engine import Engine
@@ -26,6 +27,7 @@ DEFAULT_TELEMETRY_FILE = os.path.join(APP_ROOT, "logs", "telemetry.json")
 DEFAULT_CONSIGNE_FILE = os.path.join(APP_ROOT, "logs", "consigne.json")
 DEFAULT_HISTORY_FILE = os.path.join(APP_ROOT, "logs", "history.db")
 DEFAULT_PROFILE_FILE = os.path.join(APP_ROOT, "logs", "profile.json")
+DEFAULT_CONFIG_FILE = os.path.join(APP_ROOT, "logs", "config.json")
 DEFAULT_HISTORY_DAYS = 90
 
 
@@ -100,6 +102,8 @@ def build_parser():
                     help="ID du profil device (defaut: tone-aquaair ou le premier disponible)")
     ap.add_argument("--profile-file", default=os.environ.get("ALDES_PROFILE_FILE", DEFAULT_PROFILE_FILE),
                     help="fichier de persistance du profil (survit au redemarrage)")
+    ap.add_argument("--config-file", default=os.environ.get("ALDES_CONFIG_FILE", DEFAULT_CONFIG_FILE),
+                    help="fichier de configuration persistante (survit au redemarrage)")
     return ap
 
 
@@ -119,16 +123,18 @@ def main(argv=None):
     events = EventBus(args.history_size, log=log)
     restored = events.restore_from_log(args.history_size)
 
+    config = ConfigStore(args.config_file)
+
     history = None
     if args.history_file:
-        history = HistoryDB(args.history_file, retention_days=args.history_days)
+        history = HistoryDB(args.history_file, retention_days=config.history_retention())
         if log is not None and not args.no_history_backfill:
             _backfill_history(history, log)
 
     state = AppState(args.real_host, args.real_port, events,
                      mode_file=args.mode_file, telemetry_file=args.telemetry_file,
                      consigne_file=args.consigne_file, history=history,
-                     profile_file=args.profile_file)
+                     profile_file=args.profile_file, config=config)
     # Chargement du profil device (YAML). Priorite : profil persiste > CLI/env > defaut.
     persisted_profile_id = read_persisted_profile(args.profile_file)
     profile_id = persisted_profile_id or args.profile
@@ -141,6 +147,9 @@ def main(argv=None):
     state.on_publish_in = capture_telemetry
     # Le mode persiste (mode.json) prime sur le mode CLI/env au redemarrage.
     state.set_mode(read_persisted_mode(args.mode_file) or args.mode)
+
+    # Purge automatique periodique (toutes les heures).
+    state.start_purge_timer()
 
     engine = Engine(state, mqtt_port=args.mqtt_port, bind=args.bind)
     engine.start()

@@ -182,7 +182,7 @@ class AppState:
         "evt_topic": "devices_MAC_AIR/messages/events",
     }
 
-    def __init__(self, real_host, real_port, events, mode_file=None, telemetry_file=None, consigne_file=None, history=None, profile_file=None):
+    def __init__(self, real_host, real_port, events, mode_file=None, telemetry_file=None, consigne_file=None, history=None, profile_file=None, config=None):
         self.events = events if events is not None else EventBus()
         self._lock = threading.Lock()
         self.real_host = real_host
@@ -209,6 +209,10 @@ class AppState:
         self._consigne_file = consigne_file
         # Persistance du profil device (survit au redemarrage du conteneur).
         self._profile_file = profile_file
+        # Configuration persistante (logs/config.json).
+        self.config = config
+        # Timer de purge automatique.
+        self._purge_timer = None
         # Base d'historisation des valeurs (HistoryDB ou None). Remplie par
         # main.py ; branchee ici pour capter telemetries + connexions.
         self.history = history
@@ -257,6 +261,32 @@ class AppState:
             _atomic_write_json(self._profile_file, {"profile_id": None})
         else:
             _atomic_write_json(self._profile_file, {"profile_id": self.profile.id})
+
+    def start_purge_timer(self):
+        """Demarre le timer de purge automatique (toutes les heures)."""
+        self._purge_now()
+        self._purge_timer = threading.Timer(3600.0, self._purge_loop)
+        self._purge_timer.daemon = True
+        self._purge_timer.start()
+
+    def _purge_loop(self):
+        self._purge_now()
+        self._purge_timer = threading.Timer(3600.0, self._purge_loop)
+        self._purge_timer.daemon = True
+        self._purge_timer.start()
+
+    def _purge_now(self):
+        """Execute la purge de l'historique selon la config courante."""
+        if self.history is None or self.config is None:
+            return
+        days = self.config.history_retention()
+        self.history._days = days
+        try:
+            n = self.history.purge(days)
+            if n > 0:
+                _log.info("purge history: %d echantillons supprimes (retention %d jours)", n, days)
+        except Exception as exc:
+            _log.warning("purge history echouee: %s", exc)
 
     def _persist_mode(self):
         """Ecrit le mode courant dans mode_file (atomique, ne casse jamais le runtime)."""

@@ -373,6 +373,31 @@ def create_app(state, engine, web_dir):
         })
         return {"profile": p.to_dict()}
 
+    # --- Settings (paramètres persistants) ---
+    @app.get("/api/settings")
+    def api_settings_get():
+        cfg = state.config.get() if state.config else {}
+        return {"settings": cfg}
+
+    class SettingsBody(BaseModel):
+        history_retention_days: int = None
+        log_retention_max_bytes: int = None
+
+    @app.put("/api/settings")
+    def api_settings_set(body: SettingsBody):
+        updates = {k: v for k, v in body.model_dump().items() if v is not None}
+        if not updates:
+            return JSONResponse(status_code=400, content={"error": "aucun parametre fourni"})
+        if state.config is None:
+            return JSONResponse(status_code=500, content={"error": "config non initialisee"})
+        state.config.set(updates)
+        state._purge_now()
+        state.events.publish({
+            "kind": "status", "ts": _iso(),
+            "note": f"settings mis a jour : {list(updates.keys())}",
+        })
+        return {"settings": state.config.get()}
+
     # --- SPA (doit etre declare apres /api/*) ---
     def _build_index():
         return os.path.join(web_dir, "index.html")

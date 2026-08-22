@@ -5,8 +5,10 @@ Couvre /api/state, /api/config, /api/mode, /api/send, /api/logs,
 /api/clear, /api/disconnect, /api/consigne, et la validation des paramètres.
 """
 import json
+import os
 import random
 import sys
+import tempfile
 import threading
 import time
 import urllib.error
@@ -308,6 +310,86 @@ def test_api_profiles_list():
     assert len(r["profiles"]) >= 1
     ids = [p["id"] for p in r["profiles"]]
     assert "tone-aquaair" in ids
+
+
+# --- Config ---
+
+def test_api_settings_get():
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
+        cfg_path = f.name
+    try:
+        from server.config import ConfigStore
+        config = ConfigStore(cfg_path)
+        state = AppState("h", 8883, EventBus(), config=config)
+        port, _, _ = _start_web(state)
+        r = _req(port, "/api/settings")
+        assert "settings" in r
+        assert "history_retention_days" in r["settings"]
+        assert "log_retention_max_bytes" in r["settings"]
+        assert r["settings"]["history_retention_days"] == 90
+        assert r["settings"]["log_retention_max_bytes"] == 25 * 1024 * 1024
+    finally:
+        os.unlink(cfg_path)
+
+def test_api_settings_set():
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
+        cfg_path = f.name
+    try:
+        from server.config import ConfigStore
+        config = ConfigStore(cfg_path)
+        state = AppState("h", 8883, EventBus(), config=config)
+        port, _, _ = _start_web(state)
+        r = _req(port, "/api/settings", method="PUT",
+                 body={"history_retention_days": 30})
+        assert r["settings"]["history_retention_days"] == 30
+        assert r["settings"]["log_retention_max_bytes"] == 25 * 1024 * 1024
+    finally:
+        os.unlink(cfg_path)
+
+def test_api_settings_set_empty():
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
+        cfg_path = f.name
+    try:
+        from server.config import ConfigStore
+        config = ConfigStore(cfg_path)
+        state = AppState("h", 8883, EventBus(), config=config)
+        port, _, _ = _start_web(state)
+        try:
+            _req(port, "/api/settings", method="PUT",
+                 body={})
+            assert False, "expected error"
+        except urllib.error.HTTPError as e:
+            assert e.code == 400
+    finally:
+        os.unlink(cfg_path)
+
+def test_api_settings_set_range_clamp():
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
+        cfg_path = f.name
+    try:
+        from server.config import ConfigStore
+        config = ConfigStore(cfg_path)
+        state = AppState("h", 8883, EventBus(), config=config)
+        port, _, _ = _start_web(state)
+        r = _req(port, "/api/settings", method="PUT",
+                 body={"history_retention_days": 99999})
+        assert r["settings"]["history_retention_days"] == 3650
+    finally:
+        os.unlink(cfg_path)
+
+def test_api_settings_purge_triggered():
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
+        cfg_path = f.name
+    try:
+        from server.config import ConfigStore
+        config = ConfigStore(cfg_path)
+        state = AppState("h", 8883, EventBus(), config=config)
+        port, _, _ = _start_web(state)
+        r = _req(port, "/api/settings", method="PUT",
+                 body={"history_retention_days": 1})
+        assert r["settings"]["history_retention_days"] == 1
+    finally:
+        os.unlink(cfg_path)
 
 
 if __name__ == "__main__":

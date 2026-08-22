@@ -166,3 +166,8 @@ export interface DeviceProfile {
   commands: DeviceCommand[]
   ui: DeviceUi
 }
+
+export interface AppConfig {
+  history_retention_days: number
+  log_retention_max_bytes: number
+}

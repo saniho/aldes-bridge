@@ -9,6 +9,7 @@ sys.path.insert(0, "/home/ubuntu/aldes-bridge")
 
 from server.device_profile import DeviceProfile, load_profile, list_profiles
 from server.appstate import AppState, read_persisted_profile
+from server.config import ConfigStore
 from server.events import EventBus
 from server.aldes import build_product, build_products, build_thermostats, capture_telemetry
 import json
@@ -228,5 +229,72 @@ def test_read_persisted_profile_empty():
         path = f.name
     try:
         assert read_persisted_profile(path) is None
+    finally:
+        os.unlink(path)
+
+
+# --- ConfigStore ---
+
+def test_config_store_defaults():
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
+        path = f.name
+    try:
+        cfg = ConfigStore(path)
+        assert cfg.get("history_retention_days") == 90
+        assert cfg.get("log_retention_max_bytes") == 25 * 1024 * 1024
+    finally:
+        os.unlink(path)
+
+def test_config_store_set():
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
+        path = f.name
+    try:
+        cfg = ConfigStore(path)
+        cfg.set({"history_retention_days": 30})
+        assert cfg.get("history_retention_days") == 30
+        assert cfg.get("log_retention_max_bytes") == 25 * 1024 * 1024
+    finally:
+        os.unlink(path)
+
+def test_config_store_persist():
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
+        path = f.name
+    try:
+        cfg = ConfigStore(path)
+        cfg.set({"history_retention_days": 60})
+        cfg2 = ConfigStore(path)
+        assert cfg2.get("history_retention_days") == 60
+    finally:
+        os.unlink(path)
+
+def test_config_store_range_clamp():
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
+        path = f.name
+    try:
+        cfg = ConfigStore(path)
+        cfg.set({"history_retention_days": 99999})
+        assert cfg.get("history_retention_days") == 3650
+        cfg.set({"history_retention_days": 0})
+        assert cfg.get("history_retention_days") == 1
+    finally:
+        os.unlink(path)
+
+def test_config_store_unknown_key():
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
+        path = f.name
+    try:
+        cfg = ConfigStore(path)
+        cfg.set({"unknown_key": 123})
+        assert cfg.get("unknown_key") is None
+    finally:
+        os.unlink(path)
+
+def test_config_store_helpers():
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
+        path = f.name
+    try:
+        cfg = ConfigStore(path)
+        assert cfg.history_retention() == 90
+        assert cfg.log_retention_bytes() == 25 * 1024 * 1024
     finally:
         os.unlink(path)

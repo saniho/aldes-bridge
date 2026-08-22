@@ -11,11 +11,12 @@ import CommandBuilder from './components/CommandBuilder'
 import TempsPanel from './components/TempsPanel'
 import WrapperPanel from './components/WrapperPanel'
 import ProfileSelector from './components/ProfileSelector'
+import ConfigPanel from './components/ConfigPanel'
 import './App.css'
 
 const HistoryPanel = lazy(() => import('./components/HistoryPanel'))
 
-type View = 'temps' | 'commande' | 'log' | 'wrapper' | 'historique'
+type View = 'temps' | 'commande' | 'log' | 'wrapper' | 'historique' | 'config'
 
 function mergeConsignes(
   c: Record<string, { requested: number; confirmed: boolean; ts?: string }>
@@ -39,7 +40,8 @@ const TABS: { id: View; label: string; title: string }[] = [
 const MORE: { id: View; label: string; title: string }[] = [
   { id: 'log', label: '📜 log', title: 'Trames MQTT en temps réel et historique' },
   { id: 'wrapper', label: '🔌 wrapper', title: 'Appels API du bridge (test interactif)' },
-  { id: 'historique', label: '📊 historique', title: 'Historique des valeurs (télémétries & connexions)' }
+  { id: 'historique', label: '📊 historique', title: 'Historique des valeurs (télémétries & connexions)' },
+  { id: 'config', label: '⚙️ config', title: 'Configuration du bridge' }
 ]
 
 export default function App() {
@@ -56,9 +58,10 @@ export default function App() {
       stored === 'commande' ||
       stored === 'log' ||
       stored === 'wrapper' ||
-      stored === 'historique'
+      stored === 'historique' ||
+      stored === 'config'
     ) {
-      return stored
+      return stored as View
     }
     return 'log'
   })
@@ -410,6 +413,11 @@ const { messages, lastSnapshot } = useMemo(() => {
             >
               <HistoryPanel historyDays={config?.history_days ?? null} />
             </Suspense>
+          </div>
+        )}
+        {view === 'config' && (
+          <div className="streamCol">
+            <ConfigPanel />
           </div>
         )}
       </div>
