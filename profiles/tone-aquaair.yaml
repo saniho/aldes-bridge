@@ -1,0 +1,222 @@
+# Profil device : TONE AquaAIR (PAC air-air reversible)
+# Reference: TONE_AQUA_AIR / TONE_AIR
+id: tone-aquaair
+name: "TONE AquaAIR"
+description: "PAC air-air reversible Aldes T.ONE"
+type: pac
+
+# ── Produits ──
+products:
+  TONE_AQUA_AIR:
+    name: "T.One® AquaAIR"
+    reference_fields: [NED, UDM]
+  TONE_AIR:
+    name: "T.One® AIR"
+    reference_fields: []
+
+# ── Mapping telemetrie → indicateurs product ──
+telemetry:
+  modemid: product.modem
+  productid: product.serial_number
+  dt: product.lastUpdatedDate
+  # Temperatures zones (MT0..MT9 → thermostats)
+  zone_temp_prefix: MT
+  zone_count: 10
+  zone_setpoint_prefix: UsC
+  # Modes
+  air_mode_field: UAM
+  water_mode_field: UDM
+  hot_water_field: NED
+  people_field: NpiH
+  vacation_start_field: Dvac
+  vacation_end_field: Fvac
+
+# ── Modes air (UAM 0..8) ──
+air_modes:
+  - { index: 0, code: "A", label: "Arrêt" }
+  - { index: 1, code: "B", label: "Hors gel" }
+  - { index: 2, code: "C", label: "Éco" }
+  - { index: 3, code: "D", label: "Confort" }
+  - { index: 4, code: "E", label: "Anti-condensation" }
+  - { index: 5, code: "F", label: "Nuit" }
+  - { index: 6, code: "G", label: "Éco nuit" }
+  - { index: 7, code: "H", label: "Arrêt ventilateur" }
+  - { index: 8, code: "I", label: "Auto" }
+
+# ── Modes eau chaude (UDM 0..2) ──
+water_modes:
+  - { index: 0, code: "L", label: "Eco" }
+  - { index: 1, code: "M", label: "Normal" }
+  - { index: 2, code: "N", label: "Confort" }
+
+# ── Labels historique (par famille) ──
+history_labels:
+  families:
+    - name: "Températures"
+      keys:
+        - { key: Text, label: "Température extérieure (°C)" }
+        - { key: TAin, label: "Température air entrée (°C)" }
+        - { key: TAHL, label: "Température échangeur air — bas (°C)" }
+        - { key: TAHU, label: "Température échangeur air — haut (°C)" }
+        - { key: TEHG, label: "Température échangeur — gaz (°C)" }
+        - { key: TEHL, label: "Température échangeur — liquide (°C)" }
+        - { key: TEHU, label: "Température échangeur — haut (°C)" }
+        - { key: THGa, label: "Température gaine d'air (°C)" }
+        - { key: TUeH, label: "Température unité extérieure (°C)" }
+      patterns:
+        - { re: "^MT(\\d+)$", label: "Température zone {0} (°C)" }
+    - name: "Consignes & limites"
+      keys:
+        - { key: CMaST, label: "Consigne max — chauffage (°C)" }
+        - { key: CMiST, label: "Consigne min — chauffage (°C)" }
+        - { key: FMaST, label: "Consigne max — froid (°C)" }
+        - { key: FMiST, label: "Consigne min — froid (°C)" }
+      patterns:
+        - { re: "^UsC(\\d+)$", label: "Consigne zone {0} (°C)" }
+        - { re: "^Cre(\\d+)$", label: "Consigne éco zone {0} (°C)" }
+    - name: "Pressions"
+      keys:
+        - { key: PreH, label: "Pression haute circuit (×0,1 bar)" }
+        - { key: dHi, label: "Delta pression — haut" }
+        - { key: dLo, label: "Delta pression — bas" }
+    - name: "Eau chaude (ECS)"
+      keys:
+        - { key: TBBa, label: "Ballon ECS — bas (°C)" }
+        - { key: TBHa, label: "Ballon ECS — haut (°C)" }
+        - { key: NED, label: "Niveau ECS (%)" }
+        - { key: BECS, label: "Besoin ECS (état)" }
+        - { key: AntiL, label: "Protection anti-légionelles" }
+    - name: "Modes & état"
+      keys:
+        - { key: UAM, label: "Mode air (indice)" }
+        - { key: UDM, label: "Mode eau (indice)" }
+        - { key: NpiH, label: "Nombre de personnes (réglage)" }
+        - { key: Dvac, label: "Début vacances (epoch)" }
+        - { key: Fvac, label: "Fin vacances (epoch)" }
+        - { key: MfAc, label: "Mode fonctionnement — air" }
+        - { key: MfEc, label: "Mode fonctionnement — eau" }
+        - { key: ApA1, label: "Appoint air 1" }
+        - { key: ApA2, label: "Appoint air 2" }
+        - { key: ApE, label: "Appoint électrique — eau" }
+        - { key: HPC, label: "Haute pression compresseur (état)" }
+    - name: "Énergie & tarifs"
+      keys:
+        - { key: Pno, label: "Tarif kWh — normal" }
+        - { key: Pint, label: "Tarif kWh — intermédiaire" }
+        - { key: Pkof, label: "Tarif kWh — creux" }
+        - { key: Vsec, label: "Compteur électrique (non documenté)" }
+        - { key: EPVe, label: "Énergie (non documenté)" }
+        - { key: CFrC, label: "Compteur froid (non documenté)" }
+        - { key: RFrC, label: "Compteur froid (non documenté)" }
+        - { key: CVeI, label: "Consommation (non documenté)" }
+        - { key: Cena, label: "Consommation énergie (non documenté)" }
+        - { key: EcF, label: "Économie (non documenté)" }
+        - { key: Rec, label: "Récupération (non documenté)" }
+        - { key: Sec, label: "Secondaire (non documenté)" }
+    - name: "Ventilation & débits d'air"
+      keys:
+        - { key: RVeI, label: "Vitesse rotation ventilateur (tr/min)" }
+        - { key: Dno, label: "Débit d'air — nominal (m³/h)" }
+        - { key: Dma, label: "Débit d'air — maximum (m³/h)" }
+        - { key: Dint, label: "Débit d'air — intermédiaire (m³/h)" }
+        - { key: DLN, label: "Débit d'air — faible nuit (m³/h)" }
+        - { key: DPLe, label: "Débit d'air — plein (m³/h)" }
+        - { key: DmCO, label: "Débit d'air — max CO₂ (m³/h)" }
+        - { key: Dkof, label: "Débit d'air — hors gel (m³/h)" }
+    - name: "Zones (10) — indicateurs"
+      patterns:
+        - { re: "^OCa(\\d+)$", label: "Zone {0} — indicateur ventilation (a)" }
+        - { re: "^OOa(\\d+)$", label: "Zone {0} — indicateur ventilation (b)" }
+        - { re: "^Os(\\d+)$", label: "Zone {0} — indicateur ventilation (c)" }
+    - name: "Zones (12) — répartition"
+      patterns:
+        - { re: "^Cc(C|E|H)(\\d+)$", label: "Zone {1} — indicateur {0}" }
+        - { re: "^Co(C|E|H)(\\d+)$", label: "Zone {1} — indicateur {0}" }
+    - name: "Système & connexion"
+      keys:
+        - { key: Vers_UC, label: "Version unité centrale" }
+        - { key: box, label: "Connexion box (état)" }
+        - { key: cloud, label: "Connexion cloud Aldes (état)" }
+        - { key: TyI, label: "Type d'installation" }
+        - { key: TyM, label: "Type de machine" }
+        - { key: IId, label: "Identifiant installation" }
+        - { key: NbO, label: "Nombre d'ouvertures (compteur)" }
+        - { key: NbME, label: "Nombre de modes éco" }
+        - { key: dt, label: "Horodatage dernier relevé (epoch)" }
+        - { key: Ddef, label: "Compteur dégivrage" }
+        - { key: Defr, label: "Défaut circuit froid (état)" }
+        - { key: Dev, label: "État (non documenté)" }
+    - name: "Divers / non documenté"
+      keys:
+        - { key: AVG, label: "Non documenté" }
+        - { key: AVL, label: "Non documenté" }
+        - { key: CVG, label: "Non documenté" }
+        - { key: CVL, label: "Non documenté" }
+        - { key: NoOS, label: "Non documenté" }
+        - { key: HiOS, label: "Non documenté" }
+        - { key: OOT, label: "Non documenté" }
+        - { key: OCT, label: "Non documenté" }
+
+# ── Commandes supportées ──
+commands:
+  - id: set_mode
+    label: "Changer le mode"
+    method: changeMode
+    topic_pattern: "device/{device_id}/messages/devicebound"
+    params:
+      - name: code
+        type: enum
+        options_from: air_modes
+  - id: set_consigne
+    label: "Régler la consigne"
+    method: changeConsigne
+    topic_pattern: "device/{device_id}/messages/devicebound"
+    params:
+      - name: zone
+        type: string
+        prefix: "C"
+        pattern: "^C\\d{1,2}$"
+      - name: temperature
+        type: number
+        min: 5
+        max: 30
+        step: 0.5
+  - id: set_vacances
+    label: "Programmer vacances"
+    method: changeMode
+    topic_pattern: "device/{device_id}/messages/devicebound"
+    params:
+      - name: start
+        type: datetime
+      - name: end
+        type: datetime
+  - id: set_ballon
+    label: "Ballon eau chaude"
+    method: changeMode
+    topic_pattern: "device/{device_id}/messages/devicebound"
+    params:
+      - name: code
+        type: enum
+        options_from: water_modes
+  - id: set_cmo
+    label: "Override CMO"
+    method: changeCMO
+    topic_pattern: "device/{device_id}/messages/devicebound"
+    params:
+      - name: value
+        type: enum
+        options:
+          - { code: "1", label: "ON (override)" }
+          - { code: "0", label: "OFF" }
+
+# ── Configuration UI ──
+ui:
+  quick_modes:
+    - field: air_modes
+      label: "Air"
+    - field: water_modes
+      label: "ECS"
+  show_thermostats: true
+  show_vacations: true
+  show_people: true
+  show_hot_water: true

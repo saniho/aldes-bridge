@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from .aldes import build_products, make_token
 from .appstate import _iso
+from .device_profile import list_profiles
 from .version import read_ui_version
 
 
@@ -68,6 +69,7 @@ class ConfigSnapshot(BaseModel):
     server_version: str = "dev"
     ui_version: str = "dev"
     history_days: int | None = None
+    profile: dict | None = None
 
 
 class StateSnapshot(BaseModel):
@@ -343,6 +345,18 @@ def create_app(state, engine, web_dir):
             "note": "commande recue (non renvoyee a la box)",
         })
         return {"success": True, "modem": modem, "command": body}
+
+    # --- Profils device ---
+    @app.get("/api/profiles")
+    def api_profiles():
+        return {"profiles": list_profiles()}
+
+    @app.get("/api/profile")
+    def api_profile():
+        p = getattr(state, "profile", None)
+        if p is None:
+            return {"profile": None}
+        return {"profile": p.to_dict()}
 
     # --- SPA (doit etre declare apres /api/*) ---
     def _build_index():

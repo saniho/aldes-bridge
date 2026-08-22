@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getProducts, sendCommand, requestConsigne } from '../api'
-import type { AldesProduct } from '../types'
+import type { AldesProduct, DeviceProfile } from '../types'
 import { fmtParis } from '../parisTime'
 import styles from './TempsPanel.module.css'
 
@@ -9,50 +9,57 @@ interface Props {
   clientId?: string | null
   connected?: boolean
   consignes?: Record<string, { requested: number; confirmed: boolean; ts?: string }>
+  profile?: DeviceProfile | null
 }
 
-const AIR_LABEL: Record<string, string> = {
-  A: 'Arrêt',
-  B: 'Confort',
-  C: 'Éco',
-  D: 'Auto 1',
-  E: 'Auto 2',
-  F: 'Froid confort',
-  G: 'Froid boost',
-  H: 'Froid auto 1',
-  I: 'Froid auto 2'
+function buildAirLabel(profile: DeviceProfile | null | undefined): Record<string, string> {
+  if (profile?.air_modes?.length) {
+    return Object.fromEntries(profile.air_modes.map((m) => [m.code, m.label]))
+  }
+  return {
+    A: 'Arrêt', B: 'Confort', C: 'Éco', D: 'Auto 1', E: 'Auto 2',
+    F: 'Froid confort', G: 'Froid boost', H: 'Froid auto 1', I: 'Froid auto 2'
+  }
 }
 
-const WATER_LABEL: Record<string, string> = {
-  L: 'Arrêt',
-  M: 'Marche',
-  N: 'Boost'
+function buildWaterLabel(profile: DeviceProfile | null | undefined): Record<string, string> {
+  if (profile?.water_modes?.length) {
+    return Object.fromEntries(profile.water_modes.map((m) => [m.code, m.label]))
+  }
+  return { L: 'Arrêt', M: 'Marche', N: 'Boost' }
 }
 
-const QUICK_AIR: { code: string; label: string }[] = [
-  { code: 'B', label: 'B · Confort' },
-  { code: 'C', label: 'C · Éco' },
-  { code: 'D', label: 'D · Auto 1' },
-  { code: 'E', label: 'E · Auto 2' },
-  { code: 'F', label: 'F · Froid conf.' },
-  { code: 'G', label: 'G · Froid boost' },
-  { code: 'H', label: 'H · Froid a1' },
-  { code: 'I', label: 'I · Froid a2' },
-  { code: 'A', label: 'A · Arrêt' }
-]
+function buildQuickAir(profile: DeviceProfile | null | undefined): { code: string; label: string }[] {
+  if (profile?.air_modes?.length) {
+    return profile.air_modes.filter((m) => m.code !== 'A').map((m) => ({
+      code: m.code, label: `${m.code} · ${m.label}`
+    }))
+  }
+  return [
+    { code: 'B', label: 'B · Confort' }, { code: 'C', label: 'C · Éco' },
+    { code: 'D', label: 'D · Auto 1' }, { code: 'E', label: 'E · Auto 2' },
+    { code: 'F', label: 'F · Froid conf.' }, { code: 'G', label: 'G · Froid boost' },
+    { code: 'H', label: 'H · Froid a1' }, { code: 'I', label: 'I · Froid a2' },
+    { code: 'A', label: 'A · Arrêt' }
+  ]
+}
 
-const QUICK_WATER: { code: string; label: string }[] = [
-  { code: 'M', label: 'M · On' },
-  { code: 'L', label: 'L · Off' }
-]
+function buildQuickWater(profile: DeviceProfile | null | undefined): { code: string; label: string }[] {
+  if (profile?.water_modes?.length) {
+    return profile.water_modes.map((m) => ({
+      code: m.code, label: `${m.code} · ${m.label}`
+    }))
+  }
+  return [{ code: 'M', label: 'M · On' }, { code: 'L', label: 'L · Off' }]
+}
 
 function fmtDeg(v: number | null, digits = 1): string {
   return v === null || v === undefined ? '—' : v.toFixed(digits) + ' °C'
 }
 
-function fmtMode(code: string | null, water: boolean): string {
+function fmtMode(code: string | null, labels: Record<string, string>): string {
   if (!code) return '—'
-  const label = (water ? WATER_LABEL : AIR_LABEL)[code]
+  const label = labels[code]
   return label ? `${code} · ${label}` : code
 }
 
@@ -87,19 +94,24 @@ function freshness(min: number): Freshness {
   return 'stale'
 }
 
-function ballonMode(code: string | null): { label: string; on: boolean } | null {
+function ballonMode(code: string | null, waterLabels: Record<string, string>): { label: string; on: boolean } | null {
   if (!code) return null
-  const m = WATER_LABEL[code]
+  const m = waterLabels[code]
   if (!m) return null
   return { label: m, on: code !== 'L' }
 }
 
-export default function TempsPanel({ pollMs = 5000, clientId, connected, consignes = {} }: Props) {
+export default function TempsPanel({ pollMs = 5000, clientId, connected, consignes = {}, profile }: Props) {
   const [products, setProducts] = useState<AldesProduct[]>([])
   const [error, setError] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
   const [sending, setSending] = useState<string | null>(null)
   const [now, setNow] = useState<number>(() => Date.now())
+
+  const AIR_LABEL = buildAirLabel(profile)
+  const WATER_LABEL = buildWaterLabel(profile)
+  const QUICK_AIR = buildQuickAir(profile)
+  const QUICK_WATER = buildQuickWater(profile)
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 15_000)
@@ -274,7 +286,7 @@ export default function TempsPanel({ pollMs = 5000, clientId, connected, consign
                 </span>
               </div>
               {(() => {
-                const b = ballonMode(p.indicator.current_water_mode)
+                const b = ballonMode(p.indicator.current_water_mode, WATER_LABEL)
                 return (
                   <div className={styles.stat + (b && b.on ? ' ' + styles.ballonOn : '')}>
                     <span className={styles.statLabel}>Ballon</span>
@@ -288,13 +300,13 @@ export default function TempsPanel({ pollMs = 5000, clientId, connected, consign
               <div className={styles.stat}>
                 <span className={styles.statLabel}>Mode air</span>
                 <span className={styles.statValue}>
-                  {fmtMode(p.indicator.current_air_mode, false)}
+                  {fmtMode(p.indicator.current_air_mode, AIR_LABEL)}
                 </span>
               </div>
               <div className={styles.stat}>
                 <span className={styles.statLabel}>Mode ECS</span>
                 <span className={styles.statValue}>
-                  {fmtMode(p.indicator.current_water_mode, true)}
+                  {fmtMode(p.indicator.current_water_mode, WATER_LABEL)}
                 </span>
               </div>
               {p.indicator.hors_gel && (

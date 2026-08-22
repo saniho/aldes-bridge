@@ -148,6 +148,12 @@ export async function getProducts(): Promise<import('./types').AldesProduct[]> {
   )
 }
 
+export async function getProfile(): Promise<import('./types').DeviceProfile | null> {
+  return json<{ profile: import('./types').DeviceProfile | null }>(
+    await fetch('/api/profile')
+  ).then((r) => r.profile)
+}
+
 export interface ApiCallOptions {
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   path: string

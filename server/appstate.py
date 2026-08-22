@@ -209,6 +209,8 @@ class AppState:
         # Hook appele sur chaque PUBLISH entrant (capture telemetrie). Branche par
         # main.py sur server/aldes.py::capture_telemetry pour decoupler les modules.
         self.on_publish_in = None
+        # Profil device charge depuis les fichiers YAML (DeviceProfile ou None).
+        self.profile = None
         # Derniere persistance telemetrie (epoch) — throttle d'ecriture.
         self._last_telemetry_save = 0.0
         self._load_telemetry()
@@ -410,7 +412,7 @@ class AppState:
 
     def snapshot(self):
         with self._lock:
-            return {
+            snap = {
                 "mode": self._mode,
                 "connected": self._connected,
                 "client_id": self._client_id,
@@ -425,3 +427,6 @@ class AppState:
                 "ui_version": self.ui_version,
                 "history_days": self.history.retention_days if self.history is not None else None,
             }
+            if self.profile is not None:
+                snap["profile"] = self.profile.to_dict()
+            return snap

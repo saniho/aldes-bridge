@@ -11,6 +11,7 @@ import os
 import sys
 
 from .appstate import AppState, read_persisted_mode
+from .device_profile import load_profile
 from .events import EventBus
 from .engine import Engine
 from .eventlog import EventLog
@@ -94,6 +95,8 @@ def build_parser():
                     help="retention de l'historique en jours (défaut %d)" % DEFAULT_HISTORY_DAYS)
     ap.add_argument("--no-history-backfill", action="store_true",
                     help="ne pas rejouer le log persistant dans l'historique au demarrage")
+    ap.add_argument("--profile", default=os.environ.get("ALDES_PROFILE", None),
+                    help="ID du profil device (defaut: tone-aquaair ou le premier disponible)")
     return ap
 
 
@@ -122,6 +125,11 @@ def main(argv=None):
     state = AppState(args.real_host, args.real_port, events,
                      mode_file=args.mode_file, telemetry_file=args.telemetry_file,
                      consigne_file=args.consigne_file, history=history)
+    # Chargement du profil device (YAML). Le profil par defaut est tone-aquaair.
+    profile = load_profile(args.profile)
+    if profile:
+        state.profile = profile
+        _log.info("profil device charge: %s (%s)", profile.id, profile.name)
     # Capture des telemetries : branchee ici pour decoupler appstate (plomberie
     # d'evenements) de aldes (mapping metier). Appelee sur chaque PUBLISH entrant.
     state.on_publish_in = capture_telemetry
