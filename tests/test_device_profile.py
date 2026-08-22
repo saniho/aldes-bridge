@@ -8,7 +8,7 @@ import yaml
 sys.path.insert(0, "/home/ubuntu/aldes-bridge")
 
 from server.device_profile import DeviceProfile, load_profile, list_profiles
-from server.appstate import AppState
+from server.appstate import AppState, read_persisted_profile
 from server.events import EventBus
 from server.aldes import build_product, build_products, build_thermostats, capture_telemetry
 import json
@@ -170,5 +170,63 @@ def test_custom_profile_from_yaml():
         assert p.id == "vmc-123"
         assert p.type == "vmc"
         assert len(p.air_modes) == 2
+    finally:
+        os.unlink(path)
+
+
+# --- Persistance du profil ---
+
+def test_persist_profile_none():
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
+        path = f.name
+    try:
+        state = AppState("h", 8883, EventBus(), profile_file=path)
+        state.set_profile(None)
+        assert read_persisted_profile(path) is None
+    finally:
+        os.unlink(path)
+
+def test_persist_profile_set():
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
+        path = f.name
+    try:
+        state = AppState("h", 8883, EventBus(), profile_file=path)
+        p = load_profile("tone-aquaair")
+        state.set_profile(p)
+        assert read_persisted_profile(path) == "tone-aquaair"
+    finally:
+        os.unlink(path)
+
+def test_persist_profile_change():
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
+        path = f.name
+    try:
+        state = AppState("h", 8883, EventBus(), profile_file=path)
+        p = load_profile("tone-aquaair")
+        state.set_profile(p)
+        assert read_persisted_profile(path) == "tone-aquaair"
+        state.set_profile(None)
+        assert read_persisted_profile(path) is None
+    finally:
+        os.unlink(path)
+
+def test_read_persisted_profile_missing_file():
+    assert read_persisted_profile("/tmp/nonexistent_profile.json") is None
+
+def test_read_persisted_profile_invalid_json():
+    with tempfile.NamedTemporaryFile(suffix=".json", mode="w", delete=False) as f:
+        f.write("not json")
+        path = f.name
+    try:
+        assert read_persisted_profile(path) is None
+    finally:
+        os.unlink(path)
+
+def test_read_persisted_profile_empty():
+    with tempfile.NamedTemporaryFile(suffix=".json", mode="w", delete=False) as f:
+        f.write("{}")
+        path = f.name
+    try:
+        assert read_persisted_profile(path) is None
     finally:
         os.unlink(path)

@@ -366,7 +366,7 @@ def create_app(state, engine, web_dir):
         p = load_profile(body.profile_id)
         if p is None:
             return JSONResponse(status_code=404, content={"error": f"profil '{body.profile_id}' introuvable"})
-        state.profile = p
+        state.set_profile(p)
         state.events.publish({
             "kind": "status", "ts": _iso(),
             "note": f"profil device changé : {p.id} ({p.name})",

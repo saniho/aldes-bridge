@@ -10,7 +10,7 @@ import logging
 import os
 import sys
 
-from .appstate import AppState, read_persisted_mode
+from .appstate import AppState, read_persisted_mode, read_persisted_profile
 from .device_profile import load_profile
 from .events import EventBus
 from .engine import Engine
@@ -25,6 +25,7 @@ DEFAULT_MODE_FILE = os.path.join(APP_ROOT, "logs", "mode.json")
 DEFAULT_TELEMETRY_FILE = os.path.join(APP_ROOT, "logs", "telemetry.json")
 DEFAULT_CONSIGNE_FILE = os.path.join(APP_ROOT, "logs", "consigne.json")
 DEFAULT_HISTORY_FILE = os.path.join(APP_ROOT, "logs", "history.db")
+DEFAULT_PROFILE_FILE = os.path.join(APP_ROOT, "logs", "profile.json")
 DEFAULT_HISTORY_DAYS = 90
 
 
@@ -97,6 +98,8 @@ def build_parser():
                     help="ne pas rejouer le log persistant dans l'historique au demarrage")
     ap.add_argument("--profile", default=os.environ.get("ALDES_PROFILE", None),
                     help="ID du profil device (defaut: tone-aquaair ou le premier disponible)")
+    ap.add_argument("--profile-file", default=os.environ.get("ALDES_PROFILE_FILE", DEFAULT_PROFILE_FILE),
+                    help="fichier de persistance du profil (survit au redemarrage)")
     return ap
 
 
@@ -124,9 +127,12 @@ def main(argv=None):
 
     state = AppState(args.real_host, args.real_port, events,
                      mode_file=args.mode_file, telemetry_file=args.telemetry_file,
-                     consigne_file=args.consigne_file, history=history)
-    # Chargement du profil device (YAML). Le profil par defaut est tone-aquaair.
-    profile = load_profile(args.profile)
+                     consigne_file=args.consigne_file, history=history,
+                     profile_file=args.profile_file)
+    # Chargement du profil device (YAML). Priorite : profil persiste > CLI/env > defaut.
+    persisted_profile_id = read_persisted_profile(args.profile_file)
+    profile_id = persisted_profile_id or args.profile
+    profile = load_profile(profile_id)
     if profile:
         state.profile = profile
         _log.info("profil device charge: %s (%s)", profile.id, profile.name)

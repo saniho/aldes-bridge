@@ -54,6 +54,13 @@ def read_persisted_mode(path):
     return mode if mode in AppState.MODES else None
 
 
+def read_persisted_profile(path):
+    """Lit le profil persiste (JSON {"profile_id": ...}), None si absent/invalide."""
+    data = _read_json(path)
+    profile_id = data.get("profile_id") if isinstance(data, dict) else None
+    return profile_id if isinstance(profile_id, str) and profile_id else None
+
+
 def clear_conn_ctx():
     _CONN_CTX.session = None
     _CONN_CTX.host = None
@@ -175,7 +182,7 @@ class AppState:
         "evt_topic": "devices_MAC_AIR/messages/events",
     }
 
-    def __init__(self, real_host, real_port, events, mode_file=None, telemetry_file=None, consigne_file=None, history=None):
+    def __init__(self, real_host, real_port, events, mode_file=None, telemetry_file=None, consigne_file=None, history=None, profile_file=None):
         self.events = events if events is not None else EventBus()
         self._lock = threading.Lock()
         self.real_host = real_host
@@ -200,6 +207,8 @@ class AppState:
         self._telemetry_file = telemetry_file
         # Persistance des consignes demandees (survit au redemarrage du conteneur).
         self._consigne_file = consigne_file
+        # Persistance du profil device (survit au redemarrage du conteneur).
+        self._profile_file = profile_file
         # Base d'historisation des valeurs (HistoryDB ou None). Remplie par
         # main.py ; branchee ici pour capter telemetries + connexions.
         self.history = history
@@ -236,6 +245,18 @@ class AppState:
             "kind": "status", "mode": mode, "prev_mode": prev, "ts": _iso(),
         })
         return mode
+
+    def set_profile(self, profile):
+        """Change le profil device et persiste le choix."""
+        self.profile = profile
+        self._persist_profile()
+
+    def _persist_profile(self):
+        """Ecrit le profil courant dans profile_file (atomique, ne casse jamais le runtime)."""
+        if self.profile is None:
+            _atomic_write_json(self._profile_file, {"profile_id": None})
+        else:
+            _atomic_write_json(self._profile_file, {"profile_id": self.profile.id})
 
     def _persist_mode(self):
         """Ecrit le mode courant dans mode_file (atomique, ne casse jamais le runtime)."""
