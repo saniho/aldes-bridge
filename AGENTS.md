@@ -5,6 +5,13 @@ Ce document définit les règles à respecter pour toute modification du code.
 
 ---
 
+## Équipement
+
+Le bridge Aldes connecte une **PAC air-air** (pompe à chaleur réversible) au cloud Aldes T.ONE AquaAir.
+Ce n'est **pas** une VMC. Les modes de ventilation et de température contrôlent le ventilateur et le compresseur de la PAC.
+
+---
+
 ## Workflow obligatoire
 
 ### 1. Branche feature (jamais de commit direct sur `main`)
