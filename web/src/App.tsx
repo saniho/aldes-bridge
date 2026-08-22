@@ -246,61 +246,68 @@ const { messages, lastSnapshot } = useMemo(() => {
   return (
     <div className="app">
       <header className="top">
-        <div className="topLeft">
-          <div className="moreWrap">
-            <button
-              className={'burger' + (moreOpen ? ' active' : '') + (view === 'log' || view === 'wrapper' || view === 'historique' ? ' on' : '')}
-              onClick={() => setMoreOpen((o) => !o)}
-              title="Ouvrir les outils"
-              aria-expanded={moreOpen}
-              aria-haspopup="menu"
-            >
-              ☰
-            </button>
-            {moreOpen && (
-              <div className="moreMenu" role="menu">
-                {MORE.map((m) => (
+        <div className="topRow1">
+          <div className="topLeft">
+            <div className="moreWrap">
+              <button
+                className={'burger' + (moreOpen ? ' active' : '') + (view === 'log' || view === 'wrapper' || view === 'historique' ? ' on' : '')}
+                onClick={() => setMoreOpen((o) => !o)}
+                title="Ouvrir les outils"
+                aria-expanded={moreOpen}
+                aria-haspopup="menu"
+              >
+                ☰
+              </button>
+              {moreOpen && (
+                <div className="moreMenu" role="menu">
+                  {MORE.map((m) => (
+                    <button
+                      key={m.id}
+                      role="menuitem"
+                      className={'moreItem' + (view === m.id ? ' active' : '')}
+                      onClick={() => setView(m.id)}
+                      title={m.title}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                  <div className="moreSep" role="separator" />
                   <button
-                    key={m.id}
                     role="menuitem"
-                    className={'moreItem' + (view === m.id ? ' active' : '')}
-                    onClick={() => setView(m.id)}
-                    title={m.title}
+                    className="moreItem"
+                    onClick={() => setTheme((t) => (t === 'nuit' ? 'jour' : 'nuit'))}
+                    title={theme === 'nuit' ? 'Passer en mode jour' : 'Passer en mode nuit'}
                   >
-                    {m.label}
+                    {theme === 'nuit' ? '☀️ passer en mode jour' : '🌙 passer en mode nuit'}
                   </button>
-                ))}
-                <div className="moreSep" role="separator" />
-                <button
-                  role="menuitem"
-                  className="moreItem"
-                  onClick={() => setTheme((t) => (t === 'nuit' ? 'jour' : 'nuit'))}
-                  title={theme === 'nuit' ? 'Passer en mode jour' : 'Passer en mode nuit'}
-                >
-                  {theme === 'nuit' ? '☀️ passer en mode jour' : '🌙 passer en mode nuit'}
-                </button>
-                <div className="moreSep" role="separator" />
-                <button
-                  role="menuitem"
-                  className="moreItem danger"
-                  onClick={onClear}
-                  title="Vider le log persistant"
-                >
-                  🗑 vider le log
-                </button>
-                <div className="moreVersion" title="Versions du bridge">
-                  UI v{config?.ui_version ?? 'dev'} · Backend v{config?.server_version ?? 'dev'}
+                  <div className="moreSep" role="separator" />
+                  <button
+                    role="menuitem"
+                    className="moreItem danger"
+                    onClick={onClear}
+                    title="Vider le log persistant"
+                  >
+                    🗑 vider le log
+                  </button>
+                  <div className="moreVersion" title="Versions du bridge">
+                    UI v{config?.ui_version ?? 'dev'} · Backend v{config?.server_version ?? 'dev'}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
+            <h1>Aldes Bridge</h1>
+            <ProfileSelector
+              currentProfile={config?.profile ?? null}
+              onProfileChanged={(p) => setConfig((c) => c ? { ...c, profile: p } : c)}
+            />
           </div>
-          <h1>Aldes Bridge</h1>
-          <ProfileSelector
-            currentProfile={config?.profile ?? null}
-            onProfileChanged={(p) => setConfig((c) => c ? { ...c, profile: p } : c)}
-          />
+          <div className="topRight">
+            <div className="topVersion" title="Versions du bridge">
+              v{config?.ui_version ?? 'dev'}
+            </div>
+          </div>
         </div>
-        <div className="topRight">
+        <div className="topRow2">
           <div className="tabs" role="tablist">
             {TABS.map((t) => (
               <button
