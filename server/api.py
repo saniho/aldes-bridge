@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from .aldes import build_products, make_token
 from .appstate import _iso
-from .device_profile import list_profiles
+from .device_profile import list_profiles, load_profile
 from .version import read_ui_version
 
 
@@ -356,6 +356,21 @@ def create_app(state, engine, web_dir):
         p = getattr(state, "profile", None)
         if p is None:
             return {"profile": None}
+        return {"profile": p.to_dict()}
+
+    class ProfileBody(BaseModel):
+        profile_id: str
+
+    @app.put("/api/profile")
+    def api_profile_set(body: ProfileBody):
+        p = load_profile(body.profile_id)
+        if p is None:
+            return JSONResponse(status_code=404, content={"error": f"profil '{body.profile_id}' introuvable"})
+        state.profile = p
+        state.events.publish({
+            "kind": "status", "ts": _iso(),
+            "note": f"profil device changé : {p.id} ({p.name})",
+        })
         return {"profile": p.to_dict()}
 
     # --- SPA (doit etre declare apres /api/*) ---

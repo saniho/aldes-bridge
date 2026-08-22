@@ -67,7 +67,8 @@ def test_get_water_mode_label():
 
 def test_resolve_reference():
     p = load_profile("tone-aquaair")
-    assert p.resolve_reference({"NED": 75}) == "TONE_AQUA_AIR"
+    assert p.resolve_reference({"NED": 75, "UDM": 2}) == "TONE_AQUA_AIR"
+    assert p.resolve_reference({"NED": 75}) == "TONE_AIR"
     assert p.resolve_reference({}) == "TONE_AIR"
 
 def test_to_dict():

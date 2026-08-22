@@ -270,6 +270,46 @@ def test_spa_fallback_returns_index():
         pass  # pas de frontend construit en test
 
 
+# --- /api/profile ---
+
+def test_api_profile_get():
+    state = AppState("h", 8883, EventBus())
+    port, _, _ = _start_web(state)
+    r = _req(port, "/api/profile")
+    # Pas de profil chargé par défaut
+    assert r["profile"] is None
+
+
+def test_api_profile_set():
+    from server.device_profile import load_profile
+    state = AppState("h", 8883, EventBus())
+    port, _, _ = _start_web(state)
+    r = _req(port, "/api/profile", "PUT", {"profile_id": "tone-aquaair"})
+    assert r["profile"]["id"] == "tone-aquaair"
+    assert r["profile"]["name"] == "TONE AquaAIR"
+    assert len(r["profile"]["air_modes"]) == 9
+
+
+def test_api_profile_set_not_found():
+    state = AppState("h", 8883, EventBus())
+    port, _, _ = _start_web(state)
+    try:
+        _req(port, "/api/profile", "PUT", {"profile_id": "nonexistent"})
+        raise AssertionError("attendu 404")
+    except urllib.error.HTTPError as e:
+        assert e.code == 404
+
+
+def test_api_profiles_list():
+    state = AppState("h", 8883, EventBus())
+    port, _, _ = _start_web(state)
+    r = _req(port, "/api/profiles")
+    assert "profiles" in r
+    assert len(r["profiles"]) >= 1
+    ids = [p["id"] for p in r["profiles"]]
+    assert "tone-aquaair" in ids
+
+
 if __name__ == "__main__":
     import traceback
     failures = 0

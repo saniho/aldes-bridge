@@ -1,0 +1,27 @@
+.profileSelector {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.profileLabel {
+  font-size: 12px;
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+
+.profileSelect {
+  font-size: 12px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border-input);
+  background: var(--bg-input);
+  color: var(--text);
+  cursor: pointer;
+  max-width: 160px;
+}
+
+.profileSelect:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}

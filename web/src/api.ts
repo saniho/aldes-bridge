@@ -154,6 +154,22 @@ export async function getProfile(): Promise<import('./types').DeviceProfile | nu
   ).then((r) => r.profile)
 }
 
+export async function getProfiles(): Promise<import('./types').DeviceProfile[]> {
+  return json<{ profiles: import('./types').DeviceProfile[] }>(
+    await fetch('/api/profiles')
+  ).then((r) => r.profiles)
+}
+
+export async function setProfile(profileId: string): Promise<import('./types').DeviceProfile> {
+  return json<{ profile: import('./types').DeviceProfile }>(
+    await fetch('/api/profile', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ profile_id: profileId })
+    })
+  ).then((r) => r.profile)
+}
+
 export interface ApiCallOptions {
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   path: string

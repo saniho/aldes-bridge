@@ -10,6 +10,7 @@ import RawPanel from './components/RawPanel'
 import CommandBuilder from './components/CommandBuilder'
 import TempsPanel from './components/TempsPanel'
 import WrapperPanel from './components/WrapperPanel'
+import ProfileSelector from './components/ProfileSelector'
 import './App.css'
 
 const HistoryPanel = lazy(() => import('./components/HistoryPanel'))
@@ -114,7 +115,8 @@ export default function App() {
           consignes: cfg.consignes ?? undefined,
           server_version: cfg.server_version ?? 'dev',
           ui_version: cfg.ui_version ?? 'dev',
-          history_days: cfg.history_days ?? null
+          history_days: cfg.history_days ?? null,
+          profile: cfg.profile ?? null
         })
         if (cfg.consignes) setConsignes(mergeConsignes(cfg.consignes))
       } catch {
@@ -293,6 +295,10 @@ const { messages, lastSnapshot } = useMemo(() => {
             )}
           </div>
           <h1>Aldes Bridge</h1>
+          <ProfileSelector
+            currentProfile={config?.profile ?? null}
+            onProfileChanged={(p) => setConfig((c) => c ? { ...c, profile: p } : c)}
+          />
         </div>
         <div className="topRight">
           <div className="tabs" role="tablist">
