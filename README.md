@@ -90,8 +90,12 @@ server/
   mqtt.py        # codec MQTT 3.1.1 (CONNECT/PUBLISH/SUBSCRIBE/...)
   events.py      # EventBus ring + export SSE
   api.py         # FastAPI : /api/* + SPA fallback
+  device_profile.py  # chargeur de profils YAML (DeviceProfile, load_profile)
+  aldes.py       # mapping telemetrie → indicateurs Aldes
+profiles/        # profils device (YAML)
+  tone-aquaair.yaml  # profil TONE AquaAIR (PAC air-air)
 web/             # frontend React/Vite
-tests/           # test_engine.py (bridge + proxy MITM)
+tests/           # tests pytest
 Dockerfile
 docker-compose.yml
 ```
@@ -106,6 +110,14 @@ docker compose up -d --build
 
 - MQTT/TLS : `0.0.0.0:8883` (la box s'y connecte)
 - WebUI/API : `0.0.0.0:8080`
+
+Variables d'environnement (`docker-compose.yml`) :
+
+| Variable | Défaut | Description |
+|---|---|---|
+| `ALDES_MODE` | `bridge` | Mode initial (proxy/bridge/listen/raw) |
+| `ALDES_HISTORY_DAYS` | `90` | Rétention SQLite (jours) |
+| `ALDES_PROFILE` | `tone-aquaair` | Profil device à charger |
 
 ### Kubernetes / K3s
 
@@ -266,6 +278,106 @@ redirigé vers le pont (ex. `API_URL_BASE = "http://<pont>:8080"` dans `api.py` 
 | PATCH | `/aldesoc/v5/users/me/products/{modem}/updateThermostats` | consigne thermostat (journalisée, non renvoyée à la box) |
 | POST | `/aldesoc/v5/users/me/products/{modem}/commands` | commande (journalisée, non renvoyée à la box) |
 
+### Profils device
+
+Le pont supporte plusieurs types d'appareils Aldes via un système de **profils YAML**.
+Un profil décrit les modes, commandes et le mapping telemetrie d'un appareil spécifique.
+
+**Profils disponibles** (dossier `profiles/`) :
+
+| ID | Appareil | Type | Description |
+|---|---|---|---|
+| `tone-aquaair` | TONE AquaAIR | PAC air-air | Profil par défaut, 9 modes air, 3 modes eau, 5 commandes |
+
+**API profils** :
+
+| Méthode | Chemin | Description |
+|---|---|---|
+| GET | `/api/profiles` | liste des profils disponibles (id, name, type, file) |
+| GET | `/api/profile` | profil actuellement chargé |
+| PUT | `/api/profile` | `{"profile_id":"tone-aquaair"}` — change le profil à la volée |
+
+**Sélecteur UI** : un dropdown « Appareil » dans l'en-tête permet de changer de profil
+sans redémarrer le conteneur. Le profil sélectionné influence les modes affichés,
+les commandes disponibles et les labels dans la WebUI.
+
+**Format d'un profil YAML** (`profiles/mon-appareil.yaml`) :
+
+```yaml
+id: mon-appareil
+name: "Mon Appareil"
+description: "Description courte"
+type: pac  # pac, vmc, etc.
+
+products:
+  REFERENCE_1:
+    name: "Nom commercial"
+    reference_fields: [NED, UDM]  # champs requis pour identifier ce produit
+  REFERENCE_2:
+    name: "Autre variante"
+    reference_fields: []
+
+telemetry:
+  modemid: product.modem
+  productid: product.serial_number
+  dt: product.lastUpdatedDate
+  zone_temp_prefix: MT
+  zone_count: 10
+  zone_setpoint_prefix: UsC
+  air_mode_field: UAM
+  water_mode_field: UDM
+  hot_water_field: NED
+  people_field: NpiH
+  vac_start_field: Dvac
+  vac_end_field: Fvac
+  ballon_field: NED
+
+air_modes:
+  - index: 0
+    code: A
+    label: "Arrêt"
+  # ... un mode par ligne
+
+water_modes:
+  - index: 0
+    code: L
+    label: "Eco"
+  # ...
+
+commands:
+  - id: consigne
+    label: "changeConsigneC<n> — consigne par zone"
+    method: changeConsigneC0
+    topic_pattern: "devices/{client_id}/messages/devicebound"
+    params:
+      - name: temp
+        type: number
+        min: 5
+        max: 30
+        step: 0.5
+  # ...
+
+ui:
+  quick_modes:
+    - field: air_modes
+      label: "Mode air"
+    - field: water_modes
+      label: "Mode ECS"
+  show_thermostats: true
+  show_vacations: true
+  show_people: true
+  show_hot_water: true
+
+history_labels:
+  air_mode:
+    keys: ["UAM"]
+    patterns: ["^UAM$"]
+  # ...
+```
+
+**Créer un nouvel appareil** : ajoutez un fichier YAML dans `profiles/`, redémarrez le
+conteneur (ou utilisez `PUT /api/profile`), et sélectionnez-le dans le dropdown UI.
+
 Mapping télémetrie → product (voir `server/aldes.py`) :
 
 - `modemid` → `modem`, `productid` → `serial_number`
@@ -306,6 +418,7 @@ et en preset « Change consigne C0 » dans « Envoyer une commande MQTT ».
 - `--mode proxy|bridge|listen|raw` (défaut `bridge`, ou env `ALDES_MODE`) — mode initial, changeable depuis la WebUI
 - `--mode-file logs/mode.json` — persistance du mode : un changement fait via la WebUI est
   rejoué au redémarrage du conteneur (le fichier persistant prime sur `--mode`/`ALDES_MODE`)
+- `--profile <id>` (ou env `ALDES_PROFILE`) — profil device à charger (défaut : premier profil trouvé)
 - `--bind 0.0.0.0`, `--mqtt-port 8883`, `--web-port 8080`
 - `--real-host aldesiotsuite.azure-devices.net`, `--real-port 8883`
 - `--web-dir <dist>` (frontend construit)
