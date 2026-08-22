@@ -13,9 +13,10 @@ interface Props {
   connected: boolean
   clientId: string | null
   defaultTopic?: string | null
+  theme: 'nuit' | 'jour'
 }
 
-export default function CommandBuilder({ connected, clientId, defaultTopic }: Props) {
+export default function CommandBuilder({ connected, clientId, defaultTopic, theme }: Props) {
   const [fn, setFn] = useState('consigne')
   const [consZone, setConsZone] = useState('C0')
   const [consZoneFree, setConsZoneFree] = useState(false)
@@ -186,7 +187,9 @@ export default function CommandBuilder({ connected, clientId, defaultTopic }: Pr
 
       {payload && (
         <div className={styles.hint}>
-          <code>{payload}</code>
+          <code className={theme === 'jour' ? styles.payloadJour : styles.payloadNuit}>
+            {payload}
+          </code>
         </div>
       )}
 

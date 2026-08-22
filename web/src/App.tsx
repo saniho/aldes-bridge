@@ -355,6 +355,7 @@ const { messages, lastSnapshot } = useMemo(() => {
               connected={config?.connected ?? false}
               clientId={config?.client_id ?? null}
               defaultTopic={config?.mode === 'raw' ? config?.raw?.cmd_topic ?? null : null}
+              theme={theme}
             />
             {config?.mode === 'raw' && <RawPanel />}
           </div>

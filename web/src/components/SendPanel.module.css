@@ -106,6 +106,16 @@
   border-radius: 4px;
 }
 
+.payloadJour {
+  background: #f0f4f8;
+  color: #1a365d;
+}
+
+.payloadNuit {
+  background: var(--bg-chip);
+  color: var(--topic);
+}
+
 .hint button {
   background: transparent;
   border: 1px solid var(--border-strong);
