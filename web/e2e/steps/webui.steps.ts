@@ -18,6 +18,13 @@ Given("l'historique des messages est vidé", async ({ page }) => {
   expect(res.ok()).toBeTruthy()
 })
 
+Given('les paramètres sont réinitialisés', async ({ page }) => {
+  const res = await page.request.put('/api/settings', {
+    data: { history_retention_days: 90, log_retention_max_bytes: 26214400 }
+  })
+  expect(res.ok()).toBeTruthy()
+})
+
 Given('le bridge sert la WebUI construite', async ({ page }) => {
   await page.addInitScript(() => {
     ;(window as unknown as Record<string, number>).__confirms = 0
@@ -264,4 +271,74 @@ Then('une valeur historique est affichée', async ({ page }) => {
   await expect(page.getByLabel('Capteur')).toBeVisible({ timeout: 10000 })
   const chart = page.locator('.recharts-wrapper').first()
   await expect(chart).toBeVisible({ timeout: 15000 })
+})
+
+// ---------------------------------------------------------------------------
+//  Then : vérifications config panel
+// ---------------------------------------------------------------------------
+
+Then('le panneau de configuration est visible', async ({ page }) => {
+  await expect(page.getByText('Configuration')).toBeVisible({ timeout: 10000 })
+})
+
+Then('le champ rétention historique affiche {texte}', async ({ page }, value: string) => {
+  const input = page.locator('input[type="number"]')
+  await expect(input).toBeVisible({ timeout: 10000 })
+  await expect(input).toHaveValue(value)
+})
+
+Then('le champ taille max logs affiche {texte}', async ({ page }, value: string) => {
+  const input = page.locator('input[type="text"]')
+  await expect(input).toBeVisible({ timeout: 10000 })
+  await expect(input).toHaveValue(value)
+})
+
+Then('un message de confirmation est affiché', async ({ page }) => {
+  await expect(page.getByText('Sauvegarde')).toBeVisible({ timeout: 5000 })
+})
+
+Then('la rétention historique est {texte} côté API', async ({ page }, days: string) => {
+  const res = await page.request.get('/api/settings')
+  expect(res.ok()).toBeTruthy()
+  const body = (await res.json()) as { settings: { history_retention_days: number } }
+  expect(body.settings.history_retention_days).toBe(parseInt(days, 10))
+})
+
+// ---------------------------------------------------------------------------
+//  When : actions config panel
+// ---------------------------------------------------------------------------
+
+When('je tape {texte} dans le champ rétention historique', async ({ page }, value: string) => {
+  const input = page.locator('input[type="number"]')
+  await input.fill(value)
+})
+
+// ---------------------------------------------------------------------------
+//  Then : vérifications profil selector
+// ---------------------------------------------------------------------------
+
+Then('le sélecteur de profil est visible', async ({ page }) => {
+  await expect(page.locator('select').filter({ has: page.locator('option') }).first()).toBeVisible({ timeout: 10000 })
+})
+
+Then('le profil sélectionné est {texte}', async ({ page }, name: string) => {
+  const select = page.locator('.profileSelect, select').filter({ hasText: name }).first()
+  await expect(select).toBeVisible({ timeout: 10000 })
+  await expect(select).toHaveValue(/tone-aquaair/)
+})
+
+Then('le profil {texte} est actif côté API', async ({ page }, profileId: string) => {
+  const res = await page.request.get('/api/profile')
+  expect(res.ok()).toBeTruthy()
+  const body = (await res.json()) as { profile: { id: string } | null }
+  expect(body.profile?.id).toBe(profileId)
+})
+
+// ---------------------------------------------------------------------------
+//  When : actions profil selector
+// ---------------------------------------------------------------------------
+
+When('je change le profil pour {texte}', async ({ page }, profileId: string) => {
+  const select = page.locator('.profileSelect, select').filter({ has: page.locator(`option[value="${profileId}"]`) }).first()
+  await select.selectOption(profileId)
 })

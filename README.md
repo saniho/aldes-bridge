@@ -259,6 +259,11 @@ git pull
 | POST | `/api/send` | `{"topic","payload","qos"}` — injecte une commande vers la box |
 | POST | `/api/disconnect` | force la session (pour appliquer le mode tout de suite) |
 | POST | `/api/clear` | vide l'historique affiché |
+| GET | `/api/profiles` | liste des profils disponibles (id, name, type, file) |
+| GET | `/api/profile` | profil actuellement chargé |
+| PUT | `/api/profile` | `{"profile_id":"tone-aquaair"}` — change le profil à la volée |
+| GET | `/api/settings` | paramètres (rétention historique, taille max logs) |
+| PUT | `/api/settings` | `{"history_retention_days":30, "log_retention_max_bytes":...}` — met à jour |
 | GET | `/` | SPA (frontend construit) |
 
 La WebUI a deux onglets : **🌊 flux** (trames MQTT en temps réel / historique) et **🌡 températures**
@@ -419,6 +424,8 @@ et en preset « Change consigne C0 » dans « Envoyer une commande MQTT ».
 - `--mode-file logs/mode.json` — persistance du mode : un changement fait via la WebUI est
   rejoué au redémarrage du conteneur (le fichier persistant prime sur `--mode`/`ALDES_MODE`)
 - `--profile <id>` (ou env `ALDES_PROFILE`) — profil device à charger (défaut : premier profil trouvé)
+- `--profile-file logs/profile.json` — persistance du profil sélectionné (prime sur `--profile`)
+- `--config-file logs/config.json` — persistance des paramètres (rétention, logs)
 - `--bind 0.0.0.0`, `--mqtt-port 8883`, `--web-port 8080`
 - `--real-host aldesiotsuite.azure-devices.net`, `--real-port 8883`
 - `--web-dir <dist>` (frontend construit)
@@ -435,6 +442,14 @@ python3 -m pytest --cov=server    # avec couverture
 ```
 
 Le badge de couverture est mis à jour automatiquement par le CI à chaque push sur `main`.
+
+### Tests E2E (Playwright)
+
+Scénarios Gherkin dans `web/e2e/features/`, steps TypeScript dans `web/e2e/steps/`.
+
+```bash
+cd web && npm run build && npx playwright test
+```
 
 ## Licence
 

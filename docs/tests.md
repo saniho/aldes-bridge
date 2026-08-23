@@ -74,3 +74,36 @@ relecture au démarrage, fichier manquant/invalide toléré (`test_set_mode_pers
 `test_listen_mode_persists`, `test_mode_change_overwrites`,
 `test_restart_uses_persisted_mode`, `test_missing_or_invalid_file_returns_none`,
 `test_no_mode_file_no_crash`, `test_snapshot_exposes_mode_file`).
+
+## Tests E2E (Playwright + Gherkin)
+
+Les scénarios sont écrits en Gherkin (`web/e2e/features/*.feature`)
+avec les steps en TypeScript (`web/e2e/steps/*.ts`). Le serveur Python tourne
+en local avec un broker MQTT factice, la WebUI est servie depuis `web/dist/`.
+
+### Lancer
+
+```bash
+cd web
+npm run build
+npx playwright test                    # tous les scénarios
+npx playwright test --grep "config"    # par filtre
+npx playwright test --grep "profil"    # par filtre
+```
+
+### Fichiers
+
+| Fichier | Description |
+|---|---|
+| `config-panel.feature` | Panneau config (rétention, logs) |
+| `profile-selector.feature` | Sélecteur de profil device |
+| `historique-valeurs.feature` | Onglet historique des valeurs |
+| `navigation.feature` | Navigation entre onglets |
+| `mode.feature` | Gestion des modes du bridge |
+| `theme.feature` | Thème jour / nuit |
+| `versions.feature` | Versions UI / Backend |
+| `transitions-mode.feature` | Transitions entre modes |
+| `deconnexion.feature` | Déconnexion MQTT |
+| `filtres-messagestream.feature` | Filtres de recherche messages |
+| `messages.feature` | Affichage des messages MQTT |
+| `messages-donnees.feature` | Messages avec données |
