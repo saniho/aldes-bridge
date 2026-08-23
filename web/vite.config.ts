@@ -22,6 +22,7 @@ function uiVersionPlugin(): Plugin {
 }
 
 export default defineConfig({
+  base: './',
   plugins: [react(), uiVersionPlugin()],
   server: {
     host: '0.0.0.0',
