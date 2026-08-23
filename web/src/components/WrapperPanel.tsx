@@ -18,12 +18,12 @@ interface RouteDef {
 }
 
 const ROUTES: RouteDef[] = [
-  { id: 'config', method: 'GET', path: '/api/config', desc: 'État actuel du bridge (mode, connexion, client, raw).' },
-  { id: 'state', method: 'GET', path: '/api/state', desc: 'Snapshot : config + trames de la session en cours.' },
+  { id: 'config', method: 'GET', path: 'api/config', desc: 'État actuel du bridge (mode, connexion, client, raw).' },
+  { id: 'state', method: 'GET', path: 'api/state', desc: 'Snapshot : config + trames de la session en cours.' },
   {
     id: 'logs',
     method: 'GET',
-    path: '/api/logs',
+    path: 'api/logs',
     desc: 'Lecture à posteriori du log disque persistant (plus récent d’abord).',
     queryParams: [
       { key: 'limit', label: 'limit', def: '200' },
@@ -33,16 +33,16 @@ const ROUTES: RouteDef[] = [
   {
     id: 'mode',
     method: 'POST',
-    path: '/api/mode',
+    path: 'api/mode',
     desc: 'Changer de mode : proxy / bridge / raw.',
     hasBody: true,
     bodyExample: '{"mode":"proxy"}'
   },
-  { id: 'raw', method: 'GET', path: '/api/raw', desc: 'Configuration du client MQTT natif (raw).' },
+  { id: 'raw', method: 'GET', path: 'api/raw', desc: 'Configuration du client MQTT natif (raw).' },
   {
     id: 'rawSet',
     method: 'POST',
-    path: '/api/raw',
+    path: 'api/raw',
     desc: 'Enregistrer la config raw et forcer la reconnexion.',
     hasBody: true,
     bodyExample: '{"host":"","port":1883,"tls":true,"client_id":"","cmd_topic":"","evt_topic":""}'
@@ -50,18 +50,18 @@ const ROUTES: RouteDef[] = [
   {
     id: 'send',
     method: 'POST',
-    path: '/api/send',
+    path: 'api/send',
     desc: 'Injecter une trame MQTT vers la box (topic, payload JSON-RPC, qos).',
     hasBody: true,
     bodyExample:
       '{"topic":"devices/<clientId>/messages/devicebound","payload":"{\\"id\\":1,\\"jsonrpc\\":\\"2.0\\",\\"method\\":\\"changeMode\\",\\"params\\":[\\"V\\"]}","qos":1}'
   },
-  { id: 'disconnect', method: 'POST', path: '/api/disconnect', desc: 'Déconnecter la box connectée.' },
-  { id: 'clear', method: 'POST', path: '/api/clear', desc: 'Vider l’historique en mémoire du bridge.' },
+  { id: 'disconnect', method: 'POST', path: 'api/disconnect', desc: 'Déconnecter la box connectée.' },
+  { id: 'clear', method: 'POST', path: 'api/clear', desc: 'Vider l’historique en mémoire du bridge.' },
   {
     id: 'token',
     method: 'POST',
-    path: '/oauth2/token',
+    path: 'oauth2/token',
     desc: 'Rejeu : émission d’un token (inscrit un événement « authentification » dans le flux).',
     hasBody: true,
     bodyExample: '{"username":"demo","password":"demo"}'
@@ -69,13 +69,13 @@ const ROUTES: RouteDef[] = [
   {
     id: 'products',
     method: 'GET',
-    path: '/aldesoc/v5/users/me/products',
+    path: 'aldesoc/v5/users/me/products',
     desc: 'Rejeu : produits Aldes + télémetrie capturée de la box (consommé par l’intégration HA).'
   },
   {
     id: 'updateThermo',
     method: 'PATCH',
-    path: '/aldesoc/v5/users/me/products/{modem}/updateThermostats',
+    path: 'aldesoc/v5/users/me/products/{modem}/updateThermostats',
     desc: 'Rejeu : consigne thermostat (écriture loggée, non renvoyée à la box).',
     placeholders: [{ key: 'modem', label: 'modem', def: 'ABCDEF123456' }],
     hasBody: true,
@@ -84,7 +84,7 @@ const ROUTES: RouteDef[] = [
   {
     id: 'commands',
     method: 'POST',
-    path: '/aldesoc/v5/users/me/products/{modem}/commands',
+    path: 'aldesoc/v5/users/me/products/{modem}/commands',
     desc: 'Rejeu : commande (écriture loggée, non renvoyée à la box).',
     placeholders: [{ key: 'modem', label: 'modem', def: 'ABCDEF123456' }],
     hasBody: true,

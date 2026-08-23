@@ -15,18 +15,18 @@ async function json<T>(res: Response): Promise<T> {
 }
 
 export async function getConfig(): Promise<import('./types').Config> {
-  return json<import('./types').Config>(await fetch('/api/config'))
+  return json<import('./types').Config>(await fetch('api/config'))
 }
 
 export async function getRaw(): Promise<import('./types').RawConfig> {
-  return json<import('./types').RawConfig>(await fetch('/api/raw'))
+  return json<import('./types').RawConfig>(await fetch('api/raw'))
 }
 
 export async function setRaw(
   cfg: Partial<import('./types').RawConfig>
 ): Promise<import('./types').RawConfig> {
   return json<import('./types').RawConfig>(
-    await fetch('/api/raw', {
+    await fetch('api/raw', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -43,7 +43,7 @@ export async function setRaw(
 
 export async function setMode(mode: Mode): Promise<{ mode: Mode }> {
   return json<{ mode: Mode }>(
-    await fetch('/api/mode', {
+    await fetch('api/mode', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ mode })
@@ -57,7 +57,7 @@ export async function sendCommand(
   qos: number
 ): Promise<{ ok: boolean; topic?: string; qos?: number; bytes?: number; error?: string }> {
   return json<{ ok: boolean; topic?: string; qos?: number; bytes?: number; error?: string }>(
-    await fetch('/api/send', {
+    await fetch('api/send', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ topic, payload, qos })
@@ -72,7 +72,7 @@ export interface ConsigneEntry {
 }
 
 export async function getConsignes(): Promise<Record<string, ConsigneEntry>> {
-  return json<{ consignes: Record<string, ConsigneEntry> }>(await fetch('/api/consigne')).then(
+  return json<{ consignes: Record<string, ConsigneEntry> }>(await fetch('api/consigne')).then(
     (r) => r.consignes
   )
 }
@@ -82,7 +82,7 @@ export async function requestConsigne(
   value: number
 ): Promise<Record<string, ConsigneEntry>> {
   return json<{ consignes: Record<string, ConsigneEntry> }>(
-    await fetch('/api/consigne', {
+    await fetch('api/consigne', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ zone, value })
@@ -91,11 +91,11 @@ export async function requestConsigne(
 }
 
 export async function disconnect(): Promise<{ ok: boolean }> {
-  return json<{ ok: boolean }>(await fetch('/api/disconnect', { method: 'POST' }))
+  return json<{ ok: boolean }>(await fetch('api/disconnect', { method: 'POST' }))
 }
 
 export async function clearHistory(): Promise<{ ok: boolean }> {
-  return json<{ ok: boolean }>(await fetch('/api/clear', { method: 'POST' }))
+  return json<{ ok: boolean }>(await fetch('api/clear', { method: 'POST' }))
 }
 
 export interface LogPage {
@@ -106,11 +106,11 @@ export interface LogPage {
 }
 
 export async function getLogs(limit: number, offset: number): Promise<LogPage> {
-  return json<LogPage>(await fetch(`/api/logs?limit=${limit}&offset=${offset}`))
+  return json<LogPage>(await fetch(`api/logs?limit=${limit}&offset=${offset}`))
 }
 
 export async function getHistoryKeys(): Promise<import('./types').HistoryKey[]> {
-  return json<{ keys: import('./types').HistoryKey[] }>(await fetch('/api/history/keys')).then(
+  return json<{ keys: import('./types').HistoryKey[] }>(await fetch('api/history/keys')).then(
     (r) => r.keys
   )
 }
@@ -126,7 +126,7 @@ export async function getHistorySeries(
   if (end !== undefined) qs.set('end', String(end))
   if (bucket !== undefined) qs.set('bucket', String(bucket))
   return json<{ samples: import('./types').HistoryPoint[] }>(
-    await fetch(`/api/history/series?${qs}`)
+    await fetch(`api/history/series?${qs}`)
   ).then((r) => r.samples)
 }
 
@@ -139,30 +139,30 @@ export async function getHistoryTable(
   const qs = new URLSearchParams({ limit: String(limit), offset: String(offset) })
   if (start !== undefined) qs.set('start', String(start))
   if (end !== undefined) qs.set('end', String(end))
-  return json<import('./types').HistoryTablePage>(await fetch(`/api/history/table?${qs}`))
+  return json<import('./types').HistoryTablePage>(await fetch(`api/history/table?${qs}`))
 }
 
 export async function getProducts(): Promise<import('./types').AldesProduct[]> {
   return json<import('./types').AldesProduct[]>(
-    await fetch('/aldesoc/v5/users/me/products')
+    await fetch('aldesoc/v5/users/me/products')
   )
 }
 
 export async function getProfile(): Promise<import('./types').DeviceProfile | null> {
   return json<{ profile: import('./types').DeviceProfile | null }>(
-    await fetch('/api/profile')
+    await fetch('api/profile')
   ).then((r) => r.profile)
 }
 
 export async function getProfiles(): Promise<import('./types').DeviceProfile[]> {
   return json<{ profiles: import('./types').DeviceProfile[] }>(
-    await fetch('/api/profiles')
+    await fetch('api/profiles')
   ).then((r) => r.profiles)
 }
 
 export async function setProfile(profileId: string): Promise<import('./types').DeviceProfile> {
   return json<{ profile: import('./types').DeviceProfile }>(
-    await fetch('/api/profile', {
+    await fetch('api/profile', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ profile_id: profileId })
@@ -172,7 +172,7 @@ export async function setProfile(profileId: string): Promise<import('./types').D
 
 export async function getAppConfig(): Promise<import('./types').AppConfig> {
   return json<{ settings: import('./types').AppConfig }>(
-    await fetch('/api/settings')
+    await fetch('api/settings')
   ).then((r) => r.settings)
 }
 
@@ -180,7 +180,7 @@ export async function setAppConfig(
   cfg: Partial<import('./types').AppConfig>
 ): Promise<import('./types').AppConfig> {
   return json<{ settings: import('./types').AppConfig }>(
-    await fetch('/api/settings', {
+    await fetch('api/settings', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(cfg)

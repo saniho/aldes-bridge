@@ -15,7 +15,7 @@ export function useSse(enabled: boolean) {
     let watchdog: ReturnType<typeof setTimeout> | null = null
 
     const open = () => {
-      const es = new EventSource('/api/events')
+      const es = new EventSource('api/events')
       ref.current = es
       es.onopen = () => {
         openedSinceError = true
