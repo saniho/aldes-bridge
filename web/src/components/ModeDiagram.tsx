@@ -5,18 +5,20 @@ interface Props {
   mode: Mode | null
   connected: boolean
   clientId: string | null
+  cloudSince: number | null
 }
 
-export default function ModeDiagram({ mode, connected, clientId }: Props) {
+export default function ModeDiagram({ mode, connected, clientId, cloudSince }: Props) {
   const bridge = mode === 'bridge'
   const listen = mode === 'listen'
   const raw = mode === 'raw'
+  const cloudUp = cloudSince != null
 
   return (
     <div className={styles.wrap}>
       <div className={styles.flow}>
         {/* BOX */}
-        <div className={styles.node + ' ' + (connected ? '' : styles.muted)}>
+        <div className={styles.node + ' ' + (connected ? styles.highlight : styles.muted)}>
           <span className={styles.icon}>📦</span>
           <span className={styles.name}>Box</span>
           <span className={styles.sub}>
@@ -69,17 +71,17 @@ export default function ModeDiagram({ mode, connected, clientId }: Props) {
             </div>
 
             {/* BRIDGE -> AZURE (proxy & listen) */}
-            <div className={styles.seg + (bridge ? styles.off : styles.live)}>
+            <div className={styles.seg + (bridge ? styles.off : cloudUp ? styles.live : styles.warning)}>
               <span className={styles.arrow}>▶</span>
               <span className={styles.seglab}>{bridge ? 'inactif' : listen ? 'relai télémétrie' : 'relai'}</span>
             </div>
 
             {/* AZURE */}
-            <div className={styles.node + (bridge ? styles.muted : styles.active)}>
+            <div className={styles.node + (bridge ? styles.muted : cloudUp ? styles.active : styles.warn)}>
               <span className={styles.icon}>☁️</span>
               <span className={styles.name}>Azure</span>
               <span className={styles.sub}>
-                {bridge ? 'décroché' : listen ? 'écoute seule' : 'IoT Hub'}
+                {bridge ? 'décroché' : cloudUp ? 'connecté' : 'déconnecté'}
               </span>
             </div>
           </>

@@ -35,6 +35,11 @@
   border-color: var(--out);
 }
 
+.node.warn {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 1px #f59e0b44;
+}
+
 .node.muted {
   opacity: 0.45;
 }
@@ -80,6 +85,10 @@
 .seg.off {
   color: var(--arrow-off);
   opacity: 0.6;
+}
+
+.seg.warning {
+  color: #f59e0b;
 }
 
 .seg.muted {

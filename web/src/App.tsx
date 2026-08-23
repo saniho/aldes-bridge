@@ -349,6 +349,7 @@ const { messages, lastSnapshot } = useMemo(() => {
         mode={config?.mode ?? null}
         connected={config?.connected ?? false}
         clientId={config?.client_id ?? null}
+        cloudSince={config?.cloud_since ?? null}
       />
       <StatsBar
         messages={messages}
