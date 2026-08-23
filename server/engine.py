@@ -155,14 +155,17 @@ class Engine(threading.Thread):
                     if self._stop_ev.is_set() or self._mode_changed.is_set():
                         break
                     continue
+                self.state.events.publish({"kind": "status", "ts": "now", "note": "MQTT conn from %s:%d" % (addr[0], addr[1])})
                 try:
                     cs = ctx.wrap_socket(c, server_side=True)
-                except Exception:
+                except Exception as exc:
+                    self.state.events.publish({"kind": "status", "ts": "now", "note": "TLS handshake FAILED from %s:%d: %s" % (addr[0], addr[1], exc)})
                     try:
                         c.close()
                     except Exception:
                         pass
                     continue
+                self.state.events.publish({"kind": "status", "ts": "now", "note": "TLS OK from %s:%d" % (addr[0], addr[1])})
                 threading.Thread(
                     target=self._handle, args=(cs, addr), daemon=True, name="conn"
                 ).start()
