@@ -423,7 +423,7 @@ def create_app(state, engine, web_dir):
         # 2. DNS systeme
         try:
             ip_sys = socket.gethostbyname(state.real_host)
-            is_local = ip_sys in ("127.0.0.1", "::1", state.azure_ip)
+            is_local = ip_sys in ("127.0.0.1", "::1", state._azure_ip)
             checks.append({
                 "id": "dns_system",
                 "label": "DNS systeme (dnsmasq)",
@@ -436,7 +436,7 @@ def create_app(state, engine, web_dir):
             checks.append({"id": "dns_system", "label": "DNS systeme (dnsmasq)", "detail": str(exc), "ok": False})
 
         # 3. IP Azure stockee
-        azure_ip = state.azure_ip
+        azure_ip = state._azure_ip
         checks.append({
             "id": "azure_ip",
             "label": "IP Azure résolue",
