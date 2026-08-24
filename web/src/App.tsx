@@ -12,11 +12,12 @@ import TempsPanel from './components/TempsPanel'
 import WrapperPanel from './components/WrapperPanel'
 import ProfileSelector from './components/ProfileSelector'
 import ConfigPanel from './components/ConfigPanel'
+import DiagnosticPanel from './components/DiagnosticPanel'
 import './App.css'
 
 const HistoryPanel = lazy(() => import('./components/HistoryPanel'))
 
-type View = 'temps' | 'commande' | 'log' | 'wrapper' | 'historique' | 'config'
+type View = 'temps' | 'commande' | 'log' | 'wrapper' | 'historique' | 'config' | 'diagnostic'
 
 function mergeConsignes(
   c: Record<string, { requested: number; confirmed: boolean; ts?: string }>
@@ -41,7 +42,8 @@ const MORE: { id: View; label: string; title: string }[] = [
   { id: 'log', label: '📜 log', title: 'Trames MQTT en temps réel et historique' },
   { id: 'wrapper', label: '🔌 wrapper', title: 'Appels API du bridge (test interactif)' },
   { id: 'historique', label: '📊 historique', title: 'Historique des valeurs (télémétries & connexions)' },
-  { id: 'config', label: '⚙️ config', title: 'Configuration du bridge' }
+  { id: 'config', label: '⚙️ config', title: 'Configuration du bridge' },
+  { id: 'diagnostic', label: '🩺 diagnostic', title: 'Check-up du systeme' }
 ]
 
 export default function App() {
@@ -59,7 +61,8 @@ export default function App() {
       stored === 'log' ||
       stored === 'wrapper' ||
       stored === 'historique' ||
-      stored === 'config'
+      stored === 'config' ||
+      stored === 'diagnostic'
     ) {
       return stored as View
     }
@@ -421,6 +424,11 @@ const { messages, lastSnapshot } = useMemo(() => {
         {view === 'config' && (
           <div className="streamCol">
             <ConfigPanel />
+          </div>
+        )}
+        {view === 'diagnostic' && (
+          <div className="streamCol">
+            <DiagnosticPanel />
           </div>
         )}
       </div>

@@ -172,3 +172,20 @@ export interface AppConfig {
   history_retention_days: number
   log_retention_max_bytes: number
 }
+
+export interface DiagnosticCheck {
+  id: string
+  label: string
+  detail: string
+  ok: boolean
+  warn?: boolean
+  ip?: string | null
+  rules?: string[]
+}
+
+export interface DiagnosticResult {
+  ok: boolean
+  passed: number
+  total: number
+  checks: DiagnosticCheck[]
+}

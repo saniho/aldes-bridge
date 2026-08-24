@@ -2,6 +2,8 @@
 import asyncio
 import json
 import os
+import socket
+import subprocess
 import urllib.parse
 
 from fastapi import FastAPI, HTTPException, Request
@@ -398,6 +400,140 @@ def create_app(state, engine, web_dir):
             "note": f"settings mis a jour : {list(updates.keys())}",
         })
         return {"settings": state.config.get()}
+
+    # --- Diagnostic (check-up systeme) ---
+    @app.get("/api/diagnostic")
+    def api_diagnostic():
+        checks = []
+
+        # 1. DNS resolution DoH
+        try:
+            from .tls import _doh_query
+            ip = _doh_query(state.real_host, timeout=5)
+            checks.append({
+                "id": "dns_doh",
+                "label": "DNS DoH (Cloudflare)",
+                "detail": f"{state.real_host} → {ip}" if ip else "Pas de réponse A record",
+                "ok": ip is not None,
+                "ip": ip,
+            })
+        except Exception as exc:
+            checks.append({"id": "dns_doh", "label": "DNS DoH (Cloudflare)", "detail": str(exc), "ok": False})
+
+        # 2. DNS systeme
+        try:
+            ip_sys = socket.gethostbyname(state.real_host)
+            is_local = ip_sys in ("127.0.0.1", "::1", state.azure_ip)
+            checks.append({
+                "id": "dns_system",
+                "label": "DNS systeme (dnsmasq)",
+                "detail": f"{state.real_host} → {ip_sys}" + (" ⚠️ résolu vers le bridge !" if is_local else ""),
+                "ok": not is_local,
+                "ip": ip_sys,
+                "warn": is_local,
+            })
+        except Exception as exc:
+            checks.append({"id": "dns_system", "label": "DNS systeme (dnsmasq)", "detail": str(exc), "ok": False})
+
+        # 3. IP Azure stockee
+        azure_ip = state.azure_ip
+        checks.append({
+            "id": "azure_ip",
+            "label": "IP Azure résolue",
+            "detail": azure_ip or "Non résolue",
+            "ok": azure_ip is not None,
+            "ip": azure_ip,
+        })
+
+        # 4. Connectivite TCP vers Azure (port 8883)
+        if azure_ip:
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(3)
+                result = sock.connect_ex((azure_ip, 8883))
+                sock.close()
+                checks.append({
+                    "id": "tcp_azure",
+                    "label": f"TCP Azure ({azure_ip}:8883)",
+                    "detail": "Atteignable" if result == 0 else f"Refusé (errno {result})",
+                    "ok": result == 0,
+                })
+            except Exception as exc:
+                checks.append({"id": "tcp_azure", "label": f"TCP Azure ({azure_ip}:8883)", "detail": str(exc), "ok": False})
+        else:
+            checks.append({"id": "tcp_azure", "label": "TCP Azure", "detail": "IP non résolue — test impossible", "ok": False})
+
+        # 5. Listener MQTT (port interne)
+        try:
+            port = 18883  # port interne du bridge
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(1)
+            result = sock.connect_ex(("127.0.0.1", port))
+            sock.close()
+            checks.append({
+                "id": "mqtt_listener",
+                "label": f"Listener MQTT (:{port})",
+                "detail": "En écoute" if result == 0 else "Pas en écoute",
+                "ok": result == 0,
+            })
+        except Exception as exc:
+            checks.append({"id": "mqtt_listener", "label": "Listener MQTT", "detail": str(exc), "ok": False})
+
+        # 6. iptables PREROUTING
+        try:
+            out = subprocess.check_output(
+                ["iptables", "-t", "nat", "-L", "PREROUTING", "-n", "--line-numbers"],
+                stderr=subprocess.STDOUT, timeout=3,
+            ).decode(errors="replace")
+            has_8883 = "8883" in out
+            rules = [l for l in out.splitlines() if "8883" in l]
+            checks.append({
+                "id": "iptables",
+                "label": "iptables PREROUTING",
+                "detail": f"{len(rules)} règle(s) REDIRECT 8883" if has_8883 else "Aucune règle 8883",
+                "ok": has_8883,
+                "rules": rules,
+            })
+        except FileNotFoundError:
+            checks.append({"id": "iptables", "label": "iptables", "detail": "iptables non disponible", "ok": False, "warn": True})
+        except Exception as exc:
+            checks.append({"id": "iptables", "label": "iptables", "detail": str(exc), "ok": False})
+
+        # 7. Connexion box
+        with state._lock:
+            box_connected = state._connected
+            box_ip = state._client_id
+        checks.append({
+            "id": "box_connected",
+            "label": "Box Aldes",
+            "detail": f"Connectée (client: {box_ip})" if box_connected else "Non connectée",
+            "ok": box_connected,
+        })
+
+        # 8. Mode courant
+        checks.append({
+            "id": "mode",
+            "label": "Mode actif",
+            "detail": state.mode,
+            "ok": state.mode in ("proxy", "bridge"),
+        })
+
+        # 9. Version
+        checks.append({
+            "id": "version",
+            "label": "Version",
+            "detail": f"Backend {state.server_version} · UI {state.ui_version}",
+            "ok": True,
+        })
+
+        ok_count = sum(1 for c in checks if c.get("ok"))
+        total = len(checks)
+        return {
+            "ok": ok_count == total,
+            "passed": ok_count,
+            "total": total,
+            "checks": checks,
+        }
 
     # --- SPA (doit etre declare apres /api/*) ---
     def _build_index():

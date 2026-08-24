@@ -203,6 +203,10 @@ export interface ApiResult {
   data: unknown
 }
 
+export async function getDiagnostic(): Promise<import('./types').DiagnosticResult> {
+  return json<import('./types').DiagnosticResult>(await fetch('api/diagnostic'))
+}
+
 export async function apiCall(opts: ApiCallOptions): Promise<ApiResult> {
   const started = performance.now()
   const headers: Record<string, string> = {}

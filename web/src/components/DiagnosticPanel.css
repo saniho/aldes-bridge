@@ -1,0 +1,156 @@
+.diag-panel {
+  padding: 12px;
+}
+
+.diag-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.diag-header h3 {
+  margin: 0;
+  font-size: 15px;
+  flex: 1;
+}
+
+.diag-run {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.diag-run:hover:not(:disabled) {
+  background: var(--bg3);
+}
+
+.diag-run:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.diag-error {
+  background: #3a1518;
+  color: #ff6b6b;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+.diag-summary {
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.diag-summary.ok {
+  background: #1a3a1a;
+  color: #6bcb6b;
+}
+
+.diag-summary.ko {
+  background: #3a2a15;
+  color: #f0a050;
+}
+
+.diag-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.diag-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+}
+
+.diag-check.ok {
+  border-left: 3px solid #4caf50;
+}
+
+.diag-check.warn {
+  border-left: 3px solid #ff9800;
+}
+
+.diag-check.ko {
+  border-left: 3px solid #f44336;
+}
+
+.diag-icon {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+  margin-top: 1px;
+}
+
+.diag-icon.ok {
+  background: #1a3a1a;
+  color: #6bcb6b;
+}
+
+.diag-icon.warn {
+  background: #3a2a15;
+  color: #f0a050;
+}
+
+.diag-icon.fail {
+  background: #3a1518;
+  color: #ff6b6b;
+}
+
+.diag-check-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.diag-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.diag-detail {
+  font-size: 12px;
+  color: var(--fg2);
+  margin-top: 2px;
+  word-break: break-word;
+}
+
+.diag-rules {
+  font-size: 11px;
+  color: var(--fg2);
+  background: var(--bg1);
+  padding: 4px 8px;
+  border-radius: 4px;
+  margin-top: 4px;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.diag-empty {
+  text-align: center;
+  padding: 32px 16px;
+  color: var(--fg2);
+  font-size: 13px;
+}
