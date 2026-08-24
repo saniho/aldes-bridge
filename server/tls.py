@@ -66,21 +66,64 @@ def client_context():
     return _permissive(ctx)
 
 
+def _dns_query(host, server="1.1.1.1", timeout=5):
+    """Envoie une requete DNS UDP directe a un serveur, contournant le resolver local."""
+    import random
+    import struct
+
+    tid = random.randint(0, 0xFFFF)
+    # Header: ID, flags=0x0100 (standard query, recursion desired), 1 question
+    header = struct.pack("!HHHHHH", tid, 0x0100, 1, 0, 0, 0)
+    # Question: type A (1), class IN (1)
+    question = b""
+    for label in host.encode().split(b"."):
+        question += bytes([len(label)]) + label
+    question += b"\x00"  # end of name
+    question += struct.pack("!HH", 1, 1)  # type A, class IN
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.settimeout(timeout)
+    try:
+        sock.sendto(header + question, (server, 53))
+        data, _ = sock.recvfrom(512)
+    finally:
+        sock.close()
+
+    # Parse response: skip header (12 bytes) + question
+    qname_len = 0
+    i = 12
+    while i < len(data) and data[i] != 0:
+        i += data[i] + 1
+    i += 1  # skip null byte
+    i += 4  # skip type + class
+    # Parse answer RRs
+    while i < len(data) - 12:
+        i += 2  # skip name (pointer or label)
+        rtype = struct.unpack("!H", data[i:i+2])[0]
+        i += 8  # type, class, ttl
+        rdlen = struct.unpack("!H", data[i:i+2])[0]
+        i += 2
+        if rtype == 1 and rdlen == 4:  # type A
+            return "%d.%d.%d.%d" % tuple(data[i:i+4])
+        i += rdlen
+    return None
+
+
 def resolve(host, port):
     """Resout l'IP du vrai hote en contournant le dnsmasq local (via DNS public 1.1.1.1)."""
     if host in ("localhost", "127.0.0.1", "::1"):
         return host
     try:
-        import subprocess
-        r = subprocess.run(
-            ["nslookup", host, "1.1.1.1"],
-            capture_output=True, text=True, timeout=5,
-        )
-        for line in r.stdout.split("\n"):
-            if "Address:" in line and "#" not in line and "Address:" in line:
-                ip = line.split("Address:")[-1].strip()
-                if ip and not ip.endswith("#53") and ":" not in ip:
-                    return ip
+        ip = _dns_query(host, "1.1.1.1")
+        if ip:
+            return ip
+    except Exception:
+        pass
+    # Fallback: essayer 8.8.8.8
+    try:
+        ip = _dns_query(host, "8.8.8.8")
+        if ip:
+            return ip
     except Exception:
         pass
     return socket.gethostbyname(host)

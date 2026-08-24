@@ -34,10 +34,12 @@ class ProxyHandler(MQTTEndpoint):
     def run(self):
         try:
             real_ip = resolve(self.state.real_host, self.state.real_port)
+            self.state.events.publish({"kind": "status", "ts": "now", "note": "Azure DNS: %s -> %s" % (self.state.real_host, real_ip)})
             self.real_sock = socket.create_connection((real_ip, self.state.real_port), timeout=20)
             self.real_tls = client_context().wrap_socket(
                 self.real_sock, server_hostname=self.state.real_host
             )
+            self.state.events.publish({"kind": "status", "ts": "now", "note": "Azure TLS OK: %s:%d" % (real_ip, self.state.real_port)})
             # Dead peer detecte : la box pingue ~toutes les 58 s, Azure repond
             # donc en moyenne chaque minute. Un silence plus long qu'un tour
             # complet de keepalive = lien mort (ou boite partie) -> dechirure.
