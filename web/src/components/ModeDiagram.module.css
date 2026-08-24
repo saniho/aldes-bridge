@@ -38,10 +38,21 @@
 .node.warn {
   border-color: #f59e0b;
   box-shadow: 0 0 0 1px #f59e0b44;
+  background: #f59e0b11;
 }
 
 .node.muted {
   opacity: 0.45;
+}
+
+.ip {
+  font-size: 10px;
+  font-family: monospace;
+  color: var(--green);
+  background: var(--bg);
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border-input);
 }
 
 .icon {

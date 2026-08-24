@@ -82,8 +82,11 @@ export default function ModeDiagram({ mode, connected, clientId, cloudSince, azu
               <span className={styles.icon}>☁️</span>
               <span className={styles.name}>Azure</span>
               <span className={styles.sub}>
-                {bridge ? 'décroché' : cloudUp ? (azureIp ?? 'connecté') : 'déconnecté'}
+                {bridge ? 'décroché' : cloudUp ? azureIp ?? 'connecté' : 'déconnecté'}
               </span>
+              {!bridge && azureIp && (
+                <span className={styles.ip}>{azureIp}</span>
+              )}
             </div>
           </>
         )}
