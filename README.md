@@ -18,12 +18,8 @@ Deux modes (bascule possible à chaud depuis la Web UI, appliquée à la prochai
   tout en affichant/sniffant chaque trame, et permet d'injecter des commandes vers la box (QoS0).
 - **bridge** — faux broker : la box se connecte au pont qui joue le rôle d'Azure ; messages observés,
   commandes injectées en QoS1 ; *aucune* communication avec le vrai cloud.
-- **listen** — remontée seule : la box rejoint Azure comme en proxy (télémétrie relayée), mais les
-  commandes **cloud → box sont bloquées** (observées, journalisées, jamais livrées) ; l'injection
-  locale WebUI reste possible.
-- **raw** — client MQTT natif : le pont se connecte en client au broker local configuré.
 
-Un unique listener TLS sur le port 8883 sert les modes proxy/bridge/listen ; le choix du mode est dans `AppState`
+Un unique listener TLS sur le port 8883 sert les modes proxy/bridge ; le choix du mode est dans `AppState`
 
 ### Schéma — Principe du bridge et du proxy
 
@@ -66,7 +62,7 @@ Un unique listener TLS sur le port 8883 sert les modes proxy/bridge/listen ; le 
 ```
 
 > 📐 **Version Mermaid** (rendue nativement par GitHub) : [docs/flux-modes.md](docs/flux-modes.md) —
-> les flux des quatre modes (proxy, bridge, listen, raw) en diagrammes interactifs.
+> les flux des modes (proxy, bridge) en diagrammes interactifs.
 
 Les modes partagent le même listener TLS et la même WebUI ; seule la destination
 **des trames** change (faux broker local vs relais vers Azure), d'où la bascule à chaud.
@@ -94,10 +90,9 @@ Box Aldes (192.168.1.28)           │   iptables PREROUTING        │
   ├───────────────────────────────>│   Bridge (listen :18883)     │
   │                                │     │                        │
   │                                │     ├─ mode bridge : MQTT OK │
-  │                                │     ├─ mode proxy  : MITM    │
-  │                                │     │   └─> Azure IoT Hub    │
-  │                                │     │     (DoH :443 → DNS)   │
-  │                                │     └─ mode listen : read    │
+  │                                │     └─ mode proxy  : MITM    │
+  │                                │         └─> Azure IoT Hub    │
+  │                                │           (DoH :443 → DNS)   │
   │                                │                              │
   │ WebUI                          │   FastAPI (:8080)            │
   └───────────────────────────────>│   + SPA React                │
@@ -148,7 +143,7 @@ L'add-on est disponible dans le dépôt `aldes-haos-addons`.
 
 | Option | Défaut | Description |
 |--------|--------|-------------|
-| `mode` | `bridge` | Mode initial (proxy/bridge/listen/raw) |
+| `mode` | `bridge` | Mode initial (proxy/bridge) |
 | `mqtt_port` | `18883` | Port interne du listener MQTT/TLS |
 | `box_ip` | (vide) | IP de la box Aldes (filtre les règles iptables) |
 
@@ -171,7 +166,7 @@ L'add-on est disponible dans le dépôt `aldes-haos-addons`.
 ```
 
 Le Dockerfile effectue un build multi-stage :
-1. Clone le repo `aldes-bridge` (branche `feature/device-profiles`)
+1. Clone le repo `aldes-bridge` (branche `main`)
 2. Build le frontend React
 3. Installe les dépendances Python
 4. Copie le code serveur + frontend construit
@@ -190,7 +185,7 @@ server/
   tls.py         # certificats auto-signés per-connexion, ctx permissif
   mqtt.py        # codec MQTT 3.1.1 (CONNECT/PUBLISH/SUBSCRIBE/...)
   events.py      # EventBus ring + export SSE
-  api.py         # FastAPI : /api/* + SPA fallback
+  api.py         # FastAPI : /api/* + SPA fallback + /api/diagnostic
   device_profile.py  # chargeur de profils YAML (DeviceProfile, load_profile)
   aldes.py       # mapping telemetrie → indicateurs Aldes
 profiles/        # profils device (YAML)
@@ -200,6 +195,27 @@ tests/           # tests pytest
 Dockerfile
 docker-compose.yml
 ```
+
+## Diagnostic (check-up systeme)
+
+Le panneau **Diagnostic** (menu 🩺 dans le hamburger) effectue un check-up complet du systeme :
+
+| Check | Description |
+|-------|-------------|
+| DNS DoH (Cloudflare) | Resolution `aldesiotsuite.azure-devices.net` via HTTPS (contourne dnsmasq) |
+| DNS systeme (dnsmasq) | Resolution locale — alerte si résolu vers le bridge (boucle) |
+| IP Azure résolue | Dernière IP connue |
+| TCP Azure | Connectivité vers `azure_ip:8883` |
+| Listener MQTT | Port 18883 en écoute |
+| iptables PREROUTING | Présence des règles REDIRECT 8883 |
+| Box Aldes | État connexion MQTT de la box |
+| Azure Cloud | État connexion cloud (mode proxy) |
+| Mode actif | proxy ou bridge |
+| Version | Backend + UI |
+
+Les 3 indicateurs clés (Box Aldes, Azure Cloud, Mode) sont affichés en haut du panneau avec des pastilles verte/rouge.
+
+**API** : `GET /api/diagnostic` retourne le résultat JSON de tous les checks.
 
 ## Démarrage
 
@@ -216,7 +232,7 @@ Variables d'environnement (`docker-compose.yml`) :
 
 | Variable | Défaut | Description |
 |---|---|---|
-| `ALDES_MODE` | `bridge` | Mode initial (proxy/bridge/listen/raw) |
+| `ALDES_MODE` | `bridge` | Mode initial (proxy/bridge) |
 | `ALDES_HISTORY_DAYS` | `90` | Rétention SQLite (jours) |
 | `ALDES_PROFILE` | `tone-aquaair` | Profil device à charger |
 
