@@ -350,6 +350,7 @@ const { messages, lastSnapshot } = useMemo(() => {
         connected={config?.connected ?? false}
         clientId={config?.client_id ?? null}
         cloudSince={config?.cloud_since ?? null}
+        azureIp={config?.azure_ip ?? null}
       />
       <StatsBar
         messages={messages}

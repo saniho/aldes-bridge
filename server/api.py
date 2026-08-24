@@ -65,6 +65,7 @@ class ConfigSnapshot(BaseModel):
     mode_file: str | None = None
     box_since: float | None = None
     cloud_since: float | None = None
+    azure_ip: str | None = None
     consignes: dict[str, ConsigneEntry] = {}
     server_version: str = "dev"
     ui_version: str = "dev"

@@ -6,9 +6,10 @@ interface Props {
   connected: boolean
   clientId: string | null
   cloudSince: number | null
+  azureIp: string | null
 }
 
-export default function ModeDiagram({ mode, connected, clientId, cloudSince }: Props) {
+export default function ModeDiagram({ mode, connected, clientId, cloudSince, azureIp }: Props) {
   const bridge = mode === 'bridge'
   const listen = mode === 'listen'
   const raw = mode === 'raw'
@@ -81,7 +82,7 @@ export default function ModeDiagram({ mode, connected, clientId, cloudSince }: P
               <span className={styles.icon}>☁️</span>
               <span className={styles.name}>Azure</span>
               <span className={styles.sub}>
-                {bridge ? 'décroché' : cloudUp ? 'connecté' : 'déconnecté'}
+                {bridge ? 'décroché' : cloudUp ? (azureIp ?? 'connecté') : 'déconnecté'}
               </span>
             </div>
           </>

@@ -49,7 +49,7 @@ class ProxyHandler(MQTTEndpoint):
             self.state.set_error("connexion Azure: %s" % exc)
             return
 
-        self.state.cloud_up()
+        self.state.cloud_up(azure_ip=real_ip)
 
         t1 = threading.Thread(target=self._forward_box_to_real, daemon=True)
         t2 = threading.Thread(target=self._forward_real_to_box, daemon=True)

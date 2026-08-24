@@ -200,6 +200,7 @@ class AppState:
         # Horodatages de connexion (epoch secondes) pour afficher les durees en haut.
         self._box_since = None
         self._cloud_since = None
+        self._azure_ip = None
         # Fichier de persistance du mode (survite au redemarrage du conteneur).
         self._mode_file = mode_file
         # Persistance des telemetries captees : les dernieres valeurs restent
@@ -420,10 +421,11 @@ class AppState:
         if self.history is not None:
             self.history.record_status("box", False)
 
-    def cloud_up(self):
+    def cloud_up(self, azure_ip=None):
         """Connexion du leg bridge -> Azure IoT Hub etablie (mode proxy)."""
         with self._lock:
             self._cloud_since = time.time()
+            self._azure_ip = azure_ip
         self.events.publish({
             "kind": "status", "cloud_connected": True, "ts": _iso(),
         })
@@ -433,6 +435,7 @@ class AppState:
     def cloud_down(self):
         with self._lock:
             self._cloud_since = None
+            self._azure_ip = None
         self.events.publish({
             "kind": "status", "cloud_connected": False, "ts": _iso(),
         })
@@ -473,6 +476,7 @@ class AppState:
                 "mode_file": self._mode_file,
                 "box_since": self._box_since,
                 "cloud_since": self._cloud_since,
+                "azure_ip": self._azure_ip,
                 "consignes": {k: dict(v) for k, v in self._consignes.items()},
                 "server_version": self.server_version,
                 "ui_version": self.ui_version,
