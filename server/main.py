@@ -71,7 +71,7 @@ def _backfill_history(history, log, n=10000):
 def build_parser():
     ap = argparse.ArgumentParser(prog="aldes-bridge", description="Bridge Aldes (proxy MITM / faux broker) + WebUI.")
     ap.add_argument("--mode", choices=["proxy", "bridge", "listen", "raw"],
-                    default=os.environ.get("ALDES_MODE", "bridge"),
+                    default=os.environ.get("ALDES_MODE") or None,
                     help="mode initial (changeable depuis la WebUI)")
     ap.add_argument("--mode-file", default=DEFAULT_MODE_FILE,
                     help="persistance du mode (reste pris en compte si ce fichier existe)")
@@ -145,8 +145,8 @@ def main(argv=None):
     # Capture des telemetries : branchee ici pour decoupler appstate (plomberie
     # d'evenements) de aldes (mapping metier). Appelee sur chaque PUBLISH entrant.
     state.on_publish_in = capture_telemetry
-    # Le mode persiste (mode.json) prime sur le mode CLI/env au redemarrage.
-    state.set_mode(read_persisted_mode(args.mode_file) or args.mode)
+    # Priorite : CLI explicite (depuis config HAOS) > mode.json (WebUI) > defaut bridge.
+    state.set_mode(args.mode or read_persisted_mode(args.mode_file) or "bridge")
 
     # Purge automatique periodique (toutes les heures).
     state.start_purge_timer()
