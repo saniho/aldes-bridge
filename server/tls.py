@@ -66,20 +66,41 @@ def client_context():
     return _permissive(ctx)
 
 
-def _dns_query(host, server="1.1.1.1", timeout=5):
-    """Envoie une requete DNS UDP directe a un serveur, contournant le resolver local."""
+def _doh_query(host, timeout=5):
+    """Resout un hostname via DNS over HTTPS (DoH) — contourne toute redirection DNS locale."""
+    import json
+    import urllib.request
+    import urllib.error
+
+    # Cloudflare DoH JSON API (pas de port 53, pas d'interception)
+    url = "https://cloudflare-dns.com/dns-query?name=%s&type=A" % host
+    req = urllib.request.Request(url, headers={
+        "Accept": "application/dns-json",
+        "User-Agent": "aldes-bridge/1.0",
+    })
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    resp = urllib.request.urlopen(req, timeout=timeout, context=ctx)
+    data = json.loads(resp.read())
+    for ans in data.get("Answer", []):
+        if ans.get("type") == 1:  # A record
+            return ans["data"]
+    return None
+
+
+def _dns_query_udp(host, server="1.1.1.1", timeout=5):
+    """Envoie une requete DNS UDP directe a un serveur."""
     import random
     import struct
 
     tid = random.randint(0, 0xFFFF)
-    # Header: ID, flags=0x0100 (standard query, recursion desired), 1 question
     header = struct.pack("!HHHHHH", tid, 0x0100, 1, 0, 0, 0)
-    # Question: type A (1), class IN (1)
     question = b""
     for label in host.encode().split(b"."):
         question += bytes([len(label)]) + label
-    question += b"\x00"  # end of name
-    question += struct.pack("!HH", 1, 1)  # type A, class IN
+    question += b"\x00"
+    question += struct.pack("!HH", 1, 1)
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.settimeout(timeout)
@@ -89,41 +110,51 @@ def _dns_query(host, server="1.1.1.1", timeout=5):
     finally:
         sock.close()
 
-    # Parse response: skip header (12 bytes) + question
-    qname_len = 0
     i = 12
     while i < len(data) and data[i] != 0:
         i += data[i] + 1
-    i += 1  # skip null byte
-    i += 4  # skip type + class
-    # Parse answer RRs
+    i += 1
+    i += 4
     while i < len(data) - 12:
-        i += 2  # skip name (pointer or label)
+        i += 2
         rtype = struct.unpack("!H", data[i:i+2])[0]
-        i += 8  # type, class, ttl
+        i += 8
         rdlen = struct.unpack("!H", data[i:i+2])[0]
         i += 2
-        if rtype == 1 and rdlen == 4:  # type A
+        if rtype == 1 and rdlen == 4:
             return "%d.%d.%d.%d" % tuple(data[i:i+4])
         i += rdlen
     return None
 
 
 def resolve(host, port):
-    """Resout l'IP du vrai hote en contournant le dnsmasq local (via DNS public 1.1.1.1)."""
+    """Resout l'IP du vrai hote en contournant le dnsmasq local.
+
+    Priorite : DoH (HTTPS) > UDP direct > system DNS.
+    Le DoH contourne toute redirection DNS car il utilise le port 443,
+    pas le port 53.
+    """
     if host in ("localhost", "127.0.0.1", "::1"):
         return host
+    # 1. DoH — contourne completement dnsmasq
     try:
-        ip = _dns_query(host, "1.1.1.1")
+        ip = _doh_query(host)
         if ip:
             return ip
     except Exception:
         pass
-    # Fallback: essayer 8.8.8.8
+    # 2. UDP direct — peut etre intercepte par iptables
     try:
-        ip = _dns_query(host, "8.8.8.8")
+        ip = _dns_query_udp(host, "1.1.1.1")
         if ip:
             return ip
     except Exception:
         pass
+    try:
+        ip = _dns_query_udp(host, "8.8.8.8")
+        if ip:
+            return ip
+    except Exception:
+        pass
+    # 3. Dernier recours: system DNS (dnsmasq)
     return socket.gethostbyname(host)
