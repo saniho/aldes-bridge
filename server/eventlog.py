@@ -4,7 +4,6 @@ Le fichier tourne (rotation vers <fichier>.1) quand il depasse max_bytes ;
 un seul anneau precedent est conserve, donc le stockage reste borne (~2x).
 Lecture paginee depuis la fin (tail), sans reparcourir le fichier entier.
 """
-import io
 import json
 import os
 import threading

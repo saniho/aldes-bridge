@@ -1,5 +1,4 @@
 """Certificat TLS self-signed et contextes SSL permissifs (reprise de mqtt_proxy.py)."""
-"""Certificat TLS self-signed et contextes SSL permissifs (reprise de mqtt_proxy.py)."""
 import socket
 import ssl
 import tempfile

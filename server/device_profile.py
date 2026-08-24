@@ -6,7 +6,6 @@ modes, commandes, labels historique, et configuration UI.
 Les profils sont des fichiers YAML dans le dossier profiles/.
 """
 import os
-import re
 import yaml
 
 APP_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

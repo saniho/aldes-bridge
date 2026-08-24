@@ -153,9 +153,8 @@ def main(argv=None):
         from .tls import resolve
         azure_ip = resolve(args.real_host, args.real_port)
         state.set_azure_ip(azure_ip)
-        print(f"[startup] Azure DNS: {args.real_host} -> {azure_ip}", flush=True)
+        _log.info("Azure DNS: %s -> %s", args.real_host, azure_ip)
     except Exception as exc:
-        print(f"[startup] Azure DNS FAILED: {exc}", flush=True)
         _log.warning("Azure DNS resolution failed: %s", exc)
 
     # Purge automatique periodique (toutes les heures).

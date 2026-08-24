@@ -8,7 +8,6 @@ Modes:
 import socket
 import threading
 import time
-from itertools import count
 
 from .tls import server_context
 from .appstate import set_conn_ctx, clear_conn_ctx

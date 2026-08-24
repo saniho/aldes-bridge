@@ -1,5 +1,6 @@
 """Etat applicatif partage entre le moteur MQTT (threads) et l'API web (asyncio)."""
 import json
+import logging
 import os
 import threading
 import time
@@ -7,6 +8,8 @@ from datetime import datetime, timezone
 
 from .events import EventBus
 from .mqtt import build_publish, parse_connect
+
+_log = logging.getLogger("aldes-appstate")
 from .version import SERVER_VERSION
 
 # Contexte de connexion : taggé par le thread qui gère une session box.

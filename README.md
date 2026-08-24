@@ -77,6 +77,107 @@ Les modes partagent le même listener TLS et la même WebUI ; seule la destinati
 - **Frontend** : React 18 + Vite + TypeScript (`web/`), construit puis servi statique par FastAPI.
 - **Docker** : multi-stage (build node → runtime python), réseau host.
 
+## Réseau (Home Assistant OS)
+
+Le bridge peut tourner en tant qu'**add-on HAOS** avec `host_network: true` (réseau partagé avec l'hôte).
+Dans cette configuration, la configuration réseau est entièrement gérée automatiquement.
+
+### Topologie
+
+```
+                                    HAOS (192.168.1.167)
+                                   ┌──────────────────────────────┐
+                                   │                              │
+Box Aldes (192.168.1.28)           │   iptables PREROUTING        │
+  │                                │   8883 → 18883               │
+  │ MQTT/TLS :8883                 │                              │
+  ├───────────────────────────────>│   Bridge (listen :18883)     │
+  │                                │     │                        │
+  │                                │     ├─ mode bridge : MQTT OK │
+  │                                │     ├─ mode proxy  : MITM    │
+  │                                │     │   └─> Azure IoT Hub    │
+  │                                │     │     (DoH :443 → DNS)   │
+  │                                │     └─ mode listen : read    │
+  │                                │                              │
+  │ WebUI                          │   FastAPI (:8080)            │
+  └───────────────────────────────>│   + SPA React                │
+                                   └──────────────────────────────┘
+```
+
+### Ports
+
+| Port | Protocole | Description |
+|------|-----------|-------------|
+| 8883 | TCP (entry) | Port MQTT/TLS de la box Aldes (redirigé vers 18883) |
+| 18883 | TCP (interne) | Port MQTT/TLS du bridge (listener TLS) |
+| 8080 | TCP | WebUI + API HTTP (accessible depuis HA) |
+
+### iptables (automatique)
+
+Le script `run.sh` gère automatiquement les règles NAT :
+
+- **PREROUTING** : redirige le trafic ENTRANT vers le port 8883 vers le port 18883
+  - Si `box_ip` configuré : uniquement le trafic depuis la box
+  - Sinon : tout le trafic vers 8883
+- **OUTPUT** : supprimé (plus de règle OUTPUT pour éviter la boucle bridge→Azure)
+
+> ⚠️ Les règles iptables sont nettoyées et recréées à chaque démarrage de l'add-on
+> pour éviter l'accumulation de règles obsolètes.
+
+### Résolution DNS (DoH)
+
+En mode **proxy**, le bridge doit résoudre `aldesiotsuite.azure-devices.net` pour se
+connecter au vrai cloud Azure. Le problème : **HAOS intercepte tout le trafic DNS (port 53)**
+et le redirige vers son dnsmasq local, qui résout le nom vers l'IP du bridge (boucle).
+
+La solution : **DNS over HTTPS (DoH)** via Cloudflare (`cloudflare-dns.com`), qui utilise le
+port 443 (HTTPS) au lieu du port 53, contournant ainsi complètement l'interception DNS.
+
+Priorité de résolution :
+1. **DoH** (HTTPS :443) — contourne dnsmasq
+2. **UDP direct** (1.1.1.1:53) — peut être intercepté
+3. **System DNS** (dnsmasq local) — dernier recours
+
+L'IP résolue est affichée dans le diagramme de la WebUI sous le nœud ☁️ Azure.
+
+### Add-on HAOS
+
+L'add-on est disponible dans le dépôt `aldes-haos-addons`.
+
+**Configuration** (`config.yaml`) :
+
+| Option | Défaut | Description |
+|--------|--------|-------------|
+| `mode` | `bridge` | Mode initial (proxy/bridge/listen/raw) |
+| `mqtt_port` | `18883` | Port interne du listener MQTT/TLS |
+| `box_ip` | (vide) | IP de la box Aldes (filtre les règles iptables) |
+
+**Données persistantes** (`/config/aldes/`) :
+
+| Fichier | Contenu |
+|---------|---------|
+| `config.json` | Paramètres (rétention historique, logs) |
+| `telemetry.json` | Dernières télémetries captées |
+| `history.db` | Historique SQLite |
+| `profile.json` | Profil device sélectionné |
+| `consigne.json` | Consignes thermostats |
+
+**Déploiement** :
+
+```bash
+# Depuis le dépôt aldes-haos-addons
+# Ajouter le dépôt dans HA → Settings → Add-ons → Store repos
+# Ou cloner et copier dans /addon_configs/
+```
+
+Le Dockerfile effectue un build multi-stage :
+1. Clone le repo `aldes-bridge` (branche `feature/device-profiles`)
+2. Build le frontend React
+3. Installe les dépendances Python
+4. Copie le code serveur + frontend construit
+
+La variable `CACHEBUST` dans le Dockerfile force le rebuild du code source à chaque version.
+
 ## Structure
 
 ```
