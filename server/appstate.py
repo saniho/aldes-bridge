@@ -1,5 +1,6 @@
 """Etat applicatif partage entre le moteur MQTT (threads) et l'API web (asyncio)."""
 import json
+import logging
 import os
 import threading
 import time
@@ -7,6 +8,8 @@ from datetime import datetime, timezone
 
 from .events import EventBus
 from .mqtt import build_publish, parse_connect
+
+_log = logging.getLogger("aldes-appstate")
 from .version import SERVER_VERSION
 
 # Contexte de connexion : taggé par le thread qui gère une session box.
@@ -52,6 +55,13 @@ def read_persisted_mode(path):
     data = _read_json(path)
     mode = data.get("mode") if isinstance(data, dict) else None
     return mode if mode in AppState.MODES else None
+
+
+def read_persisted_profile(path):
+    """Lit le profil persiste (JSON {"profile_id": ...}), None si absent/invalide."""
+    data = _read_json(path)
+    profile_id = data.get("profile_id") if isinstance(data, dict) else None
+    return profile_id if isinstance(profile_id, str) and profile_id else None
 
 
 def clear_conn_ctx():
@@ -175,7 +185,7 @@ class AppState:
         "evt_topic": "devices_MAC_AIR/messages/events",
     }
 
-    def __init__(self, real_host, real_port, events, mode_file=None, telemetry_file=None, consigne_file=None, history=None):
+    def __init__(self, real_host, real_port, events, mode_file=None, telemetry_file=None, consigne_file=None, history=None, profile_file=None, config=None):
         self.events = events if events is not None else EventBus()
         self._lock = threading.Lock()
         self.real_host = real_host
@@ -193,6 +203,7 @@ class AppState:
         # Horodatages de connexion (epoch secondes) pour afficher les durees en haut.
         self._box_since = None
         self._cloud_since = None
+        self._azure_ip = None
         # Fichier de persistance du mode (survite au redemarrage du conteneur).
         self._mode_file = mode_file
         # Persistance des telemetries captees : les dernieres valeurs restent
@@ -200,6 +211,12 @@ class AppState:
         self._telemetry_file = telemetry_file
         # Persistance des consignes demandees (survit au redemarrage du conteneur).
         self._consigne_file = consigne_file
+        # Persistance du profil device (survit au redemarrage du conteneur).
+        self._profile_file = profile_file
+        # Configuration persistante (logs/config.json).
+        self.config = config
+        # Timer de purge automatique.
+        self._purge_timer = None
         # Base d'historisation des valeurs (HistoryDB ou None). Remplie par
         # main.py ; branchee ici pour capter telemetries + connexions.
         self.history = history
@@ -209,6 +226,8 @@ class AppState:
         # Hook appele sur chaque PUBLISH entrant (capture telemetrie). Branche par
         # main.py sur server/aldes.py::capture_telemetry pour decoupler les modules.
         self.on_publish_in = None
+        # Profil device charge depuis les fichiers YAML (DeviceProfile ou None).
+        self.profile = None
         # Derniere persistance telemetrie (epoch) — throttle d'ecriture.
         self._last_telemetry_save = 0.0
         self._load_telemetry()
@@ -234,6 +253,44 @@ class AppState:
             "kind": "status", "mode": mode, "prev_mode": prev, "ts": _iso(),
         })
         return mode
+
+    def set_profile(self, profile):
+        """Change le profil device et persiste le choix."""
+        self.profile = profile
+        self._persist_profile()
+
+    def _persist_profile(self):
+        """Ecrit le profil courant dans profile_file (atomique, ne casse jamais le runtime)."""
+        if self.profile is None:
+            _atomic_write_json(self._profile_file, {"profile_id": None})
+        else:
+            _atomic_write_json(self._profile_file, {"profile_id": self.profile.id})
+
+    def start_purge_timer(self):
+        """Demarre le timer de purge automatique (toutes les heures)."""
+        self._purge_now()
+        self._purge_timer = threading.Timer(3600.0, self._purge_loop)
+        self._purge_timer.daemon = True
+        self._purge_timer.start()
+
+    def _purge_loop(self):
+        self._purge_now()
+        self._purge_timer = threading.Timer(3600.0, self._purge_loop)
+        self._purge_timer.daemon = True
+        self._purge_timer.start()
+
+    def _purge_now(self):
+        """Execute la purge de l'historique selon la config courante."""
+        if self.history is None or self.config is None:
+            return
+        days = self.config.history_retention()
+        self.history._days = days
+        try:
+            n = self.history.purge(days)
+            if n > 0:
+                _log.info("purge history: %d echantillons supprimes (retention %d jours)", n, days)
+        except Exception as exc:
+            _log.warning("purge history echouee: %s", exc)
 
     def _persist_mode(self):
         """Ecrit le mode courant dans mode_file (atomique, ne casse jamais le runtime)."""
@@ -367,10 +424,12 @@ class AppState:
         if self.history is not None:
             self.history.record_status("box", False)
 
-    def cloud_up(self):
+    def cloud_up(self, azure_ip=None):
         """Connexion du leg bridge -> Azure IoT Hub etablie (mode proxy)."""
         with self._lock:
             self._cloud_since = time.time()
+            if azure_ip:
+                self._azure_ip = azure_ip
         self.events.publish({
             "kind": "status", "cloud_connected": True, "ts": _iso(),
         })
@@ -380,6 +439,11 @@ class AppState:
     def cloud_down(self):
         with self._lock:
             self._cloud_since = None
+
+    def set_azure_ip(self, ip):
+        """Stocke l'IP Azure resolue (meme si la connexion echoue)."""
+        with self._lock:
+            self._azure_ip = ip
         self.events.publish({
             "kind": "status", "cloud_connected": False, "ts": _iso(),
         })
@@ -410,7 +474,7 @@ class AppState:
 
     def snapshot(self):
         with self._lock:
-            return {
+            snap = {
                 "mode": self._mode,
                 "connected": self._connected,
                 "client_id": self._client_id,
@@ -420,8 +484,12 @@ class AppState:
                 "mode_file": self._mode_file,
                 "box_since": self._box_since,
                 "cloud_since": self._cloud_since,
+                "azure_ip": self._azure_ip,
                 "consignes": {k: dict(v) for k, v in self._consignes.items()},
                 "server_version": self.server_version,
                 "ui_version": self.ui_version,
                 "history_days": self.history.retention_days if self.history is not None else None,
             }
+            if self.profile is not None:
+                snap["profile"] = self.profile.to_dict()
+            return snap

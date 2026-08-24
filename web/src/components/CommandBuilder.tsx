@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { sendCommand } from '../api'
-import type { Mode } from '../types'
-import { FNS, topicFor, withPropBag } from './commandBuilderData'
+import type { Mode, DeviceProfile } from '../types'
+import { topicFor, withPropBag } from './commandBuilderData'
 import {
   ConsigneSection, ModeSection, BallonSection, AirSection,
   VacancesSection, CmoSection, CustomSection
@@ -14,9 +14,26 @@ interface Props {
   clientId: string | null
   defaultTopic?: string | null
   theme: 'nuit' | 'jour'
+  profile?: DeviceProfile | null
 }
 
-export default function CommandBuilder({ connected, clientId, defaultTopic, theme }: Props) {
+function buildFns(profile: DeviceProfile | null | undefined): { id: string; label: string }[] {
+  if (profile?.commands?.length) {
+    return profile.commands.map((c) => ({ id: c.id, label: c.label }))
+  }
+  return [
+    { id: 'consigne', label: 'changeConsigneC<n> — consigne par zone (réel cloud)' },
+    { id: 'ballon', label: 'changeMode — ballon eau chaude On/Off' },
+    { id: 'air', label: 'changeMode — rafraîchissement air (confort/prog C/prog D/arrêt)' },
+    { id: 'mode', label: 'changeMode — mode' },
+    { id: 'vacances', label: 'changeMode — vacances (W)' },
+    { id: 'cmo', label: 'changeCMO — override 0/1' },
+    { id: 'custom', label: 'JSON libre (personnalisé)' }
+  ]
+}
+
+export default function CommandBuilder({ connected, clientId, defaultTopic, theme, profile }: Props) {
+  const FNS = buildFns(profile)
   const [fn, setFn] = useState('consigne')
   const [consZone, setConsZone] = useState('C0')
   const [consZoneFree, setConsZoneFree] = useState(false)

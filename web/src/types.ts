@@ -19,10 +19,12 @@ export interface Config {
   raw?: RawConfig
   box_since?: number | null
   cloud_since?: number | null
+  azure_ip?: string | null
   consignes?: Record<string, { requested: number; confirmed: boolean; ts?: string }>
   server_version?: string
   ui_version?: string
   history_days?: number | null
+  profile?: DeviceProfile | null
 }
 
 export interface MsgEvent {
@@ -122,4 +124,51 @@ export interface AldesProduct {
   lastUpdatedAt: string | null
   updatedAt?: string | null
   indicator: AldesIndicator
+}
+
+export interface DeviceMode {
+  index: number
+  code: string
+  label: string
+}
+
+export interface DeviceCommand {
+  id: string
+  label: string
+  method: string
+  topic_pattern: string
+  params: Array<{
+    name: string
+    type: string
+    options_from?: string
+    options?: Array<{ code: string; label: string }>
+    pattern?: string
+    min?: number
+    max?: number
+    step?: number
+  }>
+}
+
+export interface DeviceUi {
+  quick_modes?: Array<{ field: string; label: string }>
+  show_thermostats?: boolean
+  show_vacations?: boolean
+  show_people?: boolean
+  show_hot_water?: boolean
+}
+
+export interface DeviceProfile {
+  id: string
+  name: string
+  description: string
+  type: string
+  air_modes: DeviceMode[]
+  water_modes: DeviceMode[]
+  commands: DeviceCommand[]
+  ui: DeviceUi
+}
+
+export interface AppConfig {
+  history_retention_days: number
+  log_retention_max_bytes: number
 }

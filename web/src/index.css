@@ -48,11 +48,23 @@ h1 {
 
 .top {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 16px;
+  flex-direction: column;
   border-bottom: 1px solid var(--border);
   background: var(--bg-card);
+}
+
+.topRow1 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px 0;
+}
+
+.topRow2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 16px 8px;
 }
 
 .topLeft {
@@ -67,6 +79,12 @@ h1 {
   align-items: center;
   gap: 8px;
   margin-left: auto;
+}
+
+.topVersion {
+  font-size: 11px;
+  color: var(--text-faint);
+  white-space: nowrap;
 }
 
 .hist {
@@ -215,7 +233,7 @@ h1 {
 .layout {
   display: block;
   padding: 12px 16px;
-  height: calc(100vh - 116px);
+  height: calc(100vh - 136px);
   min-height: 0;
 }
 

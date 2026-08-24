@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from .aldes import build_products, make_token
 from .appstate import _iso
+from .device_profile import list_profiles, load_profile
 from .version import read_ui_version
 
 
@@ -64,10 +65,12 @@ class ConfigSnapshot(BaseModel):
     mode_file: str | None = None
     box_since: float | None = None
     cloud_since: float | None = None
+    azure_ip: str | None = None
     consignes: dict[str, ConsigneEntry] = {}
     server_version: str = "dev"
     ui_version: str = "dev"
     history_days: int | None = None
+    profile: dict | None = None
 
 
 class StateSnapshot(BaseModel):
@@ -343,6 +346,58 @@ def create_app(state, engine, web_dir):
             "note": "commande recue (non renvoyee a la box)",
         })
         return {"success": True, "modem": modem, "command": body}
+
+    # --- Profils device ---
+    @app.get("/api/profiles")
+    def api_profiles():
+        return {"profiles": list_profiles()}
+
+    @app.get("/api/profile")
+    def api_profile():
+        p = getattr(state, "profile", None)
+        if p is None:
+            return {"profile": None}
+        return {"profile": p.to_dict()}
+
+    class ProfileBody(BaseModel):
+        profile_id: str
+
+    @app.put("/api/profile")
+    def api_profile_set(body: ProfileBody):
+        p = load_profile(body.profile_id)
+        if p is None:
+            return JSONResponse(status_code=404, content={"error": f"profil '{body.profile_id}' introuvable"})
+        state.set_profile(p)
+        state.events.publish({
+            "kind": "status", "ts": _iso(),
+            "note": f"profil device changé : {p.id} ({p.name})",
+        })
+        return {"profile": p.to_dict()}
+
+    # --- Settings (paramètres persistants) ---
+    @app.get("/api/settings")
+    def api_settings_get():
+        cfg = state.config.get() if state.config else {}
+        return {"settings": cfg}
+
+    class SettingsBody(BaseModel):
+        history_retention_days: int = None
+        log_retention_max_bytes: int = None
+
+    @app.put("/api/settings")
+    def api_settings_set(body: SettingsBody):
+        updates = {k: v for k, v in body.model_dump().items() if v is not None}
+        if not updates:
+            return JSONResponse(status_code=400, content={"error": "aucun parametre fourni"})
+        if state.config is None:
+            return JSONResponse(status_code=500, content={"error": "config non initialisee"})
+        state.config.set(updates)
+        state._purge_now()
+        state.events.publish({
+            "kind": "status", "ts": _iso(),
+            "note": f"settings mis a jour : {list(updates.keys())}",
+        })
+        return {"settings": state.config.get()}
 
     # --- SPA (doit etre declare apres /api/*) ---
     def _build_index():

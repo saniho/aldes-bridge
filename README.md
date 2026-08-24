@@ -77,6 +77,107 @@ Les modes partagent le même listener TLS et la même WebUI ; seule la destinati
 - **Frontend** : React 18 + Vite + TypeScript (`web/`), construit puis servi statique par FastAPI.
 - **Docker** : multi-stage (build node → runtime python), réseau host.
 
+## Réseau (Home Assistant OS)
+
+Le bridge peut tourner en tant qu'**add-on HAOS** avec `host_network: true` (réseau partagé avec l'hôte).
+Dans cette configuration, la configuration réseau est entièrement gérée automatiquement.
+
+### Topologie
+
+```
+                                    HAOS (192.168.1.167)
+                                   ┌──────────────────────────────┐
+                                   │                              │
+Box Aldes (192.168.1.28)           │   iptables PREROUTING        │
+  │                                │   8883 → 18883               │
+  │ MQTT/TLS :8883                 │                              │
+  ├───────────────────────────────>│   Bridge (listen :18883)     │
+  │                                │     │                        │
+  │                                │     ├─ mode bridge : MQTT OK │
+  │                                │     ├─ mode proxy  : MITM    │
+  │                                │     │   └─> Azure IoT Hub    │
+  │                                │     │     (DoH :443 → DNS)   │
+  │                                │     └─ mode listen : read    │
+  │                                │                              │
+  │ WebUI                          │   FastAPI (:8080)            │
+  └───────────────────────────────>│   + SPA React                │
+                                   └──────────────────────────────┘
+```
+
+### Ports
+
+| Port | Protocole | Description |
+|------|-----------|-------------|
+| 8883 | TCP (entry) | Port MQTT/TLS de la box Aldes (redirigé vers 18883) |
+| 18883 | TCP (interne) | Port MQTT/TLS du bridge (listener TLS) |
+| 8080 | TCP | WebUI + API HTTP (accessible depuis HA) |
+
+### iptables (automatique)
+
+Le script `run.sh` gère automatiquement les règles NAT :
+
+- **PREROUTING** : redirige le trafic ENTRANT vers le port 8883 vers le port 18883
+  - Si `box_ip` configuré : uniquement le trafic depuis la box
+  - Sinon : tout le trafic vers 8883
+- **OUTPUT** : supprimé (plus de règle OUTPUT pour éviter la boucle bridge→Azure)
+
+> ⚠️ Les règles iptables sont nettoyées et recréées à chaque démarrage de l'add-on
+> pour éviter l'accumulation de règles obsolètes.
+
+### Résolution DNS (DoH)
+
+En mode **proxy**, le bridge doit résoudre `aldesiotsuite.azure-devices.net` pour se
+connecter au vrai cloud Azure. Le problème : **HAOS intercepte tout le trafic DNS (port 53)**
+et le redirige vers son dnsmasq local, qui résout le nom vers l'IP du bridge (boucle).
+
+La solution : **DNS over HTTPS (DoH)** via Cloudflare (`cloudflare-dns.com`), qui utilise le
+port 443 (HTTPS) au lieu du port 53, contournant ainsi complètement l'interception DNS.
+
+Priorité de résolution :
+1. **DoH** (HTTPS :443) — contourne dnsmasq
+2. **UDP direct** (1.1.1.1:53) — peut être intercepté
+3. **System DNS** (dnsmasq local) — dernier recours
+
+L'IP résolue est affichée dans le diagramme de la WebUI sous le nœud ☁️ Azure.
+
+### Add-on HAOS
+
+L'add-on est disponible dans le dépôt `aldes-haos-addons`.
+
+**Configuration** (`config.yaml`) :
+
+| Option | Défaut | Description |
+|--------|--------|-------------|
+| `mode` | `bridge` | Mode initial (proxy/bridge/listen/raw) |
+| `mqtt_port` | `18883` | Port interne du listener MQTT/TLS |
+| `box_ip` | (vide) | IP de la box Aldes (filtre les règles iptables) |
+
+**Données persistantes** (`/config/aldes/`) :
+
+| Fichier | Contenu |
+|---------|---------|
+| `config.json` | Paramètres (rétention historique, logs) |
+| `telemetry.json` | Dernières télémetries captées |
+| `history.db` | Historique SQLite |
+| `profile.json` | Profil device sélectionné |
+| `consigne.json` | Consignes thermostats |
+
+**Déploiement** :
+
+```bash
+# Depuis le dépôt aldes-haos-addons
+# Ajouter le dépôt dans HA → Settings → Add-ons → Store repos
+# Ou cloner et copier dans /addon_configs/
+```
+
+Le Dockerfile effectue un build multi-stage :
+1. Clone le repo `aldes-bridge` (branche `feature/device-profiles`)
+2. Build le frontend React
+3. Installe les dépendances Python
+4. Copie le code serveur + frontend construit
+
+La variable `CACHEBUST` dans le Dockerfile force le rebuild du code source à chaque version.
+
 ## Structure
 
 ```
@@ -90,8 +191,12 @@ server/
   mqtt.py        # codec MQTT 3.1.1 (CONNECT/PUBLISH/SUBSCRIBE/...)
   events.py      # EventBus ring + export SSE
   api.py         # FastAPI : /api/* + SPA fallback
+  device_profile.py  # chargeur de profils YAML (DeviceProfile, load_profile)
+  aldes.py       # mapping telemetrie → indicateurs Aldes
+profiles/        # profils device (YAML)
+  tone-aquaair.yaml  # profil TONE AquaAIR (PAC air-air)
 web/             # frontend React/Vite
-tests/           # test_engine.py (bridge + proxy MITM)
+tests/           # tests pytest
 Dockerfile
 docker-compose.yml
 ```
@@ -106,6 +211,14 @@ docker compose up -d --build
 
 - MQTT/TLS : `0.0.0.0:8883` (la box s'y connecte)
 - WebUI/API : `0.0.0.0:8080`
+
+Variables d'environnement (`docker-compose.yml`) :
+
+| Variable | Défaut | Description |
+|---|---|---|
+| `ALDES_MODE` | `bridge` | Mode initial (proxy/bridge/listen/raw) |
+| `ALDES_HISTORY_DAYS` | `90` | Rétention SQLite (jours) |
+| `ALDES_PROFILE` | `tone-aquaair` | Profil device à charger |
 
 ### Kubernetes / K3s
 
@@ -247,6 +360,11 @@ git pull
 | POST | `/api/send` | `{"topic","payload","qos"}` — injecte une commande vers la box |
 | POST | `/api/disconnect` | force la session (pour appliquer le mode tout de suite) |
 | POST | `/api/clear` | vide l'historique affiché |
+| GET | `/api/profiles` | liste des profils disponibles (id, name, type, file) |
+| GET | `/api/profile` | profil actuellement chargé |
+| PUT | `/api/profile` | `{"profile_id":"tone-aquaair"}` — change le profil à la volée |
+| GET | `/api/settings` | paramètres (rétention historique, taille max logs) |
+| PUT | `/api/settings` | `{"history_retention_days":30, "log_retention_max_bytes":...}` — met à jour |
 | GET | `/` | SPA (frontend construit) |
 
 La WebUI a deux onglets : **🌊 flux** (trames MQTT en temps réel / historique) et **🌡 températures**
@@ -265,6 +383,106 @@ redirigé vers le pont (ex. `API_URL_BASE = "http://<pont>:8080"` dans `api.py` 
 | GET | `/aldesoc/v5/users/me/products` | liste des produits déduits des télémetries captées |
 | PATCH | `/aldesoc/v5/users/me/products/{modem}/updateThermostats` | consigne thermostat (journalisée, non renvoyée à la box) |
 | POST | `/aldesoc/v5/users/me/products/{modem}/commands` | commande (journalisée, non renvoyée à la box) |
+
+### Profils device
+
+Le pont supporte plusieurs types d'appareils Aldes via un système de **profils YAML**.
+Un profil décrit les modes, commandes et le mapping telemetrie d'un appareil spécifique.
+
+**Profils disponibles** (dossier `profiles/`) :
+
+| ID | Appareil | Type | Description |
+|---|---|---|---|
+| `tone-aquaair` | TONE AquaAIR | PAC air-air | Profil par défaut, 9 modes air, 3 modes eau, 5 commandes |
+
+**API profils** :
+
+| Méthode | Chemin | Description |
+|---|---|---|
+| GET | `/api/profiles` | liste des profils disponibles (id, name, type, file) |
+| GET | `/api/profile` | profil actuellement chargé |
+| PUT | `/api/profile` | `{"profile_id":"tone-aquaair"}` — change le profil à la volée |
+
+**Sélecteur UI** : un dropdown « Appareil » dans l'en-tête permet de changer de profil
+sans redémarrer le conteneur. Le profil sélectionné influence les modes affichés,
+les commandes disponibles et les labels dans la WebUI.
+
+**Format d'un profil YAML** (`profiles/mon-appareil.yaml`) :
+
+```yaml
+id: mon-appareil
+name: "Mon Appareil"
+description: "Description courte"
+type: pac  # pac, vmc, etc.
+
+products:
+  REFERENCE_1:
+    name: "Nom commercial"
+    reference_fields: [NED, UDM]  # champs requis pour identifier ce produit
+  REFERENCE_2:
+    name: "Autre variante"
+    reference_fields: []
+
+telemetry:
+  modemid: product.modem
+  productid: product.serial_number
+  dt: product.lastUpdatedDate
+  zone_temp_prefix: MT
+  zone_count: 10
+  zone_setpoint_prefix: UsC
+  air_mode_field: UAM
+  water_mode_field: UDM
+  hot_water_field: NED
+  people_field: NpiH
+  vac_start_field: Dvac
+  vac_end_field: Fvac
+  ballon_field: NED
+
+air_modes:
+  - index: 0
+    code: A
+    label: "Arrêt"
+  # ... un mode par ligne
+
+water_modes:
+  - index: 0
+    code: L
+    label: "Eco"
+  # ...
+
+commands:
+  - id: consigne
+    label: "changeConsigneC<n> — consigne par zone"
+    method: changeConsigneC0
+    topic_pattern: "devices/{client_id}/messages/devicebound"
+    params:
+      - name: temp
+        type: number
+        min: 5
+        max: 30
+        step: 0.5
+  # ...
+
+ui:
+  quick_modes:
+    - field: air_modes
+      label: "Mode air"
+    - field: water_modes
+      label: "Mode ECS"
+  show_thermostats: true
+  show_vacations: true
+  show_people: true
+  show_hot_water: true
+
+history_labels:
+  air_mode:
+    keys: ["UAM"]
+    patterns: ["^UAM$"]
+  # ...
+```
+
+**Créer un nouvel appareil** : ajoutez un fichier YAML dans `profiles/`, redémarrez le
+conteneur (ou utilisez `PUT /api/profile`), et sélectionnez-le dans le dropdown UI.
 
 Mapping télémetrie → product (voir `server/aldes.py`) :
 
@@ -306,6 +524,9 @@ et en preset « Change consigne C0 » dans « Envoyer une commande MQTT ».
 - `--mode proxy|bridge|listen|raw` (défaut `bridge`, ou env `ALDES_MODE`) — mode initial, changeable depuis la WebUI
 - `--mode-file logs/mode.json` — persistance du mode : un changement fait via la WebUI est
   rejoué au redémarrage du conteneur (le fichier persistant prime sur `--mode`/`ALDES_MODE`)
+- `--profile <id>` (ou env `ALDES_PROFILE`) — profil device à charger (défaut : premier profil trouvé)
+- `--profile-file logs/profile.json` — persistance du profil sélectionné (prime sur `--profile`)
+- `--config-file logs/config.json` — persistance des paramètres (rétention, logs)
 - `--bind 0.0.0.0`, `--mqtt-port 8883`, `--web-port 8080`
 - `--real-host aldesiotsuite.azure-devices.net`, `--real-port 8883`
 - `--web-dir <dist>` (frontend construit)
@@ -322,6 +543,14 @@ python3 -m pytest --cov=server    # avec couverture
 ```
 
 Le badge de couverture est mis à jour automatiquement par le CI à chaque push sur `main`.
+
+### Tests E2E (Playwright)
+
+Scénarios Gherkin dans `web/e2e/features/`, steps TypeScript dans `web/e2e/steps/`.
+
+```bash
+cd web && npm run build && npx playwright test
+```
 
 ## Licence
 

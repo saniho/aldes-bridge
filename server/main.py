@@ -10,7 +10,9 @@ import logging
 import os
 import sys
 
-from .appstate import AppState, read_persisted_mode
+from .appstate import AppState, read_persisted_mode, read_persisted_profile
+from .config import ConfigStore
+from .device_profile import load_profile
 from .events import EventBus
 from .engine import Engine
 from .eventlog import EventLog
@@ -24,6 +26,8 @@ DEFAULT_MODE_FILE = os.path.join(APP_ROOT, "logs", "mode.json")
 DEFAULT_TELEMETRY_FILE = os.path.join(APP_ROOT, "logs", "telemetry.json")
 DEFAULT_CONSIGNE_FILE = os.path.join(APP_ROOT, "logs", "consigne.json")
 DEFAULT_HISTORY_FILE = os.path.join(APP_ROOT, "logs", "history.db")
+DEFAULT_PROFILE_FILE = os.path.join(APP_ROOT, "logs", "profile.json")
+DEFAULT_CONFIG_FILE = os.path.join(APP_ROOT, "logs", "config.json")
 DEFAULT_HISTORY_DAYS = 90
 
 
@@ -67,7 +71,7 @@ def _backfill_history(history, log, n=10000):
 def build_parser():
     ap = argparse.ArgumentParser(prog="aldes-bridge", description="Bridge Aldes (proxy MITM / faux broker) + WebUI.")
     ap.add_argument("--mode", choices=["proxy", "bridge", "listen", "raw"],
-                    default=os.environ.get("ALDES_MODE", "bridge"),
+                    default=os.environ.get("ALDES_MODE") or None,
                     help="mode initial (changeable depuis la WebUI)")
     ap.add_argument("--mode-file", default=DEFAULT_MODE_FILE,
                     help="persistance du mode (reste pris en compte si ce fichier existe)")
@@ -94,6 +98,12 @@ def build_parser():
                     help="retention de l'historique en jours (défaut %d)" % DEFAULT_HISTORY_DAYS)
     ap.add_argument("--no-history-backfill", action="store_true",
                     help="ne pas rejouer le log persistant dans l'historique au demarrage")
+    ap.add_argument("--profile", default=os.environ.get("ALDES_PROFILE", None),
+                    help="ID du profil device (defaut: tone-aquaair ou le premier disponible)")
+    ap.add_argument("--profile-file", default=os.environ.get("ALDES_PROFILE_FILE", DEFAULT_PROFILE_FILE),
+                    help="fichier de persistance du profil (survit au redemarrage)")
+    ap.add_argument("--config-file", default=os.environ.get("ALDES_CONFIG_FILE", DEFAULT_CONFIG_FILE),
+                    help="fichier de configuration persistante (survit au redemarrage)")
     return ap
 
 
@@ -113,20 +123,42 @@ def main(argv=None):
     events = EventBus(args.history_size, log=log)
     restored = events.restore_from_log(args.history_size)
 
+    config = ConfigStore(args.config_file)
+
     history = None
     if args.history_file:
-        history = HistoryDB(args.history_file, retention_days=args.history_days)
+        history = HistoryDB(args.history_file, retention_days=config.history_retention())
         if log is not None and not args.no_history_backfill:
             _backfill_history(history, log)
 
     state = AppState(args.real_host, args.real_port, events,
                      mode_file=args.mode_file, telemetry_file=args.telemetry_file,
-                     consigne_file=args.consigne_file, history=history)
+                     consigne_file=args.consigne_file, history=history,
+                     profile_file=args.profile_file, config=config)
+    # Chargement du profil device (YAML). Priorite : profil persiste > CLI/env > defaut.
+    persisted_profile_id = read_persisted_profile(args.profile_file)
+    profile_id = persisted_profile_id or args.profile
+    profile = load_profile(profile_id)
+    if profile:
+        state.profile = profile
+        _log.info("profil device charge: %s (%s)", profile.id, profile.name)
     # Capture des telemetries : branchee ici pour decoupler appstate (plomberie
     # d'evenements) de aldes (mapping metier). Appelee sur chaque PUBLISH entrant.
     state.on_publish_in = capture_telemetry
-    # Le mode persiste (mode.json) prime sur le mode CLI/env au redemarrage.
-    state.set_mode(read_persisted_mode(args.mode_file) or args.mode)
+    # Priorite : CLI explicite (depuis config HAOS) > mode.json (WebUI) > defaut bridge.
+    state.set_mode(args.mode or read_persisted_mode(args.mode_file) or "bridge")
+
+    # Resolution DNS Azure au demarrage (tous les modes).
+    try:
+        from .tls import resolve
+        azure_ip = resolve(args.real_host, args.real_port)
+        state.set_azure_ip(azure_ip)
+        _log.info("Azure DNS: %s -> %s", args.real_host, azure_ip)
+    except Exception as exc:
+        _log.warning("Azure DNS resolution failed: %s", exc)
+
+    # Purge automatique periodique (toutes les heures).
+    state.start_purge_timer()
 
     engine = Engine(state, mqtt_port=args.mqtt_port, bind=args.bind)
     engine.start()
