@@ -154,3 +154,83 @@
   color: var(--fg2);
   font-size: 13px;
 }
+
+/* Hero : les 3 indicateurs cles en haut */
+.diag-hero {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.diag-hero-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 8px;
+  border-radius: 8px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  text-align: center;
+}
+
+.diag-hero-item.ok {
+  border-color: #4caf50;
+  background: #1a3a1a;
+}
+
+.diag-hero-item.ko {
+  border-color: #f44336;
+  background: #3a1518;
+}
+
+.diag-hero-item.mode {
+  border-color: var(--accent, #5b8def);
+  background: var(--bg2);
+}
+
+.diag-hero-label {
+  font-size: 11px;
+  color: var(--fg2);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.diag-hero-val {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg);
+  word-break: break-word;
+}
+
+.diag-hero-item.ok .diag-hero-val {
+  color: #6bcb6b;
+}
+
+.diag-hero-item.ko .diag-hero-val {
+  color: #ff6b6b;
+}
+
+.mode-val {
+  font-size: 14px !important;
+  color: var(--accent, #5b8def) !important;
+  text-transform: uppercase;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-dot.on {
+  background: #4caf50;
+  box-shadow: 0 0 6px #4caf50;
+}
+
+.status-dot.off {
+  background: #f44336;
+  box-shadow: 0 0 6px #f44336;
+}

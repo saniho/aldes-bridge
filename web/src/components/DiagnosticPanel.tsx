@@ -9,6 +9,10 @@ function CheckIcon({ check }: { check: DiagnosticCheck }) {
   return <span className="diag-icon fail">&#10007;</span>
 }
 
+function StatusDot({ ok }: { ok: boolean }) {
+  return <span className={'status-dot' + (ok ? ' on' : ' off')} />
+}
+
 export default function DiagnosticPanel() {
   const [result, setResult] = useState<DiagnosticResult | null>(null)
   const [loading, setLoading] = useState(false)
@@ -27,6 +31,12 @@ export default function DiagnosticPanel() {
     }
   }, [])
 
+  const find = (id: string) => result?.checks.find((c) => c.id === id)
+
+  const box = find('box_connected')
+  const cloud = find('cloud_connected')
+  const mode = find('mode')
+
   return (
     <div className="diag-panel">
       <div className="diag-header">
@@ -40,9 +50,28 @@ export default function DiagnosticPanel() {
 
       {result && (
         <>
+          {/* Resume rapide : les 3 indicateurs cles */}
+          <div className="diag-hero">
+            <div className={'diag-hero-item' + (box?.ok ? ' ok' : ' ko')}>
+              <StatusDot ok={!!box?.ok} />
+              <span className="diag-hero-label">Box Aldes</span>
+              <span className="diag-hero-val">{box?.detail ?? '—'}</span>
+            </div>
+            <div className={'diag-hero-item' + (cloud?.ok ? ' ok' : ' ko')}>
+              <StatusDot ok={!!cloud?.ok} />
+              <span className="diag-hero-label">Azure Cloud</span>
+              <span className="diag-hero-val">{cloud?.detail ?? '—'}</span>
+            </div>
+            <div className={'diag-hero-item mode'}>
+              <span className="diag-hero-label">Mode</span>
+              <span className="diag-hero-val mode-val">{mode?.detail ?? '—'}</span>
+            </div>
+          </div>
+
           <div className={'diag-summary' + (result.ok ? ' ok' : ' ko')}>
             {result.passed}/{result.total} tests passes
           </div>
+
           <div className="diag-checks">
             {result.checks.map((c) => (
               <div key={c.id} className={'diag-check' + (c.ok ? ' ok' : c.warn ? ' warn' : ' ko')}>

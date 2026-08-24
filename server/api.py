@@ -503,6 +503,7 @@ def create_app(state, engine, web_dir):
         with state._lock:
             box_connected = state._connected
             box_ip = state._client_id
+            cloud_connected = state._cloud_since is not None
         checks.append({
             "id": "box_connected",
             "label": "Box Aldes",
@@ -510,7 +511,15 @@ def create_app(state, engine, web_dir):
             "ok": box_connected,
         })
 
-        # 8. Mode courant
+        # 8. Connexion Azure cloud
+        checks.append({
+            "id": "cloud_connected",
+            "label": "Azure IoT Hub (cloud)",
+            "detail": "Connecté" if cloud_connected else "Non connecté",
+            "ok": cloud_connected,
+        })
+
+        # 9. Mode courant
         checks.append({
             "id": "mode",
             "label": "Mode actif",
