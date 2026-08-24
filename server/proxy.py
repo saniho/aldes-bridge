@@ -34,6 +34,7 @@ class ProxyHandler(MQTTEndpoint):
     def run(self):
         try:
             real_ip = resolve(self.state.real_host, self.state.real_port)
+            self.state.set_azure_ip(real_ip)
             self.state.events.publish({"kind": "status", "ts": "now", "note": "Azure DNS: %s -> %s" % (self.state.real_host, real_ip)})
             self.real_sock = socket.create_connection((real_ip, self.state.real_port), timeout=20)
             self.real_tls = client_context().wrap_socket(

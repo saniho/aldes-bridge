@@ -55,6 +55,11 @@
   border: 1px solid var(--border-input);
 }
 
+.ipWarn {
+  color: #f59e0b;
+  border-color: #f59e0b44;
+}
+
 .icon {
   font-size: 22px;
   line-height: 1;

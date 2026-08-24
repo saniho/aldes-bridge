@@ -425,7 +425,8 @@ class AppState:
         """Connexion du leg bridge -> Azure IoT Hub etablie (mode proxy)."""
         with self._lock:
             self._cloud_since = time.time()
-            self._azure_ip = azure_ip
+            if azure_ip:
+                self._azure_ip = azure_ip
         self.events.publish({
             "kind": "status", "cloud_connected": True, "ts": _iso(),
         })
@@ -435,7 +436,11 @@ class AppState:
     def cloud_down(self):
         with self._lock:
             self._cloud_since = None
-            self._azure_ip = None
+
+    def set_azure_ip(self, ip):
+        """Stocke l'IP Azure resolue (meme si la connexion echoue)."""
+        with self._lock:
+            self._azure_ip = ip
         self.events.publish({
             "kind": "status", "cloud_connected": False, "ts": _iso(),
         })
