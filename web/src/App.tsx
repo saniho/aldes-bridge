@@ -115,6 +115,7 @@ export default function App() {
           last_error: cfg.last_error ?? null,
           box_since: cfg.box_since ?? null,
           cloud_since: cfg.cloud_since ?? null,
+          azure_ip: cfg.azure_ip ?? null,
           consignes: cfg.consignes ?? undefined,
           server_version: cfg.server_version ?? 'dev',
           ui_version: cfg.ui_version ?? 'dev',
