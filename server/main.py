@@ -148,6 +148,15 @@ def main(argv=None):
     # Priorite : CLI explicite (depuis config HAOS) > mode.json (WebUI) > defaut bridge.
     state.set_mode(args.mode or read_persisted_mode(args.mode_file) or "bridge")
 
+    # Resolution DNS Azure au demarrage (tous les modes).
+    try:
+        from .tls import resolve
+        azure_ip = resolve(args.real_host, args.real_port)
+        state.set_azure_ip(azure_ip)
+        _log.info("Azure DNS: %s -> %s", args.real_host, azure_ip)
+    except Exception as exc:
+        _log.warning("Azure DNS resolution failed: %s", exc)
+
     # Purge automatique periodique (toutes les heures).
     state.start_purge_timer()
 
