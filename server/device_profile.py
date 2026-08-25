@@ -51,6 +51,10 @@ class DeviceProfile:
     def ui(self):
         return self._data.get("ui", {})
 
+    @property
+    def ha_discovery(self):
+        return self._data.get("ha_discovery", {})
+
     def get_air_mode_label(self, code):
         for m in self.air_modes:
             if m.get("code") == code:
@@ -111,6 +115,7 @@ class DeviceProfile:
             "water_modes": self.water_modes,
             "commands": self.commands,
             "ui": self.ui,
+            "ha_discovery": self.ha_discovery,
         }
 
 

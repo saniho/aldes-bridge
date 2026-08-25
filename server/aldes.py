@@ -66,26 +66,8 @@ def capture_telemetry(state, payload):
     une vue complete d'un product (les telemetries arrivent en plusieurs
     messages : temperatures, settings, mode...).
     """
-    if isinstance(payload, bytes):
-        try:
-            payload = payload.decode("utf-8", errors="replace")
-        except Exception:
-            return
-    if not isinstance(payload, str):
-        return
-    payload = payload.strip()
-    # La box prefixe chaque telemetrie d'un en-tete binaire (octet de sequence,
-    # ex: \x00F). On coupe tout ce qui precede le debut du JSON.
-    pos = payload.find("{")
-    if pos < 0:
-        return
-    if pos > 0:
-        payload = payload[pos:]
-    try:
-        data = json.loads(payload)
-    except Exception:
-        return
-    if not isinstance(data, dict):
+    data = _parse_telemetry_payload(payload)
+    if data is None:
         return
     pid = data.get("productid") or data.get("modemid")
     if not pid:
@@ -93,6 +75,32 @@ def capture_telemetry(state, payload):
     # La fusion des champs + horodatage de mise a jour + persistance vivent
     # dans AppState.store_telemetry (sous le verrou, ecriture atomique).
     state.store_telemetry(pid, data)
+
+
+def _parse_telemetry_payload(payload):
+    """Parse un payload PUBLISH et renvoie le dict telemetrie ou None."""
+    if isinstance(payload, bytes):
+        try:
+            payload = payload.decode("utf-8", errors="replace")
+        except Exception:
+            return None
+    if not isinstance(payload, str):
+        return None
+    payload = payload.strip()
+    # La box prefixe chaque telemetrie d'un en-tete binaire (octet de sequence,
+    # ex: \x00F). On coupe tout ce qui precede le debut du JSON.
+    pos = payload.find("{")
+    if pos < 0:
+        return None
+    if pos > 0:
+        payload = payload[pos:]
+    try:
+        data = json.loads(payload)
+    except Exception:
+        return None
+    if not isinstance(data, dict):
+        return None
+    return data
 
 
 def _epoch_to_iso(value):

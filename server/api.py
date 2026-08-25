@@ -401,6 +401,22 @@ def create_app(state, engine, web_dir):
         })
         return {"settings": state.config.get()}
 
+    # --- Home Assistant MQTT Auto-Discovery ---
+    @app.get("/api/ha-discovery")
+    def api_ha_discovery_get():
+        """Retourne la config HA discovery et l'etat de la connexion."""
+        ha_client = getattr(state, "_ha_client", None)
+        p = getattr(state, "profile", None)
+        ha_config = p.ha_discovery if p else {}
+        return {
+            "enabled": ha_client is not None,
+            "connected": ha_client._sock is not None if ha_client else False,
+            "host": getattr(ha_client, "host", None),
+            "port": getattr(ha_client, "port", None),
+            "prefix": getattr(ha_client, "prefix", "aldes"),
+            "config": ha_config,
+        }
+
     # --- Diagnostic (check-up systeme) ---
     @app.get("/api/diagnostic")
     def api_diagnostic():
