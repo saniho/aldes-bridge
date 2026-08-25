@@ -231,6 +231,11 @@ Then('le compteur de messages affiche au moins une valeur', async ({ page }) => 
   if (filtered < 1) throw new Error(`Expected ≥1 message, got ${filtered}`)
 })
 
+Then('le compteur de messages filtrés affiche zéro', async ({ page }) => {
+  const countEl = page.locator('[class*="count"]').first()
+  await expect(countEl).toHaveText(/^0\s*\/\s*\d+$/, { timeout: 10000 })
+})
+
 Then('un texte par défaut est affiché dans les messages', async ({ page }) => {
   await expect(page.getByText('aucun message')).toBeVisible({ timeout: 10000 })
 })
@@ -250,13 +255,8 @@ Then('la légende affiche {texte}', async ({ page }, text: string) => {
 Then('les versions UI et Backend sont affichées', async ({ page }) => {
   const versionEl = page.locator('.moreVersion')
   await expect(versionEl).toBeVisible({ timeout: 10000 })
-  const text = (await versionEl.textContent()) ?? ''
-  if (!/UI v\d+\.\d+\.\d+/.test(text)) {
-    throw new Error(`Version UI non affichée dans "${text}"`)
-  }
-  if (!/Backend v\d+\.\d+\.\d+/.test(text)) {
-    throw new Error(`Version Backend non affichée dans "${text}"`)
-  }
+  await expect(versionEl).toContainText(/UI v\d+\.\d+\.\d+/, { timeout: 10000 })
+  await expect(versionEl).toContainText(/Backend v\d+\.\d+\.\d+/, { timeout: 10000 })
 })
 
 // ---------------------------------------------------------------------------

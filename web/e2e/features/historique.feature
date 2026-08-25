@@ -4,6 +4,7 @@ Fonctionnalité: Historique des valeurs
   Scénario: Le menu historique affiche les valeurs injectées
     Étant donné le mode du bridge est à proxy
     Et le bridge sert la WebUI construite
+    Et l'historique des messages est vidé
     Et des télémétries numériques sont injectées
     Quand j'ouvre la page d'accueil
     Et je clique sur le menu burger
