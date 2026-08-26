@@ -334,6 +334,8 @@ class HADiscoveryClient(threading.Thread):
 
         reader = mqtt.MQTTReader(s)
         try:
+            _log.info("ha-discovery: connexion MQTT user=%s, password=%s",
+                      self.username or "(none)", "***" if self.password else "(none)")
             s.sendall(mqtt.build_connect(
                 "aldes-ha-discovery",
                 username=self.username,
@@ -342,7 +344,8 @@ class HADiscoveryClient(threading.Thread):
             ))
             pkt = reader.read_packet()
             if pkt is None or pkt[0] != mqtt.PT_CONNACK or (pkt[3][2] if len(pkt[3]) > 2 else -1) != 0:
-                _log.warning("ha-discovery: CONNACK refuse")
+                rc = pkt[3][2] if pkt and len(pkt[3]) > 2 else -1
+                _log.warning("ha-discovery: CONNACK refuse (rc=%d)", rc)
                 s.close()
                 return False
         except Exception as exc:
