@@ -150,16 +150,16 @@ def _get_min_max(data):
 
 
 def _detect_active_zones(data):
-    """Detecte les zones actives (UsC0..UsC9 present dans la telemetry)."""
+    """Detecte les zones actives — require MT{N} (temperature) ET UsC{N} (consigne)."""
     if data is None:
-        return [0]
+        return []
     zones = []
     for i in range(10):
-        key = f"UsC{i}"
-        val = data.get(key)
-        if val is not None:
+        mt = data.get(f"MT{i}")
+        usc = data.get(f"UsC{i}")
+        if mt is not None and usc is not None:
             zones.append(i)
-    return zones if zones else [0]
+    return zones
 
 
 def _build_discovery_config(device_id, profile, prefix="aldes", data=None):
@@ -400,6 +400,7 @@ class HADiscoveryClient(threading.Thread):
         self._send_lock = threading.Lock()
         self._pkt = 0
         self._device_id = "aldes_bridge"
+        self._last_mode = None
 
     def stop(self):
         self._stop.set()
@@ -830,6 +831,16 @@ class HADiscoveryClient(threading.Thread):
         air_mode_code = self._get_air_mode_code(data)
         if air_mode_code:
             ha_mode = ALDES_TO_HA_MODE.get(air_mode_code, "off")
+
+            # Republish discovery si le mode a changé (min/max dynamiques)
+            if self._last_mode is not None and self._last_mode != ha_mode:
+                _log.info("ha-discovery: mode change %s -> %s, republish discovery", self._last_mode, ha_mode)
+                profile = getattr(self.state, "profile", None)
+                configs = _build_discovery_config(self._device_id, profile, self.prefix, data)
+                for topic, payload in configs:
+                    self._safe_send(mqtt.build_publish(topic, payload, qos=1, retain=True))
+            self._last_mode = ha_mode
+
             self._safe_send(mqtt.build_publish(
                 f"{self.prefix}/state/mode", ha_mode, qos=1, retain=True
             ))
@@ -838,27 +849,28 @@ class HADiscoveryClient(threading.Thread):
                 f"{self.prefix}/state/preset", preset, qos=1, retain=True
             ))
 
-        # Temperatures
-        temp = self._get_float(data, "MT0")
-        if temp is not None:
-            self._safe_send(mqtt.build_publish(
-                f"{self.prefix}/state/temperature", f"{temp:.1f}", qos=1, retain=True
-            ))
-            self._safe_send(mqtt.build_publish(
-                f"{self.prefix}/state/sensor/MT0", f"{temp:.1f}", qos=1, retain=True
-            ))
+        # Temperatures et consignes par zone active
+        active_zones = _detect_active_zones(data)
+        for zone_idx in active_zones:
+            temp = self._get_float(data, f"MT{zone_idx}")
+            if temp is not None:
+                self._safe_send(mqtt.build_publish(
+                    f"{self.prefix}/state/zone{zone_idx}/temperature",
+                    f"{temp:.1f}", qos=1, retain=True
+                ))
 
+            consigne = self._get_float(data, f"UsC{zone_idx}")
+            if consigne is not None:
+                self._safe_send(mqtt.build_publish(
+                    f"{self.prefix}/state/zone{zone_idx}/consigne",
+                    f"{consigne:.1f}", qos=1, retain=True
+                ))
+
+        # Temperature exterieure
         outdoor_temp = self._get_float(data, "Text")
         if outdoor_temp is not None:
             self._safe_send(mqtt.build_publish(
                 f"{self.prefix}/state/sensor/Text", f"{outdoor_temp:.1f}", qos=1, retain=True
-            ))
-
-        # Consigne zone 0
-        consigne = self._get_float(data, "UsC0")
-        if consigne is not None:
-            self._safe_send(mqtt.build_publish(
-                f"{self.prefix}/state/consigne", f"{consigne:.1f}", qos=1, retain=True
             ))
 
         # Mode air label
