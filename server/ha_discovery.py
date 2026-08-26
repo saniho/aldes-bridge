@@ -129,11 +129,11 @@ def _get_min_max(data):
     is_cooling = air_mode in ("F",)
 
     if is_cooling:
-        mi = _get_float_val(data, "FMiST")
-        ma = _get_float_val(data, "FMaST")
-    else:
         mi = _get_float_val(data, "CMiST")
         ma = _get_float_val(data, "CMaST")
+    else:
+        mi = _get_float_val(data, "FMiST")
+        ma = _get_float_val(data, "FMaST")
 
     if mi is None:
         mi = min(
