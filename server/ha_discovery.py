@@ -107,43 +107,138 @@ HA_WATER_TO_ALDES = {
 }
 
 
-def _build_discovery_config(device_id, profile, prefix="aldes"):
+def _get_float_val(data, key):
+    """Extrait un float depuis la telemetry."""
+    if data is None:
+        return None
+    val = data.get(key)
+    if val is None:
+        return None
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return None
+
+
+def _get_min_max(data):
+    """Retourne (min_temp, max_temp) selon le mode courant (chauffage vs froid)."""
+    if data is None:
+        return 5, 30
+
+    air_mode = str(data.get("UAM", ""))
+    is_cooling = air_mode in ("F",)
+
+    if is_cooling:
+        mi = _get_float_val(data, "FMiST")
+        ma = _get_float_val(data, "FMaST")
+    else:
+        mi = _get_float_val(data, "CMiST")
+        ma = _get_float_val(data, "CMaST")
+
+    if mi is None:
+        mi = min(
+            _get_float_val(data, "CMiST") or 5,
+            _get_float_val(data, "FMiST") or 5,
+        )
+    if ma is None:
+        ma = max(
+            _get_float_val(data, "CMaST") or 30,
+            _get_float_val(data, "FMaST") or 30,
+        )
+
+    return int(mi), int(ma)
+
+
+def _detect_active_zones(data):
+    """Detecte les zones actives (UsC0..UsC9 present dans la telemetry)."""
+    if data is None:
+        return [0]
+    zones = []
+    for i in range(10):
+        key = f"UsC{i}"
+        val = data.get(key)
+        if val is not None:
+            zones.append(i)
+    return zones if zones else [0]
+
+
+def _build_discovery_config(device_id, profile, prefix="aldes", data=None):
     """Construit les configs HA auto-discovery pour une PAC Aldes T.ONE."""
     configs = []
 
-    # discovery_prefix = "homeassistant" (HA default), prefix = state/command topics
     discovery_prefix = "homeassistant"
 
-    # --- Climate entity (zone 0 = principale) ---
-    climate_config = {
-        "name": "PAC Aldes",
-        "unique_id": f"aldes_{device_id}_climate",
-        "device": {
-            "identifiers": [f"aldes_{device_id}"],
-            "name": "Aldes T.ONE",
-            "manufacturer": "Aldes",
-            "model": profile.name if profile else "T.ONE AquaAIR",
-        },
-        "modes": ["off", "heat", "cool", "auto", "fan_only"],
-        "mode_state_topic": f"{prefix}/state/mode",
-        "mode_command_topic": f"{prefix}/set/mode",
-        "temperature_state_topic": f"{prefix}/state/consigne",
-        "temperature_command_topic": f"{prefix}/set/consigne",
-        "current_temperature_topic": f"{prefix}/state/temperature",
-        "temp_unit": "C",
-        "min_temp": 5,
-        "max_temp": 30,
-        "temp_step": 0.5,
-        "precision": 0.5,
-        "preset_modes": ["eco", "comfort", "night", "anti_freeze"],
-        "preset_mode_state_topic": f"{prefix}/state/preset",
-        "preset_mode_command_topic": f"{prefix}/set/preset",
-        "availability_topic": f"{prefix}/state/available",
-        "payload_available": "online",
-        "payload_not_available": "offline",
-        "icon": "mdi:heat-pump",
+    device_info = {
+        "identifiers": [f"aldes_{device_id}"],
+        "name": "Aldes T.ONE",
+        "manufacturer": "Aldes",
+        "model": profile.name if profile else "T.ONE AquaAIR",
     }
-    configs.append((f"{discovery_prefix}/climate/aldes/config", json.dumps(climate_config, ensure_ascii=False)))
+
+    # Min/max dynamiques selon le mode courant
+    min_temp, max_temp = _get_min_max(data)
+
+    # Detect active zones from UsC0..UsC9
+    active_zones = _detect_active_zones(data)
+
+    for zone_idx in active_zones:
+        zone_suffix = f"_zone{zone_idx}" if zone_idx > 0 else ""
+        zone_label = f"Zone {zone_idx}" if zone_idx > 0 else "PAC Aldes"
+
+        climate_config = {
+            "name": zone_label,
+            "unique_id": f"aldes_{device_id}_climate{zone_suffix}",
+            "device": device_info,
+            "modes": ["off", "heat", "cool", "auto", "fan_only"],
+            "mode_state_topic": f"{prefix}/state/mode",
+            "mode_command_topic": f"{prefix}/set/mode",
+            "temperature_state_topic": f"{prefix}/state/zone{zone_idx}/consigne",
+            "temperature_command_topic": f"{prefix}/set/zone{zone_idx}/consigne",
+            "current_temperature_topic": f"{prefix}/state/zone{zone_idx}/temperature",
+            "temp_unit": "C",
+            "min_temp": min_temp,
+            "max_temp": max_temp,
+            "temp_step": 1,
+            "precision": 1,
+            "preset_modes": ["eco", "comfort", "night", "anti_freeze"],
+            "preset_mode_state_topic": f"{prefix}/state/preset",
+            "preset_mode_command_topic": f"{prefix}/set/preset",
+            "availability_topic": f"{prefix}/state/available",
+            "payload_available": "online",
+            "payload_not_available": "offline",
+            "icon": "mdi:heat-pump",
+        }
+        configs.append((
+            f"{discovery_prefix}/climate/aldes_zone{zone_idx}/config",
+            json.dumps(climate_config, ensure_ascii=False),
+        ))
+
+    # Si aucune zone détectée, créer au moins zone 0
+    if not active_zones:
+        climate_config = {
+            "name": "PAC Aldes",
+            "unique_id": f"aldes_{device_id}_climate",
+            "device": device_info,
+            "modes": ["off", "heat", "cool", "auto", "fan_only"],
+            "mode_state_topic": f"{prefix}/state/mode",
+            "mode_command_topic": f"{prefix}/set/mode",
+            "temperature_state_topic": f"{prefix}/state/consigne",
+            "temperature_command_topic": f"{prefix}/set/consigne",
+            "current_temperature_topic": f"{prefix}/state/temperature",
+            "temp_unit": "C",
+            "min_temp": min_temp,
+            "max_temp": max_temp,
+            "temp_step": 1,
+            "precision": 1,
+            "preset_modes": ["eco", "comfort", "night", "anti_freeze"],
+            "preset_mode_state_topic": f"{prefix}/state/preset",
+            "preset_mode_command_topic": f"{prefix}/set/preset",
+            "availability_topic": f"{prefix}/state/available",
+            "payload_available": "online",
+            "payload_not_available": "offline",
+            "icon": "mdi:heat-pump",
+        }
+        configs.append((f"{discovery_prefix}/climate/aldes/config", json.dumps(climate_config, ensure_ascii=False)))
 
     # --- Sensor : température extérieure ---
     outdoor_config = {
@@ -369,6 +464,8 @@ class HADiscoveryClient(threading.Thread):
             (f"{self.prefix}/set/vacation_end", 1),
             (f"{self.prefix}/set/vacation_enable", 1),
         ]
+        for zi in range(10):
+            cmd_topics.append((f"{self.prefix}/set/zone{zi}/consigne", 1))
         try:
             s.sendall(mqtt.build_subscribe(1, cmd_topics))
         except Exception as exc:
@@ -432,7 +529,14 @@ class HADiscoveryClient(threading.Thread):
             if topic == f"{self.prefix}/set/mode":
                 self._handle_mode_command(payload)
             elif topic == f"{self.prefix}/set/consigne":
-                self._handle_consigne_command(payload)
+                self._handle_consigne_command(payload, zone=0)
+            elif topic.startswith(f"{self.prefix}/set/zone") and topic.endswith("/consigne"):
+                zone_str = topic.split("/set/zone")[1].split("/")[0]
+                try:
+                    zone = int(zone_str)
+                except ValueError:
+                    zone = 0
+                self._handle_consigne_command(payload, zone=zone)
             elif topic == f"{self.prefix}/set/preset":
                 self._handle_preset_command(payload)
             elif topic == f"{self.prefix}/set/ecs":
@@ -458,16 +562,16 @@ class HADiscoveryClient(threading.Thread):
         self._inject_aldes_command("changeMode", {"code": aldes_code})
         _log.info("ha-discovery: mode %s -> Aldes %s", ha_mode, aldes_code)
 
-    def _handle_consigne_command(self, payload):
-        """Recoit une consigne HA et l'envoie a la box (zone 0 par défaut)."""
+    def _handle_consigne_command(self, payload, zone=0):
+        """Recoit une consigne HA et l'envoie a la box."""
         try:
             temp = float(payload)
         except ValueError:
             _log.warning("ha-discovery: consigne invalide: %s", payload)
             return
 
-        self._inject_aldes_command("changeConsigne", {"zone": "C0", "temperature": temp})
-        _log.info("ha-discovery: consigne zone 0 -> %.1f°C", temp)
+        self._inject_aldes_command("changeConsigne", {"zone": f"C{zone}", "temperature": temp})
+        _log.info("ha-discovery: consigne zone %d -> %.1f°C", zone, temp)
 
     def _handle_preset_command(self, payload):
         """Convertit un preset HA en mode Aldes."""
@@ -568,8 +672,11 @@ class HADiscoveryClient(threading.Thread):
 
     def _publish_discovery(self):
         """Publie les configs HA auto-discovery."""
+        with self.state._lock:
+            telemetry = dict(self.state.telemetry)
+        data = next(iter(telemetry.values()), {}) if telemetry else None
         profile = getattr(self.state, "profile", None)
-        configs = _build_discovery_config(self._device_id, profile, self.prefix)
+        configs = _build_discovery_config(self._device_id, profile, self.prefix, data)
         for topic, payload in configs:
             self._safe_send(mqtt.build_publish(topic, payload, qos=1, retain=True))
 
@@ -588,7 +695,6 @@ class HADiscoveryClient(threading.Thread):
         if not telemetry:
             return
 
-        # Prend la premiere telemetrie disponible
         data = next(iter(telemetry.values()), {})
         if not data:
             return
@@ -600,33 +706,44 @@ class HADiscoveryClient(threading.Thread):
             self._safe_send(mqtt.build_publish(
                 f"{self.prefix}/state/mode", ha_mode, qos=1, retain=True
             ))
-            # Preset
             preset = ALDES_TO_HA_PRESET.get(air_mode_code, "none") or "none"
             self._safe_send(mqtt.build_publish(
                 f"{self.prefix}/state/preset", preset, qos=1, retain=True
             ))
 
-        # Temperatures
-        temp = self._get_float(data, "MT0")
-        if temp is not None:
-            self._safe_send(mqtt.build_publish(
-                f"{self.prefix}/state/temperature", f"{temp:.1f}", qos=1, retain=True
-            ))
-            self._safe_send(mqtt.build_publish(
-                f"{self.prefix}/state/sensor/MT0", f"{temp:.1f}", qos=1, retain=True
-            ))
+        # Temperatures et consignes par zone
+        active_zones = _detect_active_zones(data)
+        for zone_idx in active_zones:
+            temp = self._get_float(data, f"MT{zone_idx}")
+            if temp is not None:
+                self._safe_send(mqtt.build_publish(
+                    f"{self.prefix}/state/zone{zone_idx}/temperature",
+                    f"{temp:.1f}", qos=1, retain=True
+                ))
+                if zone_idx == 0:
+                    self._safe_send(mqtt.build_publish(
+                        f"{self.prefix}/state/sensor/MT0",
+                        f"{temp:.1f}", qos=1, retain=True
+                    ))
 
+            consigne = self._get_float(data, f"UsC{zone_idx}")
+            if consigne is not None:
+                self._safe_send(mqtt.build_publish(
+                    f"{self.prefix}/state/zone{zone_idx}/consigne",
+                    f"{consigne:.1f}", qos=1, retain=True
+                ))
+                if zone_idx == 0:
+                    self._safe_send(mqtt.build_publish(
+                        f"{self.prefix}/state/consigne",
+                        f"{consigne:.1f}", qos=1, retain=True
+                    ))
+
+        # Temperature exterieure
         outdoor_temp = self._get_float(data, "Text")
         if outdoor_temp is not None:
             self._safe_send(mqtt.build_publish(
-                f"{self.prefix}/state/sensor/Text", f"{outdoor_temp:.1f}", qos=1, retain=True
-            ))
-
-        # Consigne zone 0
-        consigne = self._get_float(data, "UsC0")
-        if consigne is not None:
-            self._safe_send(mqtt.build_publish(
-                f"{self.prefix}/state/consigne", f"{consigne:.1f}", qos=1, retain=True
+                f"{self.prefix}/state/sensor/Text",
+                f"{outdoor_temp:.1f}", qos=1, retain=True
             ))
 
         # Mode air label
