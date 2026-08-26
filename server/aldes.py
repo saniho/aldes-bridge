@@ -50,6 +50,7 @@ FRIENDLY_NAMES = {
 }
 
 # Modes air tels qu'ordonnes par l'app (TOneMode): index = valeur UAM.
+# A=Off, F=Air Confort (labels dans profiles/tone-aquaair.yaml)
 AIR_MODES = ["A", "B", "C", "D", "E", "F", "G", "H", "I"]
 # Modes eau chaude sanitaire (index = valeur UDM).
 WATER_MODES = ["L", "M", "N"]

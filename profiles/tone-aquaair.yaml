@@ -38,7 +38,7 @@ air_modes:
   - { index: 2, code: "C", label: "Éco" }
   - { index: 3, code: "D", label: "Confort" }
   - { index: 4, code: "E", label: "Anti-condensation" }
-  - { index: 5, code: "F", label: "Nuit" }
+  - { index: 5, code: "F", label: "Air Confort" }
   - { index: 6, code: "G", label: "Éco nuit" }
   - { index: 7, code: "H", label: "Arrêt ventilateur" }
   - { index: 8, code: "I", label: "Auto" }
