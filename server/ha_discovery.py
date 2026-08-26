@@ -55,7 +55,7 @@ ALDES_TO_HA_MODE = {
     "C": "heat",
     "D": "heat",
     "E": "heat",
-    "F": "heat",      # Air Confort
+    "F": "cool",      # Air Confort = mode froid
     "G": "auto",
     "H": "fan_only",
     "I": "auto",
