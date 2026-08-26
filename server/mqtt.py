@@ -230,7 +230,7 @@ def build_publish(topic, payload, qos=0, pkt_id=1, retain=False, dup=False):
 
 
 def build_connect(client_id, username=None, password=None, keepalive=60):
-    cflags = 0
+    cflags = 0x02  # Clean Session
     payload = struct.pack(">H", len(client_id)) + client_id.encode("utf-8")
     if username is not None:
         cflags |= 0x80
