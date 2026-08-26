@@ -228,8 +228,10 @@ def main(argv=None):
                 data = _parse_telemetry_payload(payload)
                 if data:
                     ha_client.publish_telemetry(data)
-            except Exception:
-                pass
+                else:
+                    _log.debug("ha-discovery: payload non-telemetrie ignore")
+            except Exception as exc:
+                _log.warning("ha-discovery: erreur publish_telemetry: %s", exc)
         state.on_publish_in = _on_publish_in_with_ha
         ha_client.start()
         state._ha_client = ha_client
