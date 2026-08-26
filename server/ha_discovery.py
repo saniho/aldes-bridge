@@ -107,9 +107,12 @@ HA_WATER_TO_ALDES = {
 }
 
 
-def _build_discovery_config(device_id, profile, prefix="homeassistant"):
+def _build_discovery_config(device_id, profile, prefix="aldes"):
     """Construit les configs HA auto-discovery pour une PAC Aldes T.ONE."""
     configs = []
+
+    # discovery_prefix = "homeassistant" (HA default), prefix = state/command topics
+    discovery_prefix = "homeassistant"
 
     # --- Climate entity (zone 0 = principale) ---
     climate_config = {
@@ -140,7 +143,7 @@ def _build_discovery_config(device_id, profile, prefix="homeassistant"):
         "payload_not_available": "offline",
         "icon": "mdi:heat-pump",
     }
-    configs.append((f"{prefix}/climate/aldes/config", json.dumps(climate_config, ensure_ascii=False)))
+    configs.append((f"{discovery_prefix}/climate/aldes/config", json.dumps(climate_config, ensure_ascii=False)))
 
     # --- Sensor : température extérieure ---
     outdoor_config = {
@@ -157,7 +160,7 @@ def _build_discovery_config(device_id, profile, prefix="homeassistant"):
         "payload_available": "online",
         "payload_not_available": "offline",
     }
-    configs.append((f"{prefix}/sensor/outdoor_temp/config", json.dumps(outdoor_config, ensure_ascii=False)))
+    configs.append((f"{discovery_prefix}/sensor/outdoor_temp/config", json.dumps(outdoor_config, ensure_ascii=False)))
 
     # --- Sensor : température intérieure (zone 0) ---
     indoor_config = {
@@ -174,7 +177,7 @@ def _build_discovery_config(device_id, profile, prefix="homeassistant"):
         "payload_available": "online",
         "payload_not_available": "offline",
     }
-    configs.append((f"{prefix}/sensor/indoor_temp/config", json.dumps(indoor_config, ensure_ascii=False)))
+    configs.append((f"{discovery_prefix}/sensor/indoor_temp/config", json.dumps(indoor_config, ensure_ascii=False)))
 
     # --- Sensor : mode air courant ---
     mode_config = {
@@ -189,7 +192,7 @@ def _build_discovery_config(device_id, profile, prefix="homeassistant"):
         "payload_available": "online",
         "payload_not_available": "offline",
     }
-    configs.append((f"{prefix}/sensor/air_mode/config", json.dumps(mode_config, ensure_ascii=False)))
+    configs.append((f"{discovery_prefix}/sensor/air_mode/config", json.dumps(mode_config, ensure_ascii=False)))
 
     # --- Binary sensor : compresseur ---
     compressor_config = {
@@ -207,7 +210,7 @@ def _build_discovery_config(device_id, profile, prefix="homeassistant"):
         "payload_available": "online",
         "payload_not_available": "offline",
     }
-    configs.append((f"{prefix}/binary_sensor/compressor/config", json.dumps(compressor_config, ensure_ascii=False)))
+    configs.append((f"{discovery_prefix}/binary_sensor/compressor/config", json.dumps(compressor_config, ensure_ascii=False)))
 
     # --- Select : mode eau chaude sanitaire (ECS) ---
     ecs_config = {
@@ -224,7 +227,7 @@ def _build_discovery_config(device_id, profile, prefix="homeassistant"):
         "payload_available": "online",
         "payload_not_available": "offline",
     }
-    configs.append((f"{prefix}/select/ecs_mode/config", json.dumps(ecs_config, ensure_ascii=False)))
+    configs.append((f"{discovery_prefix}/select/ecs_mode/config", json.dumps(ecs_config, ensure_ascii=False)))
 
     # --- Date : debut vacances ---
     vacation_start_config = {
@@ -240,7 +243,7 @@ def _build_discovery_config(device_id, profile, prefix="homeassistant"):
         "payload_available": "online",
         "payload_not_available": "offline",
     }
-    configs.append((f"{prefix}/date/vacation_start/config", json.dumps(vacation_start_config, ensure_ascii=False)))
+    configs.append((f"{discovery_prefix}/date/vacation_start/config", json.dumps(vacation_start_config, ensure_ascii=False)))
 
     # --- Date : fin vacances ---
     vacation_end_config = {
@@ -256,7 +259,7 @@ def _build_discovery_config(device_id, profile, prefix="homeassistant"):
         "payload_available": "online",
         "payload_not_available": "offline",
     }
-    configs.append((f"{prefix}/date/vacation_end/config", json.dumps(vacation_end_config, ensure_ascii=False)))
+    configs.append((f"{discovery_prefix}/date/vacation_end/config", json.dumps(vacation_end_config, ensure_ascii=False)))
 
     # --- Switch : activer/desactiver vacances ---
     vacation_enable_config = {
@@ -274,7 +277,7 @@ def _build_discovery_config(device_id, profile, prefix="homeassistant"):
         "payload_available": "online",
         "payload_not_available": "offline",
     }
-    configs.append((f"{prefix}/switch/vacation_enable/config", json.dumps(vacation_enable_config, ensure_ascii=False)))
+    configs.append((f"{discovery_prefix}/switch/vacation_enable/config", json.dumps(vacation_enable_config, ensure_ascii=False)))
 
     return configs
 
