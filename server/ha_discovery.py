@@ -22,14 +22,14 @@ from .appstate import _iso
 _log = logging.getLogger("aldes-ha-discovery")
 
 # --- Mapping Aldes air modes → HA HVAC modes ---
-# A=Arrêt, B=Hors gel, C=Éco, D=Confort, E=Anti-condensation, F=Nuit, G=Éco nuit, H=Arrêt ventilateur, I=Auto
+# A=Off, B=Hors gel, C=Éco, D=Confort, E=Anti-condensation, F=Air Confort, G=Éco nuit, H=Arrêt ventilateur, I=Auto
 ALDES_TO_HA_MODE = {
     "A": "off",
     "B": "heat",
     "C": "heat",
     "D": "heat",
     "E": "heat",
-    "F": "auto",
+    "F": "heat",      # Air Confort
     "G": "auto",
     "H": "fan_only",
     "I": "auto",
@@ -51,7 +51,7 @@ ALDES_TO_HA_PRESET = {
     "C": "eco",
     "D": "comfort",
     "E": "none",
-    "F": "night",
+    "F": "comfort",  # Air Confort
     "G": "eco",
     "H": "none",
     "I": "none",
@@ -60,8 +60,7 @@ ALDES_TO_HA_PRESET = {
 HA_PRESET_TO_ALDES = {
     "none": "D",
     "eco": "C",
-    "comfort": "D",
-    "night": "F",
+    "comfort": "F",     # Air Confort
     "anti_freeze": "B",
 }
 
