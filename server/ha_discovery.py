@@ -469,6 +469,7 @@ class HADiscoveryClient(threading.Thread):
             cmd_topics.append((f"{self.prefix}/set/zone{zi}/consigne", 1))
         try:
             s.sendall(mqtt.build_subscribe(1, cmd_topics))
+            _log.info("ha-discovery: souscrit a %d topics (prefix=%s)", len(cmd_topics), self.prefix)
         except Exception as exc:
             _log.warning("ha-discovery: subscribe echoue: %s", exc)
             s.close()
@@ -509,6 +510,7 @@ class HADiscoveryClient(threading.Thread):
         ptype, flags, body, raw = pkt
         if ptype == mqtt.PT_PUBLISH:
             topic, qos, pid, payload = mqtt.parse_publish_full(body, flags)
+            _log.debug("ha-discovery: PUBLISH recu topic=%s payload=%s", topic, payload)
             if qos == mqtt.QOS_AT_LEAST_ONCE:
                 self._safe_send(mqtt.build_puback(pid))
             elif qos == mqtt.QOS_EXACTLY_ONCE:
@@ -518,7 +520,9 @@ class HADiscoveryClient(threading.Thread):
             pid = struct.unpack_from(">H", body, 0)[0]
             self._safe_send(mqtt.build_pubrel(pid))
         elif ptype in (mqtt.PT_PUBACK, mqtt.PT_PUBCOMP, mqtt.PT_SUBACK):
-            pass
+            _log.debug("ha-discovery: recu ptype=%d", ptype)
+        else:
+            _log.debug("ha-discovery: packet inattendu ptype=%d", ptype)
 
     def _handle_command(self, topic, payload):
         """Traite une commande recue de HA."""
