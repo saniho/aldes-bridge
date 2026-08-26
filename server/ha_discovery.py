@@ -107,11 +107,9 @@ HA_WATER_TO_ALDES = {
 }
 
 
-def _build_discovery_config(device_id, profile):
+def _build_discovery_config(device_id, profile, prefix="homeassistant"):
     """Construit les configs HA auto-discovery pour une PAC Aldes T.ONE."""
     configs = []
-
-    prefix = "aldes"
 
     # --- Climate entity (zone 0 = principale) ---
     climate_config = {
@@ -568,7 +566,7 @@ class HADiscoveryClient(threading.Thread):
     def _publish_discovery(self):
         """Publie les configs HA auto-discovery."""
         profile = getattr(self.state, "profile", None)
-        configs = _build_discovery_config(self._device_id, profile)
+        configs = _build_discovery_config(self._device_id, profile, self.prefix)
         for topic, payload in configs:
             self._safe_send(mqtt.build_publish(topic, payload, qos=1, retain=True))
 

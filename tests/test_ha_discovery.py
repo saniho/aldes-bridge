@@ -65,7 +65,7 @@ def test_build_discovery_config_returns_list():
 def test_build_discovery_config_topics():
     configs = _build_discovery_config("test_device", None)
     topics = [t for t, _ in configs]
-    assert "homeassistant" not in topics[0]  # pas de prefix HA dans les topics
+    assert topics[0].startswith("homeassistant/")  # prefix HA par défaut
     assert any("climate" in t for t, _ in configs)
     assert any("sensor" in t for t, _ in configs)
     assert any("binary_sensor" in t for t, _ in configs)
