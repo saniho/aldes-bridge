@@ -220,7 +220,9 @@ def main(argv=None):
         state._ha_inject_hook = _ha_inject
         # Hook telemetrie : met a jour les topics HA a chaque trame
         _original_on_publish_in = state.on_publish_in
+        _hook_count = [0]
         def _on_publish_in_with_ha(state, payload):
+            _hook_count[0] += 1
             if _original_on_publish_in:
                 _original_on_publish_in(state, payload)
             try:
@@ -228,10 +230,11 @@ def main(argv=None):
                 data = _parse_telemetry_payload(payload)
                 if data:
                     ha_client.publish_telemetry(data)
-                else:
-                    _log.debug("ha-discovery: payload non-telemetrie ignore")
+                elif _hook_count[0] <= 5:
+                    _log.info("ha-discovery: hook #%d - payload non-JSON/telemetry ignore (len=%d)",
+                              _hook_count[0], len(payload) if payload else 0)
             except Exception as exc:
-                _log.warning("ha-discovery: erreur publish_telemetry: %s", exc)
+                _log.warning("ha-discovery: hook #%d - erreur: %s", _hook_count[0], exc)
         state.on_publish_in = _on_publish_in_with_ha
         ha_client.start()
         state._ha_client = ha_client
