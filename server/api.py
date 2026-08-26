@@ -463,9 +463,9 @@ def create_app(state, engine, web_dir):
         else:
             checks.append({"id": "tcp_azure", "label": "TCP Azure", "detail": "IP non résolue — test impossible", "ok": False})
 
-        # 5. Listener MQTT (port interne)
+        # 5. Listener MQTT
         try:
-            port = 18883  # port interne du bridge
+            port = engine.mqtt_port
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(1)
             result = sock.connect_ex(("127.0.0.1", port))
