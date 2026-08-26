@@ -21,6 +21,32 @@ from .appstate import _iso
 
 _log = logging.getLogger("aldes-ha-discovery")
 
+
+def detect_mqtt_broker():
+    """Détecte le broker MQTT via l'API Supervisor (HA OS).
+
+    Retourne {"host": ..., "port": ...} ou None si pas en mode add-on HA.
+    """
+    token = os.environ.get("SUPERVISOR_TOKEN")
+    if not token:
+        return None
+    try:
+        import urllib.request
+        req = urllib.request.Request(
+            "http://supervisor/services/mqtt",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            data = json.loads(resp.read())
+            host = data.get("data", {}).get("host")
+            port = data.get("data", {}).get("port")
+            if host and port:
+                _log.info("ha-discovery: broker MQTT détecté via Supervisor: %s:%d", host, port)
+                return {"host": host, "port": int(port)}
+    except Exception as exc:
+        _log.warning("ha-discovery: détection Supervisor échouée: %s", exc)
+    return None
+
 # --- Mapping Aldes air modes → HA HVAC modes ---
 # A=Off, B=Hors gel, C=Éco, D=Confort, E=Anti-condensation, F=Air Confort, G=Éco nuit, H=Arrêt ventilateur, I=Auto
 ALDES_TO_HA_MODE = {

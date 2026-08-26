@@ -188,11 +188,27 @@ def main(argv=None):
     # Home Assistant MQTT Auto-Discovery
     ha_client = None
     if args.ha_mqtt:
-        from .ha_discovery import HADiscoveryClient
+        from .ha_discovery import HADiscoveryClient, detect_mqtt_broker
+        # Détection auto du broker MQTT via Supervisor API
+        mqtt_host = args.ha_mqtt_host
+        mqtt_port = args.ha_mqtt_port
+        mqtt_source = "cli"
+        detected = detect_mqtt_broker()
+        if detected:
+            mqtt_host = detected["host"]
+            mqtt_port = detected["port"]
+            mqtt_source = "supervisor"
+        elif args.ha_mqtt_host == "127.0.0.1":
+            mqtt_source = "fallback"
+        state._ha_mqtt_resolved = {
+            "host": mqtt_host,
+            "port": mqtt_port,
+            "source": mqtt_source,
+        }
         ha_client = HADiscoveryClient(
             state,
-            host=args.ha_mqtt_host,
-            port=args.ha_mqtt_port,
+            host=mqtt_host,
+            port=mqtt_port,
             username=args.ha_mqtt_user,
             password=args.ha_mqtt_password,
             prefix=args.ha_mqtt_prefix,
@@ -218,8 +234,8 @@ def main(argv=None):
         ha_client.start()
         state._ha_client = ha_client
         dry_run_msg = " [DRY-RUN]" if args.ha_mqtt_dry_run else ""
-        _log.info("HA MQTT auto-discovery active%s: %s:%d (prefix: %s)",
-                  dry_run_msg, args.ha_mqtt_host, args.ha_mqtt_port, args.ha_mqtt_prefix)
+        _log.info("HA MQTT auto-discovery active%s: %s:%d via %s (prefix: %s)",
+                  dry_run_msg, mqtt_host, mqtt_port, mqtt_source, args.ha_mqtt_prefix)
 
     from .api import create_app
     app = create_app(state, engine, args.web_dir)

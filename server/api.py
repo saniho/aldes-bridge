@@ -551,6 +551,28 @@ def create_app(state, engine, web_dir):
             "ok": True,
         })
 
+        # 10. Broker MQTT HA (auto-detection)
+        ha_mqtt = getattr(state, "_ha_mqtt_resolved", None)
+        if ha_mqtt:
+            source_label = {"supervisor": "Supervisor API", "cli": "CLI", "fallback": "Fallback"}.get(ha_mqtt["source"], ha_mqtt["source"])
+            checks.append({
+                "id": "ha_mqtt_broker",
+                "label": "Broker MQTT HA",
+                "detail": f"{source_label} → {ha_mqtt['host']}:{ha_mqtt['port']}",
+                "ok": True,
+                "host": ha_mqtt["host"],
+                "port": ha_mqtt["port"],
+                "source": ha_mqtt["source"],
+            })
+        else:
+            checks.append({
+                "id": "ha_mqtt_broker",
+                "label": "Broker MQTT HA",
+                "detail": "Désactivé (--ha-mqtt non utilisé)",
+                "ok": False,
+                "warn": True,
+            })
+
         ok_count = sum(1 for c in checks if c.get("ok"))
         total = len(checks)
         return {

@@ -11,6 +11,7 @@ from server.appstate import AppState
 from server.events import EventBus
 from server.ha_discovery import (
     HADiscoveryClient,
+    detect_mqtt_broker,
     ALDES_TO_HA_MODE,
     HA_MODE_TO_ALDES,
     ALDES_TO_HA_PRESET,
@@ -44,13 +45,12 @@ def test_aldes_to_ha_preset_mapping():
     assert ALDES_TO_HA_PRESET["A"] is None
     assert ALDES_TO_HA_PRESET["C"] == "eco"
     assert ALDES_TO_HA_PRESET["D"] == "comfort"
-    assert ALDES_TO_HA_PRESET["F"] == "night"
+    assert ALDES_TO_HA_PRESET["F"] == "comfort"  # Air Confort
 
 
 def test_ha_to_aldes_preset_mapping():
     assert HA_PRESET_TO_ALDES["eco"] == "C"
-    assert HA_PRESET_TO_ALDES["comfort"] == "D"
-    assert HA_PRESET_TO_ALDES["night"] == "F"
+    assert HA_PRESET_TO_ALDES["comfort"] == "F"  # Air Confort
     assert HA_PRESET_TO_ALDES["anti_freeze"] == "B"
 
 
@@ -350,3 +350,79 @@ def test_non_dry_run_inject_calls_hook():
 
     assert len(hook_called) == 1
     assert hook_called[0][0] == "device/aldes_bridge/messages/devicebound"
+
+
+# ============================================================
+# Tests detect_mqtt_broker
+# ============================================================
+
+def test_detect_mqtt_broker_no_token(monkeypatch):
+    """Sans SUPERVISOR_TOKEN, retourne None."""
+    monkeypatch.delenv("SUPERVISOR_TOKEN", raising=False)
+    from server.ha_discovery import detect_mqtt_broker
+    assert detect_mqtt_broker() is None
+
+
+def test_detect_mqtt_broker_success(monkeypatch):
+    """Avec SUPERVISOR_TOKEN valide, retourne host/port."""
+    monkeypatch.setenv("SUPERVISOR_TOKEN", "test-token")
+
+    fake_response = json.dumps({
+        "data": {"host": "core-mosquitto", "port": 1883}
+    }).encode()
+
+    class FakeResp:
+        def read(self):
+            return fake_response
+        def __enter__(self):
+            return self
+        def __exit__(self, *a):
+            pass
+
+    def fake_urlopen(req, timeout=None):
+        assert "Bearer test-token" in req.get_header("Authorization")
+        return FakeResp()
+
+    import server.ha_discovery as hd
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+
+    result = detect_mqtt_broker()
+    assert result == {"host": "core-mosquitto", "port": 1883}
+
+
+def test_detect_mqtt_broker_http_error(monkeypatch):
+    """Erreur HTTP → retourne None."""
+    monkeypatch.setenv("SUPERVISOR_TOKEN", "test-token")
+
+    def fake_urlopen(req, timeout=None):
+        raise ConnectionError("refused")
+
+    import server.ha_discovery as hd
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+
+    result = detect_mqtt_broker()
+    assert result is None
+
+
+def test_detect_mqtt_broker_missing_fields(monkeypatch):
+    """Réponse Supervisor sans host/port → retourne None."""
+    monkeypatch.setenv("SUPERVISOR_TOKEN", "test-token")
+
+    fake_response = json.dumps({"data": {}}).encode()
+
+    class FakeResp:
+        def read(self):
+            return fake_response
+        def __enter__(self):
+            return self
+        def __exit__(self, *a):
+            pass
+
+    def fake_urlopen(req, timeout=None):
+        return FakeResp()
+
+    import server.ha_discovery as hd
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+
+    result = detect_mqtt_broker()
+    assert result is None
