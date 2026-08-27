@@ -13,6 +13,7 @@ import sys
 from .appstate import AppState, read_persisted_mode, read_persisted_profile
 from .config import ConfigStore
 from .device_profile import load_profile
+from . import __version__ as BACKEND_VERSION
 from .events import EventBus
 from .engine import Engine
 from .eventlog import EventLog
@@ -143,6 +144,10 @@ def main(argv=None):
         log = EventLog(args.log_file, max_bytes=args.log_max)
     events = EventBus(args.history_size, log=log)
     restored = events.restore_from_log(args.history_size)
+
+    ui_version = os.environ.get("ALDES_UI_VERSION", "?")
+    addon_version = os.environ.get("ALDES_ADDON_VERSION", "?")
+    _log.info("=== Aldes Bridge v%s | UI v%s | Add-on v%s ===", BACKEND_VERSION, ui_version, addon_version)
 
     config = ConfigStore(args.config_file)
 
