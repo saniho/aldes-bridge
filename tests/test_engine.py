@@ -248,6 +248,34 @@ def test_bridge_qos2():
     print("  OK")
 
 
+def test_bridge_disconnects_silent_box_after_keepalive():
+    """Une box silencieuse est deconnectee apres 1,5 fois son keepalive MQTT."""
+    events = EventBus()
+    state = AppState("fake-host", 9999, events)
+    state.set_mode("bridge")
+    eng = Engine(state, mqtt_port=18902)
+    eng.start()
+    time.sleep(0.5)
+
+    tls = box_socket(18902)
+    try:
+        tls.sendall(build_connect("box-silent", keepalive=1))
+        assert read_packet(tls)[0] == 2, "attendu CONNACK"
+        assert wait_state(state, "connected", True), "session non up"
+
+        assert wait_state(state, "connected", False, timeout=3), \
+            "la session silencieuse doit expirer"
+        expired = [
+            e for e in events.snapshot()
+            if e.get("kind") == "status" and e.get("note") == "MQTT keepalive expire"
+        ]
+        assert expired, "expiration du keepalive non journalisee"
+    finally:
+        tls.close()
+        eng.stop()
+        eng.join(timeout=3)
+
+
 def test_proxy_relay_inject():
     print("== test_proxy_relay_inject ==")
     fake = FakeRealBroker(18886)
