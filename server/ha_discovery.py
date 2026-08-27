@@ -417,7 +417,7 @@ class HADiscoveryClient(threading.Thread):
         backoff = 1.0
         while not self._stop.is_set():
             ok = self._session()
-            backoff = 1.0 if ok else min(backoff * 2, 30)
+            backoff = 1.0 if ok else min(backoff * 2, 10)
             if not self._stop.is_set():
                 time.sleep(backoff)
 
@@ -438,6 +438,10 @@ class HADiscoveryClient(threading.Thread):
                 username=self.username,
                 password=self.password,
                 keepalive=self.KEEPALIVE,
+                will_topic=f"{self.prefix}/state/available",
+                will_payload="offline",
+                will_qos=1,
+                will_retain=True,
             ))
             pkt = reader.read_packet()
             if pkt is None or pkt[0] != mqtt.PT_CONNACK or (pkt[3][2] if len(pkt[3]) > 2 else -1) != 0:
