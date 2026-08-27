@@ -429,6 +429,8 @@ class HADiscoveryClient(threading.Thread):
                 time.sleep(backoff)
 
     def _session(self):
+        _log.info("ha-discovery: tentative connexion vers %s:%d (user=%s)",
+                  self.host, self.port, self.username or "(none)")
         try:
             s = socket.create_connection((self.host, self.port), timeout=6)
             s.settimeout(self.KEEPALIVE / 3)
@@ -438,8 +440,6 @@ class HADiscoveryClient(threading.Thread):
 
         reader = mqtt.MQTTReader(s)
         try:
-            _log.info("ha-discovery: connexion MQTT user=%s, password=%s",
-                      self.username or "(none)", "***" if self.password else "(none)")
             s.sendall(mqtt.build_connect(
                 "aldes-ha-discovery",
                 username=self.username,
@@ -453,9 +453,10 @@ class HADiscoveryClient(threading.Thread):
             pkt = reader.read_packet()
             if pkt is None or pkt[0] != mqtt.PT_CONNACK or (pkt[3][2] if len(pkt[3]) > 2 else -1) != 0:
                 rc = pkt[3][2] if pkt and len(pkt[3]) > 2 else -1
-                _log.warning("ha-discovery: CONNACK refuse (rc=%d)", rc)
+                _log.warning("ha-discovery: CONNACK refuse (rc=%d) — broker=%s:%d", rc, self.host, self.port)
                 s.close()
                 return False
+            _log.info("ha-discovery: CONNACK OK — connecte a %s:%d", self.host, self.port)
         except Exception as exc:
             _log.warning("ha-discovery: erreur handshake: %s", exc)
             try:
@@ -478,13 +479,24 @@ class HADiscoveryClient(threading.Thread):
         ]
         for zi in range(10):
             cmd_topics.append((f"{self.prefix}/set/zone{zi}/consigne", 1))
+        topic_list = [t for t, _ in cmd_topics]
+        _log.info("ha-discovery: souscription a %d topics: %s", len(topic_list), topic_list)
         try:
             s.sendall(mqtt.build_subscribe(1, cmd_topics))
-            _log.info("ha-discovery: souscrit a %d topics (prefix=%s)", len(cmd_topics), self.prefix)
         except Exception as exc:
             _log.warning("ha-discovery: subscribe echoue: %s", exc)
             s.close()
             return False
+
+        # Attend le SUBACK
+        try:
+            suback = reader.read_packet()
+            if suback and suback[0] == mqtt.PT_SUBACK:
+                _log.info("ha-discovery: SUBACK recu — souscription OK")
+            else:
+                _log.warning("ha-discovery: pas de SUBACK (recu: %s)", suback)
+        except Exception as exc:
+            _log.warning("ha-discovery: erreur SUBACK: %s", exc)
 
         # Publie les configs de decouverte
         self._publish_discovery()
@@ -521,7 +533,9 @@ class HADiscoveryClient(threading.Thread):
         ptype, flags, body, raw = pkt
         if ptype == mqtt.PT_PUBLISH:
             topic, qos, pid, payload = mqtt.parse_publish_full(body, flags)
-            _log.debug("ha-discovery: PUBLISH recu topic=%s payload=%s", topic, payload)
+            if isinstance(payload, bytes):
+                payload = payload.decode("utf-8", errors="replace")
+            _log.info("ha-discovery: <-- MQTT PUBLISH topic=%s payload=%s", topic, payload[:200])
             if qos == mqtt.QOS_AT_LEAST_ONCE:
                 self._safe_send(mqtt.build_puback(pid))
             elif qos == mqtt.QOS_EXACTLY_ONCE:
@@ -530,16 +544,19 @@ class HADiscoveryClient(threading.Thread):
         elif ptype == mqtt.PT_PUBREC:
             pid = struct.unpack_from(">H", body, 0)[0]
             self._safe_send(mqtt.build_pubrel(pid))
-        elif ptype in (mqtt.PT_PUBACK, mqtt.PT_PUBCOMP, mqtt.PT_SUBACK):
-            _log.debug("ha-discovery: recu ptype=%d", ptype)
+        elif ptype == mqtt.PT_SUBACK:
+            _log.info("ha-discovery: <-- MQTT SUBACK")
+        elif ptype in (mqtt.PT_PUBACK, mqtt.PT_PUBCOMP):
+            pass
         else:
-            _log.debug("ha-discovery: packet inattendu ptype=%d", ptype)
+            _log.debug("ha-discovery: packet type=%d", ptype)
 
     def _handle_command(self, topic, payload):
         """Traite une commande recue de HA."""
         if isinstance(payload, bytes):
             payload = payload.decode("utf-8", errors="replace")
         payload = payload.strip()
+        _log.info("ha-discovery: COMMANDE RECUE topic=%s payload=%s", topic, payload)
 
         try:
             if topic == f"{self.prefix}/set/mode":
