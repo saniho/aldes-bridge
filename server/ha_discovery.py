@@ -426,11 +426,14 @@ class HADiscoveryClient(threading.Thread):
 
     def run(self):
         backoff = 1.0
-        while not self._stop.is_set():
-            ok = self._session()
-            backoff = 1.0 if ok else min(backoff * 2, 10)
-            if not self._stop.is_set():
-                time.sleep(backoff)
+        try:
+            while not self._stop.is_set():
+                ok = self._session()
+                backoff = 1.0 if ok else min(backoff * 2, 10)
+                if not self._stop.is_set():
+                    time.sleep(backoff)
+        except Exception as exc:
+            _log.exception("ha-discovery: thread crashed: %s", exc)
 
     def _session(self):
         _log.info("ha-discovery: tentative connexion vers %s:%d (user=%s)",
