@@ -29,6 +29,7 @@ def detect_mqtt_broker():
     """
     token = os.environ.get("SUPERVISOR_TOKEN")
     if not token:
+        _log.debug("ha-discovery: SUPERVISOR_TOKEN absent, skip detection Supervisor")
         return None
     try:
         import urllib.request
@@ -44,7 +45,7 @@ def detect_mqtt_broker():
                 _log.info("ha-discovery: broker MQTT détecté via Supervisor: %s:%d", host, port)
                 return {"host": host, "port": int(port)}
     except Exception as exc:
-        _log.warning("ha-discovery: détection Supervisor échouée: %s", exc)
+        _log.debug("ha-discovery: détection Supervisor échouée (normal si pas add-on HA): %s", exc)
     return None
 
 # --- Mapping Aldes air modes → HA HVAC modes ---

@@ -15,6 +15,13 @@ services:
       - ALDES_HISTORY_DAYS=90
       # profil device (tone-aquaair par défaut)
       - ALDES_PROFILE=tone-aquaair
+      # Home Assistant MQTT Auto-Discovery
+      - HA_MQTT_ENABLED=true
+      # IP du broker Mosquitto (add-on HA) depuis le host network
+      - HA_MQTT_HOST=172.30.32.1
+      - HA_MQTT_PORT=1883
+      # Desactive le dry-run pour que les commandes HA soient envoyees a la box
+      - HA_MQTT_DRY_RUN=false
     # app = python3 -m server.main [--mode ${ALDES_MODE} --mqtt-port 8883 --web-port 8080 --real-host aldesiotsuite.azure-devices.net]
     # Le mode changé depuis la WebUI est persisté dans logs/mode.json (volume monté) et
     # rejoué au redémarrage du conteneur, en priorité sur ALDES_MODE.
