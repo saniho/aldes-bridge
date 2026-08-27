@@ -25,6 +25,7 @@ export default function ConfigPanel() {
   const [cfg, setCfg] = useState<AppConfig | null>(null)
   const [days, setDays] = useState('')
   const [logSize, setLogSize] = useState('')
+  const [dryRun, setDryRun] = useState(true)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
 
@@ -33,6 +34,7 @@ export default function ConfigPanel() {
       setCfg(c)
       setDays(String(c.history_retention_days))
       setLogSize(fmtBytes(c.log_retention_max_bytes))
+      setDryRun(c.ha_mqtt_dry_run)
     })
   }, [])
 
@@ -45,10 +47,12 @@ export default function ConfigPanel() {
       if (!isNaN(d)) updates.history_retention_days = d
       const bytes = parseBytes(logSize)
       if (bytes !== null && bytes > 0) updates.log_retention_max_bytes = bytes
+      updates.ha_mqtt_dry_run = dryRun
       const c = await setAppConfig(updates)
       setCfg(c)
       setDays(String(c.history_retention_days))
       setLogSize(fmtBytes(c.log_retention_max_bytes))
+      setDryRun(c.ha_mqtt_dry_run)
       setMsg('Sauvegarde')
       setTimeout(() => setMsg(''), 2000)
     } catch (e: any) {
@@ -83,6 +87,19 @@ export default function ConfigPanel() {
             placeholder="25 MB"
           />
         </label>
+      </div>
+      <div className="config-toggle-row">
+        <label className="config-toggle">
+          <input
+            type="checkbox"
+            checked={dryRun}
+            onChange={(e) => setDryRun(e.target.checked)}
+          />
+          <span>Envoyer commandes HA vers la box</span>
+        </label>
+        <span className="config-toggle-hint">
+          {dryRun ? 'Desactive — commandes logguees uniquement' : 'Active — commandes envoyees a la PAC'}
+        </span>
       </div>
       <div className="config-actions">
         <button onClick={save} disabled={saving}>

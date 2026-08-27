@@ -215,6 +215,7 @@ def main(argv=None):
             "port": mqtt_port,
             "source": mqtt_source,
         }
+        initial_dry_run = config.get("ha_mqtt_dry_run") if config else True
         ha_client = HADiscoveryClient(
             state,
             host=mqtt_host,
@@ -222,7 +223,7 @@ def main(argv=None):
             username=args.ha_mqtt_user,
             password=args.ha_mqtt_password,
             prefix=args.ha_mqtt_prefix,
-            dry_run=args.ha_mqtt_dry_run and not args.ha_mqtt_no_dry_run,
+            dry_run=initial_dry_run,
         )
         # Hook d'injection : les commandes HA → box passent par engine.inject
         def _ha_inject(topic, payload, qos):
@@ -248,7 +249,7 @@ def main(argv=None):
         state.on_publish_in = _on_publish_in_with_ha
         ha_client.start()
         state._ha_client = ha_client
-        dry_run_msg = " [DRY-RUN]" if (args.ha_mqtt_dry_run and not args.ha_mqtt_no_dry_run) else ""
+        dry_run_msg = " [DRY-RUN]" if initial_dry_run else ""
         _log.info("HA MQTT auto-discovery active%s: %s:%d via %s (prefix: %s)",
                   dry_run_msg, mqtt_host, mqtt_port, mqtt_source, args.ha_mqtt_prefix)
 

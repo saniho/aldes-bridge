@@ -10,6 +10,7 @@ import threading
 DEFAULTS = {
     "history_retention_days": 90,
     "log_retention_max_bytes": 25 * 1024 * 1024,
+    "ha_mqtt_dry_run": True,
 }
 
 RANGES = {

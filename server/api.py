@@ -385,6 +385,7 @@ def create_app(state, engine, web_dir):
     class SettingsBody(BaseModel):
         history_retention_days: int = None
         log_retention_max_bytes: int = None
+        ha_mqtt_dry_run: bool = None
 
     @app.put("/api/settings")
     def api_settings_set(body: SettingsBody):
@@ -395,6 +396,11 @@ def create_app(state, engine, web_dir):
             return JSONResponse(status_code=500, content={"error": "config non initialisee"})
         state.config.set(updates)
         state._purge_now()
+        if "ha_mqtt_dry_run" in updates:
+            ha_client = getattr(state, "_ha_client", None)
+            if ha_client is not None:
+                ha_client.dry_run = updates["ha_mqtt_dry_run"]
+                _log.info("ha-discovery: dry_run=%s (toggle UI)", updates["ha_mqtt_dry_run"])
         state.events.publish({
             "kind": "status", "ts": _iso(),
             "note": f"settings mis a jour : {list(updates.keys())}",

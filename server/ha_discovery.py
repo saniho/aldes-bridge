@@ -696,7 +696,8 @@ class HADiscoveryClient(threading.Thread):
             "method": method,
             "params": params,
         }
-        if self.dry_run:
+        dry_run = self.state.config.get("ha_mqtt_dry_run") if self.state.config else self.dry_run
+        if dry_run:
             _log.info("ha-discovery [DRY-RUN]: commande simulée: %s", json.dumps(body, ensure_ascii=False))
             return
         # Utilise le hook d'injection du engine si disponible
