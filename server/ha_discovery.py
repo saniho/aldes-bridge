@@ -181,6 +181,14 @@ def _build_discovery_config(device_id, profile, prefix="aldes", data=None):
     # Detect active zones from UsC0..UsC9
     active_zones = _detect_active_zones(data)
 
+    # Nettoyage : on retire tous les anciens topics de decouverte climate
+    # puis on publie uniquement les entités actives
+    old_climate_topics = [f"{discovery_prefix}/climate/aldes/config"]
+    for zi in range(10):
+        old_climate_topics.append(f"{discovery_prefix}/climate/aldes_zone{zi}/config")
+    for old_topic in old_climate_topics:
+        configs.append((old_topic, ""))
+
     for zone_idx in active_zones:
         zone_suffix = f"_zone{zone_idx}" if zone_idx > 0 else ""
         zone_label = f"Zone {zone_idx}" if zone_idx > 0 else "PAC Aldes"
@@ -213,7 +221,6 @@ def _build_discovery_config(device_id, profile, prefix="aldes", data=None):
             json.dumps(climate_config, ensure_ascii=False),
         ))
 
-    # Si aucune zone détectée, créer au moins zone 0
     if not active_zones:
         climate_config = {
             "name": "PAC Aldes",

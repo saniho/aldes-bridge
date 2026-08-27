@@ -76,7 +76,7 @@ def test_build_discovery_config_climate_valid():
     climate_topic = None
     climate_payload = None
     for topic, payload in configs:
-        if "climate" in topic:
+        if "climate" in topic and payload:
             climate_topic = topic
             climate_payload = json.loads(payload)
             break
@@ -100,6 +100,8 @@ def test_build_discovery_config_climate_valid():
 def test_build_discovery_config_device_info():
     configs = _build_discovery_config("dev123", None)
     for _, payload_str in configs:
+        if not payload_str:
+            continue
         payload = json.loads(payload_str)
         if "device" in payload:
             device = payload["device"]
