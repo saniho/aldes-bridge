@@ -130,6 +130,11 @@ def build_parser():
 
 
 def main(argv=None):
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(name)s %(levelname)s %(message)s",
+        datefmt="%H:%M:%S",
+    )
     args = build_parser().parse_args(argv)
 
     try:
