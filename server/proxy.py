@@ -1,5 +1,6 @@
 """Mode proxy transparent : MITM entre la box et le vrai Azure IoT Hub + injection boxward."""
 import json
+import logging
 import socket
 import threading
 
@@ -10,6 +11,8 @@ from .mqtt import (
 )
 from .appstate import emit_message, emit_connect, MQTTEndpoint
 from .tls import client_context, resolve
+
+_log = logging.getLogger("aldes-proxy")
 
 
 RELAY_TIMEOUT = 180.0  # s ; silence >= 3 min d'un cote -> dechirure du relais
@@ -126,6 +129,7 @@ class ProxyHandler(MQTTEndpoint):
             emit_connect(self.state, body)
         elif ptype == PT_PUBLISH:  # telemetrie
             topic, qos, _pid, payload = parse_publish_full(body, flags)
+            _log.debug("proxy: <-- BOX PUBLISH topic=%s qos=%d payload=%s", topic, qos, payload[:100] if isinstance(payload, str) else payload)
             emit_message(self.state, "in", "PUBLISH", topic=topic, payload=payload, qos=qos)
         elif ptype == PT_SUBSCRIBE:  # memoriser pour proposer les topics dans l'UI
             pkt_id, topics = parse_subscribe(body)

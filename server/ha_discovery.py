@@ -408,6 +408,9 @@ class HADiscoveryClient(threading.Thread):
         self._pkt = 0
         self._device_id = "aldes_bridge"
         self._last_mode = None
+        if dry_run:
+            _log.warning("ha-discovery: *** DRY-RUN active *** les commandes HA ne seront PAS envoyees a la box")
+            _log.warning("ha-discovery: pour activer, passez HA_MQTT_DRY_RUN=false ou --ha-mqtt-no-dry-run")
 
     def stop(self):
         self._stop.set()
