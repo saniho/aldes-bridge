@@ -599,7 +599,7 @@ class HADiscoveryClient(threading.Thread):
             return
 
         # Envoie la commande via le hook on_publish_in -> engine.inject
-        self._inject_aldes_command("changeMode", {"code": aldes_code})
+        self._inject_aldes_command("changeMode", [aldes_code])
         _log.info("ha-discovery: mode %s -> Aldes %s", ha_mode, aldes_code)
 
     def _handle_consigne_command(self, payload, zone=0):
@@ -610,7 +610,7 @@ class HADiscoveryClient(threading.Thread):
             _log.warning("ha-discovery: consigne invalide: %s", payload)
             return
 
-        self._inject_aldes_command("changeConsigne", {"zone": f"C{zone}", "temperature": temp})
+        self._inject_aldes_command(f"changeConsigneC{zone}", [str(temp)])
         self.state.request_consigne(str(zone), temp)
         _log.info("ha-discovery: consigne zone %d -> %.1f°C", zone, temp)
 
@@ -622,7 +622,7 @@ class HADiscoveryClient(threading.Thread):
             _log.warning("ha-discovery: preset inconnu: %s", preset)
             return
 
-        self._inject_aldes_command("changeMode", {"code": aldes_code})
+        self._inject_aldes_command("changeMode", [aldes_code])
         _log.info("ha-discovery: preset %s -> Aldes %s", preset, aldes_code)
 
     def _handle_ecs_command(self, payload):
@@ -633,7 +633,7 @@ class HADiscoveryClient(threading.Thread):
             _log.warning("ha-discovery: mode ECS inconnu: %s", mode)
             return
 
-        self._inject_aldes_command("changeMode", {"code": aldes_code})
+        self._inject_aldes_command("changeMode", [aldes_code])
         _log.info("ha-discovery: ECS %s -> Aldes %s", mode, aldes_code)
 
     def _handle_vacation_start_command(self, payload):
@@ -667,10 +667,7 @@ class HADiscoveryClient(threading.Thread):
             _log.warning("ha-discovery: format date vacances invalide: %s / %s", start_str, end_str)
             return
 
-        self._inject_aldes_command("changeVacation", {
-            "start": start_epoch,
-            "end": end_epoch,
-        })
+        self._inject_aldes_command("changeVacation", [str(start_epoch), str(end_epoch)])
         _log.info("ha-discovery: vacances %s -> %s", start_str, end_str)
 
     def _handle_vacation_enable_command(self, payload):
@@ -688,14 +685,16 @@ class HADiscoveryClient(threading.Thread):
                 _log.info("ha-discovery: vacances activee (dates non definies, utilisez les topics date)")
         else:
             # Desactive vacances : envoie start=0 end=0
-            self._inject_aldes_command("changeVacation", {"start": 0, "end": 0})
+            self._inject_aldes_command("changeVacation", ["0", "0"])
             _log.info("ha-discovery: vacances desactivees")
 
     def _inject_aldes_command(self, method, params):
         """Envoie une commande Aldes JSON-RPC via le state (engine.inject)."""
         body = {
+            "id": 1,
+            "jsonrpc": "2.0",
             "method": method,
-            "params": params,
+            "params": params if isinstance(params, list) else [params],
         }
         dry_run = self.state.config.get("ha_mqtt_dry_run") if self.state.config else self.dry_run
         if dry_run:
@@ -705,7 +704,7 @@ class HADiscoveryClient(threading.Thread):
         hook = getattr(self.state, "_ha_inject_hook", None)
         if hook:
             hook(
-                f"device/{self._device_id}/messages/devicebound",
+                f"devices/{self._device_id}/messages/devicebound",
                 json.dumps(body, ensure_ascii=False),
                 1,
             )
