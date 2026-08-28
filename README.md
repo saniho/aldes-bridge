@@ -10,7 +10,7 @@
 > (et potentiellement le cloud Aldes) — assurez-vous de comprendre les risques avant de l'utiliser.
 
 Pont MQTT over TLS pour intercepter, analyser **et commander** une box **Aldes Connect**
-(qui remonte vers Azure IoT Hub), avec une Web UI React.
+(qui remonte vers Azure IoT Hub), avec une Web UI React et **auto-discovery Home Assistant**.
 
 Deux modes (bascule possible à chaud depuis la Web UI, appliquée à la prochaine connexion de la box) :
 
@@ -582,3 +582,14 @@ Ce projet est distribué sous la licence **MIT** — voir [LICENSE](LICENSE).
 - En mode **bridge**, la box ne parle plus au cloud Azure (le pont joue le rôle d'Azure) ;
   en mode **proxy**, elle y reste réellement connectée. Dans les deux cas, les __commandes__
   vers la box passent par `devices/<boxid>/messages/devicebound`.
+- **v0.8.0** : auto-discovery MQTT Home Assistant (climate, sensors, ECS, vacances),
+  toggle dry-run depuis l'UI, consignes envoyées directement à la box.
+
+## Contributions
+
+Merci à **[Jv1i3nn](https://github.com/Jv1i3nn)** pour ses contributions au projet :
+
+- **PR #1** — Déploiement Kubernetes (guide K3s)
+- **PR #2** — Correction des profils AIR et tests E2E
+- **PR #3** — Correction du port MQTT dans le diagnostic
+- **PR #4** — Expiration des sessions MQTT silencieuses (keepalive)
