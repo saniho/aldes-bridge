@@ -92,8 +92,8 @@ export default function ConfigPanel() {
         <label className="config-toggle">
           <input
             type="checkbox"
-            checked={dryRun}
-            onChange={(e) => setDryRun(e.target.checked)}
+            checked={!dryRun}
+            onChange={(e) => setDryRun(!e.target.checked)}
           />
           <span>Envoyer commandes HA vers la box</span>
         </label>
