@@ -611,6 +611,7 @@ class HADiscoveryClient(threading.Thread):
             return
 
         self._inject_aldes_command("changeConsigne", {"zone": f"C{zone}", "temperature": temp})
+        self.state.request_consigne(str(zone), temp)
         _log.info("ha-discovery: consigne zone %d -> %.1f°C", zone, temp)
 
     def _handle_preset_command(self, payload):
