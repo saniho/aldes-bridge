@@ -351,7 +351,7 @@ def test_non_dry_run_inject_calls_hook():
     client._inject_aldes_command("changeMode", {"code": "D"})
 
     assert len(hook_called) == 1
-    assert hook_called[0][0] == "device/aldes_bridge/messages/devicebound"
+    assert hook_called[0][0] == "devices/aldes_bridge/messages/devicebound"
 
 
 # ============================================================

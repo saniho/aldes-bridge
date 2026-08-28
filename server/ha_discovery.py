@@ -612,6 +612,17 @@ class HADiscoveryClient(threading.Thread):
 
         self._inject_aldes_command(f"changeConsigneC{zone}", [str(temp)])
         self.state.request_consigne(str(zone), temp)
+        # Publie immediatement la valeur demandee sur le topic state pour
+        # que HA affiche la nouvelle consigne sans attendre la telemetry.
+        self._safe_send(mqtt.build_publish(
+            f"{self.prefix}/state/zone{zone}/consigne",
+            f"{temp:.1f}", qos=1, retain=True,
+        ))
+        if zone == 0:
+            self._safe_send(mqtt.build_publish(
+                f"{self.prefix}/state/consigne",
+                f"{temp:.1f}", qos=1, retain=True,
+            ))
         _log.info("ha-discovery: consigne zone %d -> %.1f°C", zone, temp)
 
     def _handle_preset_command(self, payload):
@@ -753,6 +764,7 @@ class HADiscoveryClient(threading.Thread):
             ))
 
         # Temperatures et consignes par zone
+        consignes = self.state.consignes_state()
         active_zones = _detect_active_zones(data)
         for zone_idx in active_zones:
             temp = self._get_float(data, f"MT{zone_idx}")
@@ -768,6 +780,9 @@ class HADiscoveryClient(threading.Thread):
                     ))
 
             consigne = self._get_float(data, f"UsC{zone_idx}")
+            entry = consignes.get(str(zone_idx))
+            if entry and not entry.get("confirmed"):
+                consigne = float(entry["requested"])
             if consigne is not None:
                 self._safe_send(mqtt.build_publish(
                     f"{self.prefix}/state/zone{zone_idx}/consigne",
@@ -890,6 +905,7 @@ class HADiscoveryClient(threading.Thread):
             ))
 
         # Temperatures et consignes par zone active
+        consignes = self.state.consignes_state()
         active_zones = _detect_active_zones(data)
         for zone_idx in active_zones:
             temp = self._get_float(data, f"MT{zone_idx}")
@@ -900,6 +916,11 @@ class HADiscoveryClient(threading.Thread):
                 ))
 
             consigne = self._get_float(data, f"UsC{zone_idx}")
+            entry = consignes.get(str(zone_idx))
+            if entry and not entry.get("confirmed"):
+                # Consigne demandee pas encore confirmee par la PAC : publie
+                # la valeur demandee pour que HA l'affiche immediatement.
+                consigne = float(entry["requested"])
             if consigne is not None:
                 self._safe_send(mqtt.build_publish(
                     f"{self.prefix}/state/zone{zone_idx}/consigne",
