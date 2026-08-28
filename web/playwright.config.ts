@@ -15,7 +15,11 @@ const BASE_URL = `http://127.0.0.1:${WEB_PORT}`
 
 export default defineConfig({
   testDir,
-  fullyParallel: true,
+  // Les scénarios partagent un backend dont le mode est un état global mutable.
+  // Leur exécution concurrente permet à un scénario de réinitialiser le mode
+  // pendant qu'un autre le vérifie côté API.
+  fullyParallel: false,
+  workers: 1,
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: BASE_URL,

@@ -141,6 +141,7 @@ def emit_connect(state, body):
     clean = {k: v for k, v in info.items() if k not in ("password",)}
     emit_message(state, "in", "CONNECT", payload=json.dumps(clean, ensure_ascii=False))
     state.session_up(info.get("client_id"))
+    return info
 
 
 class MQTTEndpoint:

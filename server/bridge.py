@@ -1,6 +1,7 @@
 """Mode bridge : faux broker MQTT/TLS. La box se connecte a nous, on injecte direct."""
 import json
 import logging
+import socket
 import struct
 import threading
 
@@ -33,7 +34,17 @@ class BridgeHandler(MQTTEndpoint):
         while not self._closed:
             try:
                 packet = reader.read_packet()
+            except socket.timeout:
+                self.state.events.publish({
+                    "kind": "status",
+                    "ts": "now",
+                    "note": "MQTT keepalive expire",
+                    "session": self.session,
+                })
+                break
             except MQTTError:
+                break
+            except OSError:
                 break
             if packet is None:
                 break
@@ -68,7 +79,10 @@ class BridgeHandler(MQTTEndpoint):
     # --- protocole ---
     def _handle(self, ptype, flags, body):
         if ptype == PT_CONNECT:
-            emit_connect(self.state, body)
+            info = emit_connect(self.state, body)
+            keepalive = info.get("keepalive", 0)
+            if keepalive > 0:
+                self.sock.settimeout(keepalive * 1.5)
             self._send(build_connack(0))
         elif ptype == PT_PUBLISH:
             topic, qos, pkt_id, payload = parse_publish_full(body, flags)

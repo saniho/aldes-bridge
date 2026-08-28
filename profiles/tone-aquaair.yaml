@@ -34,20 +34,20 @@ telemetry:
 # ── Modes air (UAM 0..8) ──
 air_modes:
   - { index: 0, code: "A", label: "Arrêt" }
-  - { index: 1, code: "B", label: "Hors gel" }
+  - { index: 1, code: "B", label: "Confort" }
   - { index: 2, code: "C", label: "Éco" }
-  - { index: 3, code: "D", label: "Confort" }
-  - { index: 4, code: "E", label: "Anti-condensation" }
-  - { index: 5, code: "F", label: "Air Confort" }
-  - { index: 6, code: "G", label: "Éco nuit" }
-  - { index: 7, code: "H", label: "Arrêt ventilateur" }
-  - { index: 8, code: "I", label: "Auto" }
+  - { index: 3, code: "D", label: "Chauffage programme A" }
+  - { index: 4, code: "E", label: "Chauffage programme B" }
+  - { index: 5, code: "F", label: "Climatisation" }
+  - { index: 6, code: "G", label: "Climatisation boost" }
+  - { index: 7, code: "H", label: "Climatisation programme C" }
+  - { index: 8, code: "I", label: "Climatisation programme D" }
 
 # ── Modes eau chaude (UDM 0..2) ──
 water_modes:
-  - { index: 0, code: "L", label: "Eco" }
-  - { index: 1, code: "M", label: "Normal" }
-  - { index: 2, code: "N", label: "Confort" }
+  - { index: 0, code: "L", label: "Arrêt" }
+  - { index: 1, code: "M", label: "Marche" }
+  - { index: 2, code: "N", label: "Boost" }
 
 # ── Labels historique (par famille) ──
 history_labels:

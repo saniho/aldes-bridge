@@ -31,7 +31,7 @@ function buildWaterLabel(profile: DeviceProfile | null | undefined): Record<stri
 
 function buildQuickAir(profile: DeviceProfile | null | undefined): { code: string; label: string }[] {
   if (profile?.air_modes?.length) {
-    return profile.air_modes.filter((m) => m.code !== 'A').map((m) => ({
+    return profile.air_modes.map((m) => ({
       code: m.code, label: `${m.code} · ${m.label}`
     }))
   }
