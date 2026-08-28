@@ -7,6 +7,7 @@ Couvre /api/state, /api/config, /api/mode, /api/send, /api/logs,
 import json
 import os
 import random
+import socket
 import sys
 import tempfile
 import threading
@@ -22,8 +23,9 @@ from server.history import HistoryDB
 
 
 class _StubEngine:
-    def __init__(self):
+    def __init__(self, mqtt_port=8883):
         self._mode = None
+        self.mqtt_port = mqtt_port
 
     def set_mode(self, mode):
         self._mode = mode
@@ -38,10 +40,10 @@ class _StubEngine:
         return {"ok": True, "session": "test"}
 
 
-def _start_web(state):
+def _start_web(state, engine=None):
     import uvicorn
     from server.api import create_app
-    engine = _StubEngine()
+    engine = engine or _StubEngine()
     app = create_app(state, engine, "/nonexistent")
     for _ in range(20):
         port = random.randint(18200, 18999)
@@ -390,6 +392,24 @@ def test_api_settings_purge_triggered():
         assert r["settings"]["history_retention_days"] == 1
     finally:
         os.unlink(cfg_path)
+
+
+# --- /api/diagnostic ---
+
+def test_api_diagnostic_uses_configured_mqtt_port():
+    listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    listener.bind(("127.0.0.1", 0))
+    listener.listen(1)
+    mqtt_port = listener.getsockname()[1]
+    try:
+        state = AppState("h", 8883, EventBus())
+        port, _, _ = _start_web(state, _StubEngine(mqtt_port=mqtt_port))
+        result = _req(port, "/api/diagnostic")
+        check = next(c for c in result["checks"] if c["id"] == "mqtt_listener")
+        assert check["label"] == f"Listener MQTT (:{mqtt_port})"
+        assert check["ok"] is True
+    finally:
+        listener.close()
 
 
 if __name__ == "__main__":
