@@ -1,6 +1,7 @@
 """API web (FastAPI) : config, etat, SSE temps reel, envoi de commandes, mode."""
 import asyncio
 import json
+import logging
 import os
 import socket
 import subprocess
@@ -13,6 +14,8 @@ from pydantic import BaseModel
 from .aldes import build_products, make_token
 from .appstate import _iso
 from .device_profile import list_profiles, load_profile
+
+_log = logging.getLogger("aldes-api")
 from .version import read_ui_version
 
 
