@@ -45,26 +45,37 @@ def test_profile_products():
 
 def test_profile_air_modes():
     p = load_profile("tone-aquaair")
-    assert len(p.air_modes) == 9
-    assert p.air_modes[0] == {"index": 0, "code": "A", "label": "Arr\u00eat"}
-    assert p.air_modes[5] == {"index": 5, "code": "F", "label": "Nuit"}
+    assert p.air_modes == [
+        {"index": 0, "code": "A", "label": "Arrêt"},
+        {"index": 1, "code": "B", "label": "Confort"},
+        {"index": 2, "code": "C", "label": "Éco"},
+        {"index": 3, "code": "D", "label": "Chauffage programme A"},
+        {"index": 4, "code": "E", "label": "Chauffage programme B"},
+        {"index": 5, "code": "F", "label": "Climatisation"},
+        {"index": 6, "code": "G", "label": "Climatisation boost"},
+        {"index": 7, "code": "H", "label": "Climatisation programme C"},
+        {"index": 8, "code": "I", "label": "Climatisation programme D"},
+    ]
 
 def test_profile_water_modes():
     p = load_profile("tone-aquaair")
-    assert len(p.water_modes) == 3
-    assert p.water_modes[0]["code"] == "L"
+    assert p.water_modes == [
+        {"index": 0, "code": "L", "label": "Arrêt"},
+        {"index": 1, "code": "M", "label": "Marche"},
+        {"index": 2, "code": "N", "label": "Boost"},
+    ]
 
 def test_get_air_mode_label():
     p = load_profile("tone-aquaair")
     assert p.get_air_mode_label("A") == "Arr\u00eat"
-    assert p.get_air_mode_label("F") == "Nuit"
+    assert p.get_air_mode_label("F") == "Climatisation"
     assert p.get_air_mode_label("Z") == "Z"
 
 def test_get_water_mode_label():
     p = load_profile("tone-aquaair")
-    assert p.get_water_mode_label("L") == "Eco"
-    assert p.get_water_mode_label("M") == "Normal"
-    assert p.get_water_mode_label("N") == "Confort"
+    assert p.get_water_mode_label("L") == "Arrêt"
+    assert p.get_water_mode_label("M") == "Marche"
+    assert p.get_water_mode_label("N") == "Boost"
 
 def test_resolve_reference():
     p = load_profile("tone-aquaair")
