@@ -192,7 +192,7 @@ def _build_discovery_config(device_id, profile, prefix="aldes", data=None):
 
     for zone_idx in active_zones:
         zone_suffix = f"_zone{zone_idx}" if zone_idx > 0 else ""
-        zone_label = f"Zone {zone_idx}" if zone_idx > 0 else "PAC Aldes"
+        zone_label = f"Zone {zone_idx + 1}" if zone_idx > 0 else "PAC Aldes"
 
         climate_config = {
             "name": zone_label,
