@@ -21,9 +21,12 @@ Mapping de la telemetrie brute (payload PUBLISH boxward) vers le product :
     Dvac/Fvac   -> indicator.date_debut_vac / date_fin_vac (epoch, 0 = off)
 """
 import json
+import logging
 import os
 import uuid
 from datetime import datetime, timezone
+
+_log = logging.getLogger("aldes-telemetry")
 
 try:
     from zoneinfo import ZoneInfo
@@ -50,6 +53,7 @@ FRIENDLY_NAMES = {
 }
 
 # Modes air tels qu'ordonnes par l'app (TOneMode): index = valeur UAM.
+# A=Off, F=Air Confort (labels dans profiles/tone-aquaair.yaml)
 AIR_MODES = ["A", "B", "C", "D", "E", "F", "G", "H", "I"]
 # Modes eau chaude sanitaire (index = valeur UDM).
 WATER_MODES = ["L", "M", "N"]
@@ -66,33 +70,47 @@ def capture_telemetry(state, payload):
     une vue complete d'un product (les telemetries arrivent en plusieurs
     messages : temperatures, settings, mode...).
     """
+    data = _parse_telemetry_payload(payload)
+    if data is None:
+        _log.debug("capture_telemetry: payload non reconnu (pas du JSON?), len=%d", len(payload) if payload else 0)
+        return
+    pid = data.get("productid") or data.get("modemid")
+    if not pid:
+        _log.debug("capture_telemetry: pid manquant, keys=%s", list(data.keys()))
+        return
+    # Log les champs temperature/consigne pour debug
+    temp_keys = [k for k in data if k.startswith("MT") or k.startswith("UsC")]
+    if temp_keys:
+        _log.info("capture_telemetry: pid=%s temp/consigne: %s", pid, {k: data[k] for k in temp_keys})
+    # La fusion des champs + horodatage de mise a jour + persistance vivent
+    # dans AppState.store_telemetry (sous le verrou, ecriture atomique).
+    state.store_telemetry(pid, data)
+
+
+def _parse_telemetry_payload(payload):
+    """Parse un payload PUBLISH et renvoie le dict telemetrie ou None."""
     if isinstance(payload, bytes):
         try:
             payload = payload.decode("utf-8", errors="replace")
         except Exception:
-            return
+            return None
     if not isinstance(payload, str):
-        return
+        return None
     payload = payload.strip()
     # La box prefixe chaque telemetrie d'un en-tete binaire (octet de sequence,
     # ex: \x00F). On coupe tout ce qui precede le debut du JSON.
     pos = payload.find("{")
     if pos < 0:
-        return
+        return None
     if pos > 0:
         payload = payload[pos:]
     try:
         data = json.loads(payload)
     except Exception:
-        return
+        return None
     if not isinstance(data, dict):
-        return
-    pid = data.get("productid") or data.get("modemid")
-    if not pid:
-        return
-    # La fusion des champs + horodatage de mise a jour + persistance vivent
-    # dans AppState.store_telemetry (sous le verrou, ecriture atomique).
-    state.store_telemetry(pid, data)
+        return None
+    return data
 
 
 def _epoch_to_iso(value):

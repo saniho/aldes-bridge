@@ -1,6 +1,7 @@
 """API web (FastAPI) : config, etat, SSE temps reel, envoi de commandes, mode."""
 import asyncio
 import json
+import logging
 import os
 import socket
 import subprocess
@@ -13,6 +14,8 @@ from pydantic import BaseModel
 from .aldes import build_products, make_token
 from .appstate import _iso
 from .device_profile import list_profiles, load_profile
+
+_log = logging.getLogger("aldes-api")
 from .version import read_ui_version
 
 
@@ -385,6 +388,7 @@ def create_app(state, engine, web_dir):
     class SettingsBody(BaseModel):
         history_retention_days: int = None
         log_retention_max_bytes: int = None
+        ha_mqtt_dry_run: bool = None
 
     @app.put("/api/settings")
     def api_settings_set(body: SettingsBody):
@@ -395,11 +399,32 @@ def create_app(state, engine, web_dir):
             return JSONResponse(status_code=500, content={"error": "config non initialisee"})
         state.config.set(updates)
         state._purge_now()
+        if "ha_mqtt_dry_run" in updates:
+            ha_client = getattr(state, "_ha_client", None)
+            if ha_client is not None:
+                ha_client.dry_run = updates["ha_mqtt_dry_run"]
+                _log.info("ha-discovery: dry_run=%s (toggle UI)", updates["ha_mqtt_dry_run"])
         state.events.publish({
             "kind": "status", "ts": _iso(),
             "note": f"settings mis a jour : {list(updates.keys())}",
         })
         return {"settings": state.config.get()}
+
+    # --- Home Assistant MQTT Auto-Discovery ---
+    @app.get("/api/ha-discovery")
+    def api_ha_discovery_get():
+        """Retourne la config HA discovery et l'etat de la connexion."""
+        ha_client = getattr(state, "_ha_client", None)
+        p = getattr(state, "profile", None)
+        ha_config = p.ha_discovery if p else {}
+        return {
+            "enabled": ha_client is not None,
+            "connected": ha_client._sock is not None if ha_client else False,
+            "host": getattr(ha_client, "host", None),
+            "port": getattr(ha_client, "port", None),
+            "prefix": getattr(ha_client, "prefix", "aldes"),
+            "config": ha_config,
+        }
 
     # --- Diagnostic (check-up systeme) ---
     @app.get("/api/diagnostic")
@@ -534,6 +559,28 @@ def create_app(state, engine, web_dir):
             "detail": f"Backend {state.server_version} · UI {state.ui_version}",
             "ok": True,
         })
+
+        # 10. Broker MQTT HA (auto-detection)
+        ha_mqtt = getattr(state, "_ha_mqtt_resolved", None)
+        if ha_mqtt:
+            source_label = {"supervisor": "Supervisor API", "cli": "CLI", "fallback": "Fallback"}.get(ha_mqtt["source"], ha_mqtt["source"])
+            checks.append({
+                "id": "ha_mqtt_broker",
+                "label": "Broker MQTT HA",
+                "detail": f"{source_label} → {ha_mqtt['host']}:{ha_mqtt['port']}",
+                "ok": True,
+                "host": ha_mqtt["host"],
+                "port": ha_mqtt["port"],
+                "source": ha_mqtt["source"],
+            })
+        else:
+            checks.append({
+                "id": "ha_mqtt_broker",
+                "label": "Broker MQTT HA",
+                "detail": "Désactivé (--ha-mqtt non utilisé)",
+                "ok": False,
+                "warn": True,
+            })
 
         ok_count = sum(1 for c in checks if c.get("ok"))
         total = len(checks)

@@ -13,6 +13,7 @@ import sys
 from .appstate import AppState, read_persisted_mode, read_persisted_profile
 from .config import ConfigStore
 from .device_profile import load_profile
+from . import __version__ as BACKEND_VERSION
 from .events import EventBus
 from .engine import Engine
 from .eventlog import EventLog
@@ -104,10 +105,36 @@ def build_parser():
                     help="fichier de persistance du profil (survit au redemarrage)")
     ap.add_argument("--config-file", default=os.environ.get("ALDES_CONFIG_FILE", DEFAULT_CONFIG_FILE),
                     help="fichier de configuration persistante (survit au redemarrage)")
+    # Home Assistant MQTT Auto-Discovery
+    ap.add_argument("--ha-mqtt", action="store_true",
+                    default=os.environ.get("HA_MQTT_ENABLED", "").lower() in ("1", "true", "yes"),
+                    help="activer la decouverte MQTT Home Assistant")
+    ap.add_argument("--ha-mqtt-host", default=os.environ.get("HA_MQTT_HOST", "127.0.0.1"),
+                    help="hote du broker MQTT local (defaut: 127.0.0.1)")
+    ap.add_argument("--ha-mqtt-port", type=int,
+                    default=int(os.environ.get("HA_MQTT_PORT", "1883")),
+                    help="port du broker MQTT local (defaut: 1883)")
+    ap.add_argument("--ha-mqtt-user", default=os.environ.get("HA_MQTT_USER", None),
+                    help="utilisateur MQTT (optionnel)")
+    ap.add_argument("--ha-mqtt-password", default=os.environ.get("HA_MQTT_PASSWORD", None),
+                    help="mot de passe MQTT (optionnel)")
+    ap.add_argument("--ha-mqtt-prefix", default=os.environ.get("HA_MQTT_PREFIX", "aldes"),
+                    help="prefixe des topics HA (defaut: aldes)")
+    ap.add_argument("--ha-mqtt-dry-run", action="store_true",
+                    default=os.environ.get("HA_MQTT_DRY_RUN", "true").lower() in ("1", "true", "yes"),
+                    help="mode dry-run : log les commandes sans les envoyer (defaut: active)")
+    ap.add_argument("--ha-mqtt-no-dry-run", action="store_true",
+                    default=os.environ.get("HA_MQTT_DRY_RUN", "").lower() in ("0", "false", "no"),
+                    help="desactive le dry-run : les commandes HA sont envoyees reellement a la box")
     return ap
 
 
 def main(argv=None):
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(name)s %(levelname)s %(message)s",
+        datefmt="%H:%M:%S",
+    )
     args = build_parser().parse_args(argv)
 
     try:
@@ -122,6 +149,10 @@ def main(argv=None):
         log = EventLog(args.log_file, max_bytes=args.log_max)
     events = EventBus(args.history_size, log=log)
     restored = events.restore_from_log(args.history_size)
+
+    ui_version = os.environ.get("ALDES_UI_VERSION", "?")
+    addon_version = os.environ.get("ALDES_ADDON_VERSION", "?")
+    _log.info("=== Aldes Bridge v%s | UI v%s | Add-on v%s ===", BACKEND_VERSION, ui_version, addon_version)
 
     config = ConfigStore(args.config_file)
 
@@ -163,6 +194,64 @@ def main(argv=None):
     engine = Engine(state, mqtt_port=args.mqtt_port, bind=args.bind)
     engine.start()
     state.set_error("ecoute MQTT sur %s:%d, web sur %s:%d" % (args.bind, args.mqtt_port, args.bind, args.web_port))
+
+    # Home Assistant MQTT Auto-Discovery
+    ha_client = None
+    if args.ha_mqtt:
+        from .ha_discovery import HADiscoveryClient, detect_mqtt_broker
+        # Détection auto du broker MQTT via Supervisor API
+        mqtt_host = args.ha_mqtt_host
+        mqtt_port = args.ha_mqtt_port
+        mqtt_source = "cli"
+        detected = detect_mqtt_broker()
+        if detected:
+            mqtt_host = detected["host"]
+            mqtt_port = detected["port"]
+            mqtt_source = "supervisor"
+        elif args.ha_mqtt_host == "127.0.0.1":
+            mqtt_source = "fallback"
+        state._ha_mqtt_resolved = {
+            "host": mqtt_host,
+            "port": mqtt_port,
+            "source": mqtt_source,
+        }
+        initial_dry_run = config.get("ha_mqtt_dry_run") if config else True
+        ha_client = HADiscoveryClient(
+            state,
+            host=mqtt_host,
+            port=mqtt_port,
+            username=args.ha_mqtt_user,
+            password=args.ha_mqtt_password,
+            prefix=args.ha_mqtt_prefix,
+            dry_run=initial_dry_run,
+        )
+        # Hook d'injection : les commandes HA → box passent par engine.inject
+        def _ha_inject(topic, payload, qos):
+            return engine.inject(topic, payload, qos)
+        state._ha_inject_hook = _ha_inject
+        # Hook telemetrie : met a jour les topics HA a chaque trame
+        _original_on_publish_in = state.on_publish_in
+        _hook_count = [0]
+        def _on_publish_in_with_ha(state, payload):
+            _hook_count[0] += 1
+            if _original_on_publish_in:
+                _original_on_publish_in(state, payload)
+            try:
+                from .aldes import _parse_telemetry_payload
+                data = _parse_telemetry_payload(payload)
+                if data:
+                    ha_client.publish_telemetry(data)
+                elif _hook_count[0] <= 5:
+                    _log.info("ha-discovery: hook #%d - payload non-JSON/telemetry ignore (len=%d)",
+                              _hook_count[0], len(payload) if payload else 0)
+            except Exception as exc:
+                _log.warning("ha-discovery: hook #%d - erreur: %s", _hook_count[0], exc)
+        state.on_publish_in = _on_publish_in_with_ha
+        ha_client.start()
+        state._ha_client = ha_client
+        dry_run_msg = " [DRY-RUN]" if initial_dry_run else ""
+        _log.info("HA MQTT auto-discovery active%s: %s:%d via %s (prefix: %s)",
+                  dry_run_msg, mqtt_host, mqtt_port, mqtt_source, args.ha_mqtt_prefix)
 
     from .api import create_app
     app = create_app(state, engine, args.web_dir)

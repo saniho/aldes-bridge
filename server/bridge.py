@@ -1,5 +1,6 @@
 """Mode bridge : faux broker MQTT/TLS. La box se connecte a nous, on injecte direct."""
 import json
+import logging
 import socket
 import struct
 import threading
@@ -13,6 +14,8 @@ from .mqtt import (
     build_pingresp,
 )
 from .appstate import emit_message, emit_connect, MQTTEndpoint
+
+_log = logging.getLogger("aldes-bridge-mode")
 
 
 class BridgeHandler(MQTTEndpoint):
@@ -83,6 +86,7 @@ class BridgeHandler(MQTTEndpoint):
             self._send(build_connack(0))
         elif ptype == PT_PUBLISH:
             topic, qos, pkt_id, payload = parse_publish_full(body, flags)
+            _log.debug("bridge: <-- PUBLISH topic=%s qos=%d payload=%s", topic, qos, payload[:100] if isinstance(payload, str) else payload)
             emit_message(self.state, "in", "PUBLISH", topic=topic, payload=payload, qos=qos)
             if qos == QOS_AT_LEAST_ONCE:
                 self._send(build_puback(pkt_id))

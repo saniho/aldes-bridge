@@ -220,3 +220,79 @@ ui:
   show_vacations: true
   show_people: true
   show_hot_water: true
+
+# ── Home Assistant MQTT Auto-Discovery ──
+ha_discovery:
+  # Mapping modes Aldes → modes HA HVAC
+  mode_mapping:
+    A: "off"        # Arrêt
+    B: "heat"       # Hors gel
+    C: "heat"       # Éco
+    D: "heat"       # Confort
+    E: "heat"       # Anti-condensation (≈ sec)
+    F: "auto"       # Nuit
+    G: "auto"       # Éco nuit
+    H: "fan_only"   # Arrêt ventilateur
+    I: "auto"       # Auto
+  # Mapping presets HA → codes Aldes
+  preset_mapping:
+    none: "D"        # Confort
+    eco: "C"         # Éco
+    comfort: "D"     # Confort
+    night: "F"       # Nuit
+    anti_freeze: "B" # Hors gel
+  # Entités HA à créer
+  entities:
+    climate:
+      - id: "aldes_pac"
+        name: "PAC Aldes"
+        icon: "mdi:heat-pump"
+        min_temp: 5
+        max_temp: 30
+        temp_step: 0.5
+    sensors:
+      - key: "Text"
+        name: "Température extérieure"
+        unit: "°C"
+        device_class: "temperature"
+        icon: "mdi:thermometer"
+      - key: "MT0"
+        name: "Température intérieure"
+        unit: "°C"
+        device_class: "temperature"
+        icon: "mdi:thermometer"
+      - key: "UAM"
+        name: "Mode air"
+        icon: "mdi:fog"
+      - key: "MfAc"
+        name: "Compresseur"
+        binary: true
+        device_class: "running"
+        icon: "mdi:cog"
+    select:
+      - id: "aldes_ecs"
+        name: "PAC Aldes Eau Chaude"
+        icon: "mdi:water-boiler"
+        options:
+          - label: "Éco"
+            value: "eco"
+            icon: "mdi:leaf"
+          - label: "Normal"
+            value: "normal"
+            icon: "mdi:thermometer"
+          - label: "Confort"
+            value: "confort"
+            icon: "mdi:fire"
+    date:
+      - id: "aldes_vacation_start"
+        name: "Vacances Début"
+        icon: "mdi:calendar-start"
+      - id: "aldes_vacation_end"
+        name: "Vacances Fin"
+        icon: "mdi:calendar-end"
+    switch:
+      - id: "aldes_vacation_enable"
+        name: "Vacances Activer"
+        icon: "mdi:calendar-check"
+        payload_on: "on"
+        payload_off: "off"

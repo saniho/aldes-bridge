@@ -5,12 +5,15 @@ Modes:
   - raw            : on se connecte en CLIENT a un broker MQTT externe
                      (server/raw.py) — pas de listener TLS.
 """
+import logging
 import socket
 import threading
 import time
 
 from .tls import server_context
 from .appstate import set_conn_ctx, clear_conn_ctx
+
+_log = logging.getLogger("aldes-engine")
 from .bridge import BridgeHandler
 from .proxy import ProxyHandler
 from .listen import ListenHandler
@@ -203,18 +206,24 @@ class Engine(threading.Thread):
 
     # --- API pour l'UI ---
     def inject(self, topic, payload, qos):
+        _log.info("inject: topic=%s payload=%s qos=%d mode=%s", topic, payload[:200] if isinstance(payload, str) else payload, qos, self.state.mode)
         if self.state.mode == "raw":
             with self._lock:
                 raw = self._raw
             if raw is None:
+                _log.warning("inject: mode raw inactif, commande abandonnee")
                 return {"ok": False, "error": "mode raw inactif"}
             return raw.inject(topic, payload, qos)
         handler = self.current_handler
         if handler is None:
+            _log.warning("inject: aucune box connectee, commande abandonnee")
             return {"ok": False, "error": "aucune box connectee"}
         if not topic or not topic.strip():
+            _log.warning("inject: topic vide, commande abandonnee")
             return {"ok": False, "error": "topic vide"}
-        return handler.inject(topic.strip(), payload, qos)
+        result = handler.inject(topic.strip(), payload, qos)
+        _log.info("inject: resultat=%s", result)
+        return result
 
     def disconnect(self):
         if self.state.mode == "raw":

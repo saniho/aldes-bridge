@@ -171,6 +171,7 @@ export interface DeviceProfile {
 export interface AppConfig {
   history_retention_days: number
   log_retention_max_bytes: number
+  ha_mqtt_dry_run: boolean
 }
 
 export interface DiagnosticCheck {

@@ -153,9 +153,11 @@ class MQTTEndpoint:
     """
 
     def _inject_raw(self, topic, payload, qos):
+        _log.info("_inject_raw: topic=%s payload=%s qos=%d", topic, payload[:200] if isinstance(payload, str) else payload, qos)
         self._pkt_id = getattr(self, "_pkt_id", 0) + 1
         pkt = build_publish(topic, payload, qos=qos, pkt_id=self._pkt_id)
         self.send_publish(pkt)
+        _log.info("_inject_raw: PUBLISH envoye (%d octets)", len(pkt))
         emit_message(
             self.state, "out", "PUBLISH",
             topic=topic, payload=payload, qos=qos,
@@ -315,6 +317,12 @@ class AppState:
         """
         with self._lock:
             current = dict(self.telemetry.get(pid, {}))
+            # Log les changements de temperature/consigne
+            temp_keys = [k for k in data if k.startswith("MT") or k.startswith("UsC")]
+            if temp_keys:
+                changes = {k: data[k] for k in temp_keys if str(data.get(k)) != str(current.get(k))}
+                if changes:
+                    _log.info("store_telemetry: pid=%s changements: %s", pid, changes)
             current.update(data)
             current["_pid"] = pid
             current["_upd_at"] = time.time()
@@ -381,10 +389,13 @@ class AppState:
                 got = float(data.get("UsC%s" % zone))
             except (TypeError, ValueError):
                 continue
+            _log.debug("confirm_consigne: zone %s requested=%.1f got=%.1f (diff=%.2f)",
+                       zone, entry["requested"], got, abs(got - entry["requested"]))
             if abs(got - entry["requested"]) < 0.01:
                 entry["confirmed"] = True
                 entry["ts"] = _iso()
                 changed.append(zone)
+                _log.info("confirm_consigne: zone %s CONFIRMEE -> %.1f", zone, got)
         if not changed:
             return
         self._save_consignes()

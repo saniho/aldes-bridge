@@ -229,9 +229,18 @@ def build_publish(topic, payload, qos=0, pkt_id=1, retain=False, dup=False):
     return bytes([hdr]) + encode_remaining_length(len(body)) + body
 
 
-def build_connect(client_id, username=None, password=None, keepalive=60):
-    cflags = 0
+def build_connect(client_id, username=None, password=None, keepalive=60,
+                   will_topic=None, will_payload=None, will_qos=0, will_retain=False):
+    cflags = 0x02  # Clean Session
     payload = struct.pack(">H", len(client_id)) + client_id.encode("utf-8")
+    if will_topic is not None:
+        cflags |= 0x04  # Will Flag
+        cflags |= (will_qos & 3) << 3
+        if will_retain:
+            cflags |= 0x20
+        payload += struct.pack(">H", len(will_topic)) + will_topic.encode("utf-8")
+        wp = will_payload.encode("utf-8") if isinstance(will_payload, str) else will_payload
+        payload += struct.pack(">H", len(wp)) + wp
     if username is not None:
         cflags |= 0x80
         payload += struct.pack(">H", len(username)) + username.encode("utf-8")
