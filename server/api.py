@@ -3,9 +3,12 @@ import asyncio
 import json
 import logging
 import os
+import resource
 import socket
 import subprocess
+import time
 import urllib.parse
+from datetime import datetime, timezone
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
@@ -17,6 +20,8 @@ from .device_profile import list_profiles, load_profile
 
 _log = logging.getLogger("aldes-api")
 from .version import read_ui_version
+
+_PROCESS_START = time.time()
 
 
 class SendBody(BaseModel):
@@ -577,10 +582,130 @@ def create_app(state, engine, web_dir):
             checks.append({
                 "id": "ha_mqtt_broker",
                 "label": "Broker MQTT HA",
-                "detail": "Désactivé (--ha-mqtt non utilisé)",
+                "detail": "Desactive (--ha-mqtt non utilise)",
                 "ok": False,
                 "warn": True,
             })
+
+        # 11. Certificat TLS self-signe
+        try:
+            from .tls import _generate
+            from cryptography import x509 as _x509
+            cert_path, key_path = _generate(state.real_host)
+            try:
+                with open(cert_path, "rb") as _cf:
+                    cert_pem = _cf.read()
+                cert = _x509.load_pem_x509_certificate(cert_pem)
+                not_after = cert.not_valid_after_utc
+                now_aware = datetime.now(timezone.utc)
+                days_left = (not_after - now_aware).days
+                detail = f"Expire le {not_after.strftime('%Y-%m-%d')} ({days_left}j)"
+                ok = days_left > 30
+                warn = 0 < days_left <= 30
+                checks.append({
+                    "id": "tls_cert",
+                    "label": "Certificat TLS",
+                    "detail": detail,
+                    "ok": ok,
+                    "warn": warn,
+                })
+            finally:
+                os.unlink(cert_path)
+                os.unlink(key_path)
+        except Exception as exc:
+            checks.append({"id": "tls_cert", "label": "Certificat TLS", "detail": str(exc), "ok": False})
+
+        # 12. Latence reseau vers Azure (RTT TCP)
+        if azure_ip:
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(3)
+                t0 = time.monotonic()
+                result_tcp = sock.connect_ex((azure_ip, 8883))
+                rtt_ms = (time.monotonic() - t0) * 1000
+                sock.close()
+                if result_tcp == 0:
+                    detail = f"{rtt_ms:.0f} ms" + (" (lent)" if rtt_ms > 1000 else "")
+                    checks.append({
+                        "id": "azure_latency",
+                        "label": "Latence Azure",
+                        "detail": detail,
+                        "ok": rtt_ms < 1000,
+                        "warn": rtt_ms > 500,
+                    })
+                else:
+                    checks.append({"id": "azure_latency", "label": "Latence Azure", "detail": f"Refuse (errno {result_tcp})", "ok": False})
+            except Exception as exc:
+                checks.append({"id": "azure_latency", "label": "Latence Azure", "detail": str(exc), "ok": False})
+        else:
+            checks.append({"id": "azure_latency", "label": "Latence Azure", "detail": "IP non resolue", "ok": False})
+
+        # 13. Sante du processus backend
+        try:
+            uptime_s = time.time() - _PROCESS_START
+            if uptime_s < 60:
+                uptime_str = f"{uptime_s:.0f}s"
+            elif uptime_s < 3600:
+                uptime_str = f"{uptime_s / 60:.0f}min"
+            else:
+                uptime_str = f"{uptime_s / 3600:.1f}h"
+            mem_kb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+            mem_mb = mem_kb / 1024
+            checks.append({
+                "id": "process_health",
+                "label": "Processus backend",
+                "detail": f"Uptime {uptime_str} · {mem_mb:.0f} Mo RSS",
+                "ok": True,
+            })
+        except Exception as exc:
+            checks.append({"id": "process_health", "label": "Processus backend", "detail": str(exc), "ok": False})
+
+        # 14. Consignes en attente
+        try:
+            with state._lock:
+                consignes = {k: dict(v) for k, v in state._consignes.items()}
+            pending = {z: c for z, c in consignes.items() if not c.get("confirmed")}
+            if not pending:
+                checks.append({
+                    "id": "pending_consignes",
+                    "label": "Consignes en attente",
+                    "detail": "Aucune consigne en attente",
+                    "ok": True,
+                })
+            else:
+                now_ts = time.time()
+                oldest_age = 0
+                for z, c in pending.items():
+                    try:
+                        ts_str = c.get("ts", "")
+                        if ts_str:
+                            from datetime import datetime as _dt
+                            ts_dt = _dt.fromisoformat(ts_str)
+                            age = now_ts - ts_dt.timestamp()
+                            oldest_age = max(oldest_age, age)
+                    except Exception:
+                        pass
+                if oldest_age < 60:
+                    age_str = f"{oldest_age:.0f}s"
+                elif oldest_age < 3600:
+                    age_str = f"{oldest_age / 60:.0f}min"
+                else:
+                    age_str = f"{oldest_age / 3600:.1f}h"
+                zones = ", ".join(sorted(pending.keys()))
+                ok = oldest_age < 300
+                warn = not ok and oldest_age < 1800
+                detail = f"{len(pending)} zone(s) [{zones}] · {age_str}"
+                if not ok:
+                    detail += " — probablement perdue"
+                checks.append({
+                    "id": "pending_consignes",
+                    "label": "Consignes en attente",
+                    "detail": detail,
+                    "ok": ok,
+                    "warn": warn,
+                })
+        except Exception as exc:
+            checks.append({"id": "pending_consignes", "label": "Consignes en attente", "detail": str(exc), "ok": False})
 
         ok_count = sum(1 for c in checks if c.get("ok"))
         total = len(checks)
