@@ -191,12 +191,11 @@ def _build_discovery_config(device_id, profile, prefix="aldes", data=None):
         configs.append((old_topic, ""))
 
     for zone_idx in active_zones:
-        zone_suffix = f"_zone{zone_idx}" if zone_idx > 0 else ""
-        zone_label = f"Zone {zone_idx + 1}" if zone_idx > 0 else "PAC Aldes"
+        zone_label = f"Zone {zone_idx + 1}"
 
         climate_config = {
             "name": zone_label,
-            "unique_id": f"aldes_{device_id}_climate{zone_suffix}",
+            "unique_id": f"aldes_{device_id}_climate_zone{zone_idx}",
             "device": device_info,
             "modes": ["off", "heat", "cool", "auto", "fan_only"],
             "mode_state_topic": f"{prefix}/state/mode",
