@@ -9,6 +9,7 @@ import pytest
 
 from server.appstate import AppState
 from server.events import EventBus
+from server.device_profile import load_profile
 from server.ha_discovery import (
     HADiscoveryClient,
     detect_mqtt_broker,
@@ -29,29 +30,27 @@ def test_aldes_to_ha_mode_mapping():
     assert ALDES_TO_HA_MODE["B"] == "heat"
     assert ALDES_TO_HA_MODE["C"] == "heat"
     assert ALDES_TO_HA_MODE["D"] == "heat"
-    assert ALDES_TO_HA_MODE["I"] == "auto"
-    assert ALDES_TO_HA_MODE["H"] == "fan_only"
+    assert ALDES_TO_HA_MODE["I"] == "cool"
+    assert ALDES_TO_HA_MODE["H"] == "cool"
 
 
 def test_ha_to_aldes_mode_mapping():
     assert HA_MODE_TO_ALDES["off"] == "A"
-    assert HA_MODE_TO_ALDES["heat"] == "D"
-    assert HA_MODE_TO_ALDES["auto"] == "I"
-    assert HA_MODE_TO_ALDES["fan_only"] == "H"
-    assert HA_MODE_TO_ALDES["dry"] == "E"
+    assert HA_MODE_TO_ALDES["heat"] == "B"
+    assert HA_MODE_TO_ALDES["cool"] == "F"
 
 
 def test_aldes_to_ha_preset_mapping():
-    assert ALDES_TO_HA_PRESET["A"] is None
-    assert ALDES_TO_HA_PRESET["C"] == "eco"
-    assert ALDES_TO_HA_PRESET["D"] == "comfort"
-    assert ALDES_TO_HA_PRESET["F"] == "comfort"  # Air Confort
+    assert ALDES_TO_HA_PRESET["A"] == "Arrêt"
+    assert ALDES_TO_HA_PRESET["C"] == "Éco"
+    assert ALDES_TO_HA_PRESET["D"] == "Chauffage programme A"
+    assert ALDES_TO_HA_PRESET["F"] == "Climatisation"
 
 
 def test_ha_to_aldes_preset_mapping():
-    assert HA_PRESET_TO_ALDES["eco"] == "C"
-    assert HA_PRESET_TO_ALDES["comfort"] == "F"  # Air Confort
-    assert HA_PRESET_TO_ALDES["anti_freeze"] == "B"
+    assert HA_PRESET_TO_ALDES["Éco"] == "C"
+    assert HA_PRESET_TO_ALDES["Climatisation"] == "F"
+    assert HA_PRESET_TO_ALDES["Confort"] == "B"
 
 
 # --- Tests de la config discovery ---
@@ -72,7 +71,8 @@ def test_build_discovery_config_topics():
 
 
 def test_build_discovery_config_climate_valid():
-    configs = _build_discovery_config("dev123", None)
+    profile = load_profile("tone-aquaair")
+    configs = _build_discovery_config("dev123", profile)
     climate_topic = None
     climate_payload = None
     for topic, payload in configs:
@@ -86,14 +86,26 @@ def test_build_discovery_config_climate_valid():
     assert climate_payload["unique_id"] == "aldes_dev123_climate"
     assert "off" in climate_payload["modes"]
     assert "heat" in climate_payload["modes"]
-    assert "auto" in climate_payload["modes"]
-    assert "fan_only" in climate_payload["modes"]
+    assert climate_payload["modes"] == ["off", "heat", "cool"]
     assert "mode_state_topic" in climate_payload
     assert "mode_command_topic" in climate_payload
     assert "temperature_state_topic" in climate_payload
     assert "temperature_command_topic" in climate_payload
     assert "current_temperature_topic" in climate_payload
     assert "preset_modes" in climate_payload
+    assert climate_payload["preset_modes"] == [
+        "Arrêt",
+        "Confort",
+        "Éco",
+        "Chauffage programme A",
+        "Chauffage programme B",
+        "Climatisation",
+        "Climatisation boost",
+        "Climatisation programme C",
+        "Climatisation programme D",
+    ]
+    assert climate_payload["precision"] == 0.1
+    assert climate_payload["temp_step"] == 0.5
     assert "availability_topic" in climate_payload
 
 
@@ -174,15 +186,15 @@ def test_get_float():
 # --- Tests des mappings ECS (eau chaude sanitaire) ---
 
 def test_aldes_water_to_ha_mapping():
-    assert ALDES_WATER_TO_HA["L"] == "eco"
-    assert ALDES_WATER_TO_HA["M"] == "normal"
-    assert ALDES_WATER_TO_HA["N"] == "confort"
+    assert ALDES_WATER_TO_HA["L"] == "Arrêt"
+    assert ALDES_WATER_TO_HA["M"] == "Marche"
+    assert ALDES_WATER_TO_HA["N"] == "Boost"
 
 
 def test_ha_water_to_aldes_mapping():
-    assert HA_WATER_TO_ALDES["eco"] == "L"
-    assert HA_WATER_TO_ALDES["normal"] == "M"
-    assert HA_WATER_TO_ALDES["confort"] == "N"
+    assert HA_WATER_TO_ALDES["Arrêt"] == "L"
+    assert HA_WATER_TO_ALDES["Marche"] == "M"
+    assert HA_WATER_TO_ALDES["Boost"] == "N"
 
 
 def test_get_water_mode_code_valid():
@@ -206,18 +218,35 @@ def test_get_water_mode_code_invalid():
 # --- Tests des configs ECS et vacances ---
 
 def test_build_discovery_config_has_ecs_select():
-    configs = _build_discovery_config("dev123", None)
+    configs = _build_discovery_config("dev123", load_profile("tone-aquaair"))
     ecs_topic = None
     for topic, payload_str in configs:
         if "ecs" in topic and "select" in topic:
             ecs_topic = topic
             payload = json.loads(payload_str)
             assert payload["name"] == "PAC Aldes Eau Chaude"
-            assert payload["options"] == ["eco", "normal", "confort"]
+            assert payload["options"] == ["Arrêt", "Marche", "Boost"]
             assert "command_topic" in payload
             assert "state_topic" in payload
             break
     assert ecs_topic is not None
+
+
+def test_profile_program_commands_are_converted_to_aldes_codes():
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events)
+    state.profile = load_profile("tone-aquaair")
+    injected = []
+    state._ha_inject_hook = lambda topic, payload, qos: injected.append(json.loads(payload))
+    client = HADiscoveryClient(state, dry_run=False)
+
+    client._handle_preset_command("Climatisation boost")
+    client._handle_ecs_command("Boost")
+
+    assert injected == [
+        {"id": 1, "jsonrpc": "2.0", "method": "changeMode", "params": ["G"]},
+        {"id": 1, "jsonrpc": "2.0", "method": "changeMode", "params": ["N"]},
+    ]
 
 
 def test_build_discovery_config_has_vacation_entities():
