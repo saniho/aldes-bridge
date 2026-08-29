@@ -457,3 +457,46 @@ def test_detect_mqtt_broker_missing_fields(monkeypatch):
 
     result = detect_mqtt_broker()
     assert result is None
+
+
+# --- Tests anti-flicker (zones inactives) ---
+
+def test_build_discovery_no_blanket_cleanup_on_republish():
+    """Aucun payload vide envoye quand previous_active_zones == active_zones."""
+    data = {"UsC0": 1, "UsC1": 1, "MT0": 21.0, "MT1": 22.0}
+    configs_first = _build_discovery_config("dev1", None, data=data)
+    empty_first = [t for t, p in configs_first if not p]
+    assert len(empty_first) > 0
+
+    configs_second = _build_discovery_config(
+        "dev1", None, data=data,
+        previous_active_zones=[0, 1],
+    )
+    empty_second = [t for t, p in configs_second if not p]
+    assert empty_second == [], f"Payload vides inattendus: {empty_second}"
+
+
+def test_build_discovery_cleans_deactivated_zone():
+    """Payload vide envoye uniquement pour les zones devenues inactives."""
+    data_one_less = {"UsC0": 1, "UsC1": 0, "MT0": 21.0}
+    configs = _build_discovery_config(
+        "dev1", None, data=data_one_less,
+        previous_active_zones=[0, 1],
+    )
+    empty_topics = [t for t, p in configs if not p]
+    assert any("aldes_zone1/config" in t for t in empty_topics), \
+        f"Zone 1 devrait etre nettoyee: {empty_topics}"
+    assert not any("aldes_zone0/config" in t for t in empty_topics), \
+        f"Zone 0 ne devrait PAS etre nettoyee: {empty_topics}"
+
+
+def test_build_discovery_no_cleanup_for_new_zones():
+    """Pas de payload vide pour des zones jamais actives."""
+    data = {"UsC0": 1, "UsC1": 1, "UsC2": 1, "MT0": 21.0, "MT1": 22.0, "MT2": 23.0}
+    configs = _build_discovery_config(
+        "dev1", None, data=data,
+        previous_active_zones=[0, 1],
+    )
+    empty_topics = [t for t, p in configs if not p]
+    assert not any("aldes_zone2/config" in t for t in empty_topics), \
+        f"Zone 2 (nouvelle) ne devrait pas etre nettoyee: {empty_topics}"
