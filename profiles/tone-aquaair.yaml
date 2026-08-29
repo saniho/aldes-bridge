@@ -249,7 +249,7 @@ ha_discovery:
         icon: "mdi:heat-pump"
         min_temp: 5
         max_temp: 30
-        temp_step: 0.5
+        temp_step: 1
     sensors:
       - key: "Text"
         name: "Température extérieure"

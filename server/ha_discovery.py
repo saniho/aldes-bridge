@@ -201,6 +201,11 @@ def _build_discovery_config(device_id, profile, prefix="aldes", data=None):
     air_programs = _profile_mode_labels(profile, "air_modes", ALDES_TO_HA_PRESET)
     water_programs = _profile_mode_labels(profile, "water_modes", ALDES_WATER_TO_HA)
 
+    # temp_step depuis le profil, fallback 1
+    ha_entities = (profile.ha_discovery.get("entities", {}) if profile else {}) or {}
+    climate_entities = ha_entities.get("climate", []) or []
+    temp_step = climate_entities[0].get("temp_step", 1) if climate_entities else 1
+
     # Nettoyage : on retire tous les anciens topics de decouverte climate
     # puis on publie uniquement les entités actives
     old_climate_topics = [f"{discovery_prefix}/climate/aldes/config"]
@@ -225,7 +230,7 @@ def _build_discovery_config(device_id, profile, prefix="aldes", data=None):
             "temp_unit": "C",
             "min_temp": min_temp,
             "max_temp": max_temp,
-            "temp_step": 1,
+            "temp_step": temp_step,
             "precision": 0.1,
             "preset_modes": air_programs,
             "preset_mode_state_topic": f"{prefix}/state/preset",
@@ -254,7 +259,7 @@ def _build_discovery_config(device_id, profile, prefix="aldes", data=None):
             "temp_unit": "C",
             "min_temp": min_temp,
             "max_temp": max_temp,
-            "temp_step": 1,
+            "temp_step": temp_step,
             "precision": 0.1,
             "preset_modes": air_programs,
             "preset_mode_state_topic": f"{prefix}/state/preset",
