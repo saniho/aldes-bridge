@@ -543,6 +543,7 @@ et en preset « Change consigne C0 » dans « Envoyer une commande MQTT ».
 - `--profile <id>` (ou env `ALDES_PROFILE`) — profil device à charger (défaut : premier profil trouvé)
 - `--profile-file logs/profile.json` — persistance du profil sélectionné (prime sur `--profile`)
 - `--config-file logs/config.json` — persistance des paramètres (rétention, logs)
+- `--zones-file logs/zones.json` — persistance des zones actives (nettoyage auto-discovery au redemarrage)
 - `--bind 0.0.0.0`, `--mqtt-port 8883`, `--web-port 8080`
 - `--real-host aldesiotsuite.azure-devices.net`, `--real-port 8883`
 - `--web-dir <dist>` (frontend construit)

@@ -528,3 +528,33 @@ def test_ha_client_no_zones_file():
     assert client._last_active_zones == []
     client._save_zones([0, 1])
     assert client._last_active_zones == []
+
+
+def test_ha_client_zones_file_corrupt(tmp_path):
+    """Fichier JSON corrompu → fallback zones vides."""
+    zones_file = str(tmp_path / "zones.json")
+    zones_file_path = tmp_path / "zones.json"
+    zones_file_path.write_text("{invalid json!!!")
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events)
+    client = HADiscoveryClient(state, host="127.0.0.1", port=19999, zones_file=zones_file)
+    assert client._last_active_zones == []
+
+
+def test_ha_client_zones_file_not_a_list(tmp_path):
+    """Fichier JSON avec un dict au lieu d'une liste → fallback zones vides."""
+    zones_file = str(tmp_path / "zones.json")
+    zones_file_path = tmp_path / "zones.json"
+    zones_file_path.write_text('{"key": "value"}')
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events)
+    client = HADiscoveryClient(state, host="127.0.0.1", port=19999, zones_file=zones_file)
+    assert client._last_active_zones == []
+
+
+def test_build_discovery_backward_compat_none():
+    """previous_active_zones=None fonctionne (pas de nettoyage)."""
+    data = {"UsC0": 1, "MT0": 21.0}
+    configs = _build_discovery_config("dev1", None, data=data, previous_active_zones=None)
+    empty = [t for t, p in configs if not p]
+    assert empty == []
