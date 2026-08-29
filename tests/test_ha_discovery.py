@@ -466,7 +466,7 @@ def test_build_discovery_no_blanket_cleanup_on_republish():
     data = {"UsC0": 1, "UsC1": 1, "MT0": 21.0, "MT1": 22.0}
     configs_first = _build_discovery_config("dev1", None, data=data)
     empty_first = [t for t, p in configs_first if not p]
-    assert len(empty_first) > 0
+    assert empty_first == [], f"Premiere publication ne devrait pas nettoyer: {empty_first}"
 
     configs_second = _build_discovery_config(
         "dev1", None, data=data,

@@ -212,13 +212,6 @@ def _build_discovery_config(device_id, profile, prefix="aldes", data=None,
         deactivated = set(previous_active_zones) - set(active_zones)
         for zi in deactivated:
             configs.append((f"{discovery_prefix}/climate/aldes_zone{zi}/config", ""))
-    else:
-        # Premiere publication : nettoyer tous les anciens topics
-        old_climate_topics = [f"{discovery_prefix}/climate/aldes/config"]
-        for zi in range(10):
-            old_climate_topics.append(f"{discovery_prefix}/climate/aldes_zone{zi}/config")
-        for old_topic in old_climate_topics:
-            configs.append((old_topic, ""))
 
     for zone_idx in active_zones:
         zone_label = f"Zone {zone_idx + 1}"
@@ -438,7 +431,7 @@ class HADiscoveryClient(threading.Thread):
         self._pkt = 0
         self._device_id = "aldes_bridge"
         self._last_mode = None
-        self._last_active_zones = None
+        self._last_active_zones = []
         if dry_run:
             _log.warning("ha-discovery: *** DRY-RUN active *** les commandes HA ne seront PAS envoyees a la box")
             _log.warning("ha-discovery: pour activer, passez HA_MQTT_DRY_RUN=false ou --ha-mqtt-no-dry-run")
