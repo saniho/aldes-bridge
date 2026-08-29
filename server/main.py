@@ -32,6 +32,19 @@ DEFAULT_CONFIG_FILE = os.path.join(APP_ROOT, "logs", "config.json")
 DEFAULT_HISTORY_DAYS = 90
 
 
+def _optional_env_bool(name):
+    value = os.environ.get(name)
+    if value is None:
+        return None
+    return value.lower() in ("1", "true", "yes")
+
+
+def _resolve_ha_mqtt_dry_run(args, config):
+    if args.ha_mqtt_dry_run is not None:
+        return args.ha_mqtt_dry_run
+    return config.get("ha_mqtt_dry_run") if config else True
+
+
 def _default_web_dir():
     for cand in ("dist", "web/dist"):
         p = os.path.join(APP_ROOT, cand)
@@ -120,12 +133,11 @@ def build_parser():
                     help="mot de passe MQTT (optionnel)")
     ap.add_argument("--ha-mqtt-prefix", default=os.environ.get("HA_MQTT_PREFIX", "aldes"),
                     help="prefixe des topics HA (defaut: aldes)")
-    ap.add_argument("--ha-mqtt-dry-run", action="store_true",
-                    default=os.environ.get("HA_MQTT_DRY_RUN", "true").lower() in ("1", "true", "yes"),
+    ap.add_argument("--ha-mqtt-dry-run", dest="ha_mqtt_dry_run", action="store_true",
                     help="mode dry-run : log les commandes sans les envoyer (defaut: active)")
-    ap.add_argument("--ha-mqtt-no-dry-run", action="store_true",
-                    default=os.environ.get("HA_MQTT_DRY_RUN", "").lower() in ("0", "false", "no"),
+    ap.add_argument("--ha-mqtt-no-dry-run", dest="ha_mqtt_dry_run", action="store_false",
                     help="desactive le dry-run : les commandes HA sont envoyees reellement a la box")
+    ap.set_defaults(ha_mqtt_dry_run=_optional_env_bool("HA_MQTT_DRY_RUN"))
     return ap
 
 
@@ -215,7 +227,7 @@ def main(argv=None):
             "port": mqtt_port,
             "source": mqtt_source,
         }
-        initial_dry_run = config.get("ha_mqtt_dry_run") if config else True
+        initial_dry_run = _resolve_ha_mqtt_dry_run(args, config)
         ha_client = HADiscoveryClient(
             state,
             host=mqtt_host,
