@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.8.5] - 2026-08-29
+
+### Fixes
+- **HA Discovery** : élimination du flicker "Inconnu" des entités climate — nettoyage ciblé des zones devenues inactives au lieu d'un nettoyage aveugle de tous les topics
+- **HA Discovery** : persistance des zones actives dans `logs/zones.json` pour un nettoyage correct après redemarrage
+
+### Ajouté
+- Argument CLI `--zones-file` pour configurer le chemin de persistance des zones
+
 ## [0.8.4] - 2026-08-29
 
 ### Fixes

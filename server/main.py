@@ -29,6 +29,7 @@ DEFAULT_CONSIGNE_FILE = os.path.join(APP_ROOT, "logs", "consigne.json")
 DEFAULT_HISTORY_FILE = os.path.join(APP_ROOT, "logs", "history.db")
 DEFAULT_PROFILE_FILE = os.path.join(APP_ROOT, "logs", "profile.json")
 DEFAULT_CONFIG_FILE = os.path.join(APP_ROOT, "logs", "config.json")
+DEFAULT_ZONES_FILE = os.path.join(APP_ROOT, "logs", "zones.json")
 DEFAULT_HISTORY_DAYS = 90
 
 
@@ -118,6 +119,8 @@ def build_parser():
                     help="fichier de persistance du profil (survit au redemarrage)")
     ap.add_argument("--config-file", default=os.environ.get("ALDES_CONFIG_FILE", DEFAULT_CONFIG_FILE),
                     help="fichier de configuration persistante (survit au redemarrage)")
+    ap.add_argument("--zones-file", default=os.environ.get("ALDES_ZONES_FILE", DEFAULT_ZONES_FILE),
+                    help="fichier de persistance des zones actives (nettoyage decouverte)")
     # Home Assistant MQTT Auto-Discovery
     ap.add_argument("--ha-mqtt", action="store_true",
                     default=os.environ.get("HA_MQTT_ENABLED", "").lower() in ("1", "true", "yes"),
@@ -236,6 +239,7 @@ def main(argv=None):
             password=args.ha_mqtt_password,
             prefix=args.ha_mqtt_prefix,
             dry_run=initial_dry_run,
+            zones_file=args.zones_file,
         )
         # Hook d'injection : les commandes HA → box passent par engine.inject
         def _ha_inject(topic, payload, qos):
