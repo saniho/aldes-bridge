@@ -457,3 +457,74 @@ def test_detect_mqtt_broker_missing_fields(monkeypatch):
 
     result = detect_mqtt_broker()
     assert result is None
+
+
+# --- Tests anti-flicker (zones inactives) ---
+
+def test_build_discovery_no_blanket_cleanup():
+    """Pas de nettoyage aveugle au premier appel."""
+    data = {"UsC0": 1, "UsC1": 1, "MT0": 21.0, "MT1": 22.0}
+    configs = _build_discovery_config("dev1", None, data=data)
+    empty = [t for t, p in configs if not p]
+    assert empty == [], f"Premiere publication ne devrait pas nettoyer: {empty}"
+
+
+def test_build_discovery_cleans_deactivated_zone():
+    """Payload vide envoye uniquement pour les zones devenues inactives."""
+    data_one_less = {"UsC0": 1, "UsC1": 0, "MT0": 21.0}
+    configs = _build_discovery_config(
+        "dev1", None, data=data_one_less,
+        previous_active_zones=[0, 1],
+    )
+    empty_topics = [t for t, p in configs if not p]
+    assert any("aldes_zone1/config" in t for t in empty_topics), \
+        f"Zone 1 devrait etre nettoyee: {empty_topics}"
+    assert not any("aldes_zone0/config" in t for t in empty_topics), \
+        f"Zone 0 ne devrait PAS etre nettoyee: {empty_topics}"
+
+
+def test_build_discovery_no_cleanup_for_new_zones():
+    """Pas de payload vide pour des zones jamais actives."""
+    data = {"UsC0": 1, "UsC1": 1, "UsC2": 1, "MT0": 21.0, "MT1": 22.0, "MT2": 23.0}
+    configs = _build_discovery_config(
+        "dev1", None, data=data,
+        previous_active_zones=[0, 1],
+    )
+    empty_topics = [t for t, p in configs if not p]
+    assert not any("aldes_zone2/config" in t for t in empty_topics), \
+        f"Zone 2 (nouvelle) ne devrait pas etre nettoyee: {empty_topics}"
+
+
+# --- Tests persistance des zones ---
+
+def test_ha_client_zones_file_persist(tmp_path):
+    """Zones sauvegardees et relues via le fichier JSON."""
+    zones_file = str(tmp_path / "zones.json")
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events)
+
+    client = HADiscoveryClient(state, host="127.0.0.1", port=19999, zones_file=zones_file)
+    assert client._last_active_zones == []
+
+    client._save_zones([0, 1, 2])
+    client2 = HADiscoveryClient(state, host="127.0.0.1", port=19999, zones_file=zones_file)
+    assert client2._last_active_zones == [0, 1, 2]
+
+
+def test_ha_client_zones_file_missing(tmp_path):
+    """Fichier inexistant → zones vides."""
+    zones_file = str(tmp_path / "nonexistent.json")
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events)
+    client = HADiscoveryClient(state, host="127.0.0.1", port=19999, zones_file=zones_file)
+    assert client._last_active_zones == []
+
+
+def test_ha_client_no_zones_file():
+    """Sans zones_file → pas de persistance."""
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events)
+    client = HADiscoveryClient(state, host="127.0.0.1", port=19999)
+    assert client._last_active_zones == []
+    client._save_zones([0, 1])
+    assert client._last_active_zones == []

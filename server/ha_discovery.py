@@ -180,7 +180,8 @@ def _detect_active_zones(data):
     return zones
 
 
-def _build_discovery_config(device_id, profile, prefix="aldes", data=None):
+def _build_discovery_config(device_id, profile, prefix="aldes", data=None,
+                            previous_active_zones=None):
     """Construit les configs HA auto-discovery pour une PAC Aldes T.ONE."""
     configs = []
 
@@ -206,13 +207,11 @@ def _build_discovery_config(device_id, profile, prefix="aldes", data=None):
     climate_entities = ha_entities.get("climate", []) or []
     temp_step = climate_entities[0].get("temp_step", 1) if climate_entities else 1
 
-    # Nettoyage : on retire tous les anciens topics de decouverte climate
-    # puis on publie uniquement les entités actives
-    old_climate_topics = [f"{discovery_prefix}/climate/aldes/config"]
-    for zi in range(10):
-        old_climate_topics.append(f"{discovery_prefix}/climate/aldes_zone{zi}/config")
-    for old_topic in old_climate_topics:
-        configs.append((old_topic, ""))
+    # Nettoyage cible : uniquement les zones devenues inactives
+    if previous_active_zones is not None:
+        deactivated = set(previous_active_zones) - set(active_zones)
+        for zi in deactivated:
+            configs.append((f"{discovery_prefix}/climate/aldes_zone{zi}/config", ""))
 
     for zone_idx in active_zones:
         zone_label = f"Zone {zone_idx + 1}"
@@ -417,7 +416,7 @@ class HADiscoveryClient(threading.Thread):
     KEEPALIVE = 30
     PUBLISH_INTERVAL = 60  # re-publie les configs toutes les 60s
 
-    def __init__(self, state, host="127.0.0.1", port=1883, username=None, password=None, prefix="aldes", dry_run=True):
+    def __init__(self, state, host="127.0.0.1", port=1883, username=None, password=None, prefix="aldes", dry_run=True, zones_file=None):
         super().__init__(daemon=True, name="ha-discovery")
         self.state = state
         self.host = host
@@ -432,9 +431,32 @@ class HADiscoveryClient(threading.Thread):
         self._pkt = 0
         self._device_id = "aldes_bridge"
         self._last_mode = None
+        self._zones_file = zones_file
+        self._last_active_zones = self._load_zones()
         if dry_run:
             _log.warning("ha-discovery: *** DRY-RUN active *** les commandes HA ne seront PAS envoyees a la box")
             _log.warning("ha-discovery: pour activer, passez HA_MQTT_DRY_RUN=false ou --ha-mqtt-no-dry-run")
+
+    def _load_zones(self):
+        """Charge les zones actives depuis le fichier de persistance."""
+        if not self._zones_file:
+            return []
+        try:
+            with open(self._zones_file, "r") as f:
+                data = json.load(f)
+                return data if isinstance(data, list) else []
+        except (FileNotFoundError, json.JSONDecodeError):
+            return []
+
+    def _save_zones(self, zones):
+        """Sauvegarde les zones actives sur disque."""
+        if not self._zones_file:
+            return
+        try:
+            with open(self._zones_file, "w") as f:
+                json.dump(zones, f)
+        except OSError as exc:
+            _log.warning("ha-discovery: impossible de sauvegarder les zones: %s", exc)
 
     def stop(self):
         self._stop.set()
@@ -757,9 +779,15 @@ class HADiscoveryClient(threading.Thread):
             telemetry = dict(self.state.telemetry)
         data = next(iter(telemetry.values()), {}) if telemetry else None
         profile = getattr(self.state, "profile", None)
-        configs = _build_discovery_config(self._device_id, profile, self.prefix, data)
+        active_zones = _detect_active_zones(data) if data else []
+        configs = _build_discovery_config(
+            self._device_id, profile, self.prefix, data,
+            previous_active_zones=self._last_active_zones,
+        )
         for topic, payload in configs:
             self._safe_send(mqtt.build_publish(topic, payload, qos=1, retain=True))
+        self._last_active_zones = active_zones
+        self._save_zones(active_zones)
 
     def _publish_state(self):
         """Publie l'etat courant de la PAC sur les topics HA."""
@@ -926,9 +954,15 @@ class HADiscoveryClient(threading.Thread):
             if self._last_mode is not None and self._last_mode != ha_mode:
                 _log.info("ha-discovery: mode change %s -> %s, republish discovery", self._last_mode, ha_mode)
                 profile = getattr(self.state, "profile", None)
-                configs = _build_discovery_config(self._device_id, profile, self.prefix, data)
+                active_zones = _detect_active_zones(data)
+                configs = _build_discovery_config(
+                    self._device_id, profile, self.prefix, data,
+                    previous_active_zones=self._last_active_zones,
+                )
                 for topic, payload in configs:
                     self._safe_send(mqtt.build_publish(topic, payload, qos=1, retain=True))
+                self._last_active_zones = active_zones
+                self._save_zones(active_zones)
             self._last_mode = ha_mode
 
             self._safe_send(mqtt.build_publish(
