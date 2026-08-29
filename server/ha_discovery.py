@@ -49,63 +49,80 @@ def detect_mqtt_broker():
     return None
 
 # --- Mapping Aldes air modes → HA HVAC modes ---
-# A=Off, B=Hors gel, C=Éco, D=Confort, E=Anti-condensation, F=Air Confort, G=Éco nuit, H=Arrêt ventilateur, I=Auto
 ALDES_TO_HA_MODE = {
     "A": "off",
     "B": "heat",
     "C": "heat",
     "D": "heat",
     "E": "heat",
-    "F": "cool",      # Air Confort = mode froid
-    "G": "auto",
-    "H": "fan_only",
-    "I": "auto",
+    "F": "cool",
+    "G": "cool",
+    "H": "cool",
+    "I": "cool",
 }
 
 HA_MODE_TO_ALDES = {
     "off": "A",
-    "heat": "D",      # Confort par défaut
-    "cool": "D",      # PAC air-air : même mode, la PAC gère le sens
-    "auto": "I",
-    "fan_only": "H",
-    "dry": "E",       # Anti-condensation ≈ mode sec
+    "heat": "B",
+    "cool": "F",
 }
 
-# Preset modes HA ↔ Aldes
 ALDES_TO_HA_PRESET = {
-    "A": None,
-    "B": "none",
-    "C": "eco",
-    "D": "comfort",
-    "E": "none",
-    "F": "comfort",  # Air Confort
-    "G": "eco",
-    "H": "none",
-    "I": "none",
+    "A": "Arrêt",
+    "B": "Confort",
+    "C": "Éco",
+    "D": "Chauffage programme A",
+    "E": "Chauffage programme B",
+    "F": "Climatisation",
+    "G": "Climatisation boost",
+    "H": "Climatisation programme C",
+    "I": "Climatisation programme D",
 }
 
-HA_PRESET_TO_ALDES = {
-    "none": "D",
-    "eco": "C",
-    "comfort": "F",     # Air Confort
-    "anti_freeze": "B",
-}
+HA_PRESET_TO_ALDES = {label: code for code, label in ALDES_TO_HA_PRESET.items()}
 
 # --- Mapping modes eau chaude (UDM 0..2) ---
 WATER_MODE_INDEX_TO_CODE = {0: "L", 1: "M", 2: "N"}
 WATER_MODE_CODE_TO_INDEX = {"L": 0, "M": 1, "N": 2}
 
 ALDES_WATER_TO_HA = {
-    "L": "eco",
-    "M": "normal",
-    "N": "confort",
+    "L": "Arrêt",
+    "M": "Marche",
+    "N": "Boost",
 }
 
-HA_WATER_TO_ALDES = {
-    "eco": "L",
-    "normal": "M",
-    "confort": "N",
-}
+HA_WATER_TO_ALDES = {label: code for code, label in ALDES_WATER_TO_HA.items()}
+
+
+def _profile_mode_labels(profile, field, fallback):
+    modes = getattr(profile, field, None) if profile else None
+    if modes:
+        return [mode["label"] for mode in modes]
+    return list(fallback.values())
+
+
+def _profile_code_for_label(profile, field, label, fallback):
+    normalized = label.casefold()
+    modes = getattr(profile, field, None) if profile else None
+    if modes:
+        for mode in modes:
+            if mode.get("label", "").casefold() == normalized:
+                return mode.get("code")
+        return None
+    for candidate, code in fallback.items():
+        if candidate.casefold() == normalized:
+            return code
+    return None
+
+
+def _profile_label_for_code(profile, field, code, fallback):
+    modes = getattr(profile, field, None) if profile else None
+    if modes:
+        for mode in modes:
+            if mode.get("code") == code:
+                return mode.get("label")
+        return None
+    return fallback.get(code)
 
 
 def _get_float_val(data, key):
@@ -181,6 +198,13 @@ def _build_discovery_config(device_id, profile, prefix="aldes", data=None):
 
     # Detect active zones from UsC0..UsC9
     active_zones = _detect_active_zones(data)
+    air_programs = _profile_mode_labels(profile, "air_modes", ALDES_TO_HA_PRESET)
+    water_programs = _profile_mode_labels(profile, "water_modes", ALDES_WATER_TO_HA)
+
+    # temp_step depuis le profil, fallback 1
+    ha_entities = (profile.ha_discovery.get("entities", {}) if profile else {}) or {}
+    climate_entities = ha_entities.get("climate", []) or []
+    temp_step = climate_entities[0].get("temp_step", 1) if climate_entities else 1
 
     # Nettoyage : on retire tous les anciens topics de decouverte climate
     # puis on publie uniquement les entités actives
@@ -197,7 +221,7 @@ def _build_discovery_config(device_id, profile, prefix="aldes", data=None):
             "name": zone_label,
             "unique_id": f"aldes_{device_id}_climate_zone{zone_idx}",
             "device": device_info,
-            "modes": ["off", "heat", "cool", "auto", "fan_only"],
+            "modes": ["off", "heat", "cool"],
             "mode_state_topic": f"{prefix}/state/mode",
             "mode_command_topic": f"{prefix}/set/mode",
             "temperature_state_topic": f"{prefix}/state/zone{zone_idx}/consigne",
@@ -206,9 +230,9 @@ def _build_discovery_config(device_id, profile, prefix="aldes", data=None):
             "temp_unit": "C",
             "min_temp": min_temp,
             "max_temp": max_temp,
-            "temp_step": 1,
-            "precision": 1,
-            "preset_modes": ["eco", "comfort", "night", "anti_freeze"],
+            "temp_step": temp_step,
+            "precision": 0.1,
+            "preset_modes": air_programs,
             "preset_mode_state_topic": f"{prefix}/state/preset",
             "preset_mode_command_topic": f"{prefix}/set/preset",
             "availability_topic": f"{prefix}/state/available",
@@ -226,7 +250,7 @@ def _build_discovery_config(device_id, profile, prefix="aldes", data=None):
             "name": "PAC Aldes",
             "unique_id": f"aldes_{device_id}_climate",
             "device": device_info,
-            "modes": ["off", "heat", "cool", "auto", "fan_only"],
+            "modes": ["off", "heat", "cool"],
             "mode_state_topic": f"{prefix}/state/mode",
             "mode_command_topic": f"{prefix}/set/mode",
             "temperature_state_topic": f"{prefix}/state/consigne",
@@ -235,9 +259,9 @@ def _build_discovery_config(device_id, profile, prefix="aldes", data=None):
             "temp_unit": "C",
             "min_temp": min_temp,
             "max_temp": max_temp,
-            "temp_step": 1,
-            "precision": 1,
-            "preset_modes": ["eco", "comfort", "night", "anti_freeze"],
+            "temp_step": temp_step,
+            "precision": 0.1,
+            "preset_modes": air_programs,
             "preset_mode_state_topic": f"{prefix}/state/preset",
             "preset_mode_command_topic": f"{prefix}/set/preset",
             "availability_topic": f"{prefix}/state/available",
@@ -320,7 +344,7 @@ def _build_discovery_config(device_id, profile, prefix="aldes", data=None):
         "unique_id": f"aldes_{device_id}_ecs_mode",
         "state_topic": f"{prefix}/state/ecs",
         "command_topic": f"{prefix}/set/ecs",
-        "options": ["eco", "normal", "confort"],
+        "options": water_programs,
         "device": {
             "identifiers": [f"aldes_{device_id}"],
         },
@@ -626,8 +650,11 @@ class HADiscoveryClient(threading.Thread):
 
     def _handle_preset_command(self, payload):
         """Convertit un preset HA en mode Aldes."""
-        preset = payload.lower().strip()
-        aldes_code = HA_PRESET_TO_ALDES.get(preset)
+        preset = payload.strip()
+        profile = getattr(self.state, "profile", None)
+        aldes_code = _profile_code_for_label(
+            profile, "air_modes", preset, HA_PRESET_TO_ALDES
+        )
         if not aldes_code:
             _log.warning("ha-discovery: preset inconnu: %s", preset)
             return
@@ -637,8 +664,11 @@ class HADiscoveryClient(threading.Thread):
 
     def _handle_ecs_command(self, payload):
         """Convertit un mode ECS HA en commande Aldes."""
-        mode = payload.lower().strip()
-        aldes_code = HA_WATER_TO_ALDES.get(mode)
+        mode = payload.strip()
+        profile = getattr(self.state, "profile", None)
+        aldes_code = _profile_code_for_label(
+            profile, "water_modes", mode, HA_WATER_TO_ALDES
+        )
         if not aldes_code:
             _log.warning("ha-discovery: mode ECS inconnu: %s", mode)
             return
@@ -757,7 +787,10 @@ class HADiscoveryClient(threading.Thread):
             self._safe_send(mqtt.build_publish(
                 f"{self.prefix}/state/mode", ha_mode, qos=1, retain=True
             ))
-            preset = ALDES_TO_HA_PRESET.get(air_mode_code, "none") or "none"
+            profile = getattr(self.state, "profile", None)
+            preset = _profile_label_for_code(
+                profile, "air_modes", air_mode_code, ALDES_TO_HA_PRESET
+            )
             self._safe_send(mqtt.build_publish(
                 f"{self.prefix}/state/preset", preset, qos=1, retain=True
             ))
@@ -818,7 +851,10 @@ class HADiscoveryClient(threading.Thread):
         # Mode eau chaude (UDM)
         water_mode_code = self._get_water_mode_code(data)
         if water_mode_code:
-            ha_water = ALDES_WATER_TO_HA.get(water_mode_code, "normal")
+            profile = getattr(self.state, "profile", None)
+            ha_water = _profile_label_for_code(
+                profile, "water_modes", water_mode_code, ALDES_WATER_TO_HA
+            )
             self._safe_send(mqtt.build_publish(
                 f"{self.prefix}/state/ecs", ha_water, qos=1, retain=True
             ))
@@ -898,7 +934,10 @@ class HADiscoveryClient(threading.Thread):
             self._safe_send(mqtt.build_publish(
                 f"{self.prefix}/state/mode", ha_mode, qos=1, retain=True
             ))
-            preset = ALDES_TO_HA_PRESET.get(air_mode_code, "none") or "none"
+            profile = getattr(self.state, "profile", None)
+            preset = _profile_label_for_code(
+                profile, "air_modes", air_mode_code, ALDES_TO_HA_PRESET
+            )
             self._safe_send(mqtt.build_publish(
                 f"{self.prefix}/state/preset", preset, qos=1, retain=True
             ))
@@ -950,7 +989,10 @@ class HADiscoveryClient(threading.Thread):
         # Mode eau chaude (UDM)
         water_mode_code = self._get_water_mode_code(data)
         if water_mode_code:
-            ha_water = ALDES_WATER_TO_HA.get(water_mode_code, "normal")
+            profile = getattr(self.state, "profile", None)
+            ha_water = _profile_label_for_code(
+                profile, "water_modes", water_mode_code, ALDES_WATER_TO_HA
+            )
             self._safe_send(mqtt.build_publish(
                 f"{self.prefix}/state/ecs", ha_water, qos=1, retain=True
             ))
