@@ -105,7 +105,7 @@ def test_build_discovery_config_climate_valid():
         "Climatisation programme D",
     ]
     assert climate_payload["precision"] == 0.1
-    assert climate_payload["temp_step"] == 0.5
+    assert climate_payload["temp_step"] == 1
     assert "availability_topic" in climate_payload
 
 
