@@ -7,6 +7,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from ..aldes import build_products, make_token
+from . import get_state
 from ..utils import iso
 
 _log = logging.getLogger("aldes-api")
@@ -14,13 +15,9 @@ _log = logging.getLogger("aldes-api")
 router = APIRouter(tags=["aldes-compat"])
 
 
-def _state(request: Request):
-    return request.app.extra["state"]
-
-
 @router.post("/oauth2/token")
 async def aldes_token(request: Request):
-    st = _state(request)
+    st = get_state(request)
     raw = await request.body()
     try:
         form = urllib.parse.parse_qs(raw.decode("utf-8", errors="replace"))
@@ -39,12 +36,12 @@ async def aldes_token(request: Request):
 
 @router.get("/aldesoc/v5/users/me/products")
 def aldes_products(request: Request):
-    return build_products(_state(request))
+    return build_products(get_state(request))
 
 
 @router.patch("/aldesoc/v5/users/me/products/{modem}/updateThermostats")
 async def aldes_update_thermostats(request: Request, modem: str):
-    st = _state(request)
+    st = get_state(request)
     try:
         body = await request.json()
     except ValueError:
@@ -60,7 +57,7 @@ async def aldes_update_thermostats(request: Request, modem: str):
 
 @router.post("/aldesoc/v5/users/me/products/{modem}/commands")
 async def aldes_commands(request: Request, modem: str):
-    st = _state(request)
+    st = get_state(request)
     try:
         body = await request.json()
     except ValueError:

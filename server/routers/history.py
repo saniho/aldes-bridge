@@ -1,15 +1,13 @@
 """Routes historisation des valeurs (SQLite)."""
 from fastapi import APIRouter, HTTPException, Request
 
+from . import get_state
+
 router = APIRouter(prefix="/api/history", tags=["history"])
 
 
-def _state(request: Request):
-    return request.app.extra["state"]
-
-
 def _history(request: Request):
-    h = getattr(_state(request), "history", None)
+    h = getattr(get_state(request), "history", None)
     if h is None:
         raise HTTPException(status_code=503, detail="historique non activé")
     return h

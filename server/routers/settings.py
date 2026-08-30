@@ -5,6 +5,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from ..utils import iso
+from . import get_state
 from .schemas import SettingsBody
 
 _log = logging.getLogger("aldes-api")
@@ -12,19 +13,15 @@ _log = logging.getLogger("aldes-api")
 router = APIRouter(prefix="/api", tags=["settings"])
 
 
-def _state(request: Request):
-    return request.app.extra["state"]
-
-
 @router.get("/settings")
 def api_settings_get(request: Request):
-    cfg = _state(request).config.get() if _state(request).config else {}
+    cfg = get_state(request).config.get() if get_state(request).config else {}
     return {"settings": cfg}
 
 
 @router.put("/settings")
 def api_settings_set(request: Request, body: SettingsBody):
-    st = _state(request)
+    st = get_state(request)
     updates = {k: v for k, v in body.model_dump().items() if v is not None}
     if not updates:
         return JSONResponse(status_code=400, content={"error": "aucun parametre fourni"})

@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from ..utils import iso
+from . import get_state, get_engine
 from .schemas import (
     ConfigSnapshot, StateSnapshot, LogPage, ModeBody, ModeResult,
     RawBody, RawConfig, SendBody, SendResult,
@@ -19,28 +20,23 @@ _log = logging.getLogger("aldes-api")
 router = APIRouter(prefix="/api", tags=["core"])
 
 
-def _state(request: Request):
-    return request.app.extra["state"]
 
-
-def _engine(request: Request):
-    return request.app.extra["engine"]
 
 
 @router.get("/config", response_model=ConfigSnapshot)
 def api_config(request: Request):
-    return _state(request).snapshot()
+    return get_state(request).snapshot()
 
 
 @router.get("/state", response_model=StateSnapshot)
 def api_state(request: Request):
-    st = _state(request)
+    st = get_state(request)
     return {"config": st.snapshot(), "messages": st.events.snapshot()}
 
 
 @router.get("/logs", response_model=LogPage)
 def api_logs(request: Request, limit: int = 200, offset: int = 0):
-    st = _state(request)
+    st = get_state(request)
     limit = max(1, min(limit, 1000))
     offset = max(0, offset)
     log = st.events.log
@@ -57,7 +53,7 @@ def api_logs(request: Request, limit: int = 200, offset: int = 0):
 
 @router.get("/events")
 async def api_events(request: Request):
-    st = _state(request)
+    st = get_state(request)
     q = st.events.subscribe()
 
     async def gen():
@@ -90,8 +86,8 @@ async def api_events(request: Request):
 
 @router.post("/mode", response_model=ModeResult)
 def api_mode(request: Request, body: ModeBody):
-    st = _state(request)
-    eng = _engine(request)
+    st = get_state(request)
+    eng = get_engine(request)
     try:
         mode = st.set_mode(body.mode)
     except ValueError as exc:
@@ -102,13 +98,13 @@ def api_mode(request: Request, body: ModeBody):
 
 @router.get("/raw", response_model=RawConfig)
 def api_raw_get(request: Request):
-    return _state(request).raw_config()
+    return get_state(request).raw_config()
 
 
 @router.post("/raw", response_model=RawConfig)
 def api_raw_set(request: Request, body: RawBody):
-    st = _state(request)
-    eng = _engine(request)
+    st = get_state(request)
+    eng = get_engine(request)
     fields = {
         "host": body.host,
         "port": body.port,
@@ -124,31 +120,31 @@ def api_raw_set(request: Request, body: RawBody):
 
 @router.post("/send", response_model=SendResult)
 def api_send(request: Request, body: SendBody):
-    eng = _engine(request)
+    eng = get_engine(request)
     qos = body.qos if body.qos in (0, 1, 2) else 0
     return eng.inject(body.topic, body.payload, qos)
 
 
 @router.get("/consigne", response_model=ConsigneList)
 def api_consigne_get(request: Request):
-    return {"consignes": _state(request).consignes_state()}
+    return {"consignes": get_state(request).consignes_state()}
 
 
 @router.post("/consigne", response_model=ConsigneList)
 def api_consigne_post(request: Request, body: ConsigneBody):
-    st = _state(request)
+    st = get_state(request)
     st.request_consigne(body.zone, body.value)
     return {"ok": True, "consignes": st.consignes_state()}
 
 
 @router.post("/disconnect", response_model=DisconnectResult)
 def api_disconnect(request: Request):
-    return _engine(request).disconnect()
+    return get_engine(request).disconnect()
 
 
 @router.post("/clear", response_model=OkResult)
 def api_clear(request: Request):
-    _state(request).events.clear()
+    get_state(request).events.clear()
     return {"ok": True}
 
 
@@ -160,7 +156,7 @@ class _TestInjectBody(BaseModel):
 
 @router.post("/test/inject", response_model=OkResult)
 def api_test_inject(request: Request, body: _TestInjectBody = _TestInjectBody()):
-    st = _state(request)
+    st = get_state(request)
     st.events.publish({
         "kind": "message",
         "ts": iso(),

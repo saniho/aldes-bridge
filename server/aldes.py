@@ -26,6 +26,8 @@ import os
 import uuid
 from datetime import datetime, timezone
 
+from .utils import parse_json_payload
+
 _log = logging.getLogger("aldes-telemetry")
 
 try:
@@ -70,7 +72,7 @@ def capture_telemetry(state, payload):
     une vue complete d'un product (les telemetries arrivent en plusieurs
     messages : temperatures, settings, mode...).
     """
-    data = _parse_telemetry_payload(payload)
+    data = parse_json_payload(payload)
     if data is None:
         _log.debug("capture_telemetry: payload non reconnu (pas du JSON?), len=%d", len(payload) if payload else 0)
         return
@@ -85,32 +87,6 @@ def capture_telemetry(state, payload):
     # La fusion des champs + horodatage de mise a jour + persistance vivent
     # dans AppState.store_telemetry (sous le verrou, ecriture atomique).
     state.store_telemetry(pid, data)
-
-
-def _parse_telemetry_payload(payload):
-    """Parse un payload PUBLISH et renvoie le dict telemetrie ou None."""
-    if isinstance(payload, bytes):
-        try:
-            payload = payload.decode("utf-8", errors="replace")
-        except Exception:
-            return None
-    if not isinstance(payload, str):
-        return None
-    payload = payload.strip()
-    # La box prefixe chaque telemetrie d'un en-tete binaire (octet de sequence,
-    # ex: \x00F). On coupe tout ce qui precede le debut du JSON.
-    pos = payload.find("{")
-    if pos < 0:
-        return None
-    if pos > 0:
-        payload = payload[pos:]
-    try:
-        data = json.loads(payload)
-    except Exception:
-        return None
-    if not isinstance(data, dict):
-        return None
-    return data
 
 
 def _epoch_to_iso(value):

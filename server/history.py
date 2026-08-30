@@ -14,6 +14,8 @@ import sqlite3
 import threading
 import time
 
+from .utils import parse_json_payload
+
 
 class HistoryDB:
     def __init__(self, path, retention_days=90):
@@ -52,22 +54,10 @@ class HistoryDB:
     # --- écriture ---
     def record_telemetry(self, payload):
         """Stocke les champs numériques d'un payload télémétrie (str ou dict)."""
-        if isinstance(payload, bytes):
-            try:
-                payload = payload.decode("utf-8", errors="replace")
-            except Exception:
-                return 0
-        if isinstance(payload, str):
-            pos = payload.find("{")
-            if pos < 0:
-                return 0
-            payload = payload[pos:]
-            try:
-                data = json.loads(payload)
-            except Exception:
-                return 0
-        else:
+        if isinstance(payload, dict):
             data = payload
+        else:
+            data = parse_json_payload(payload)
         if not isinstance(data, dict):
             return 0
         now = time.time()

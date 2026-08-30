@@ -2,18 +2,14 @@
 from fastapi import APIRouter, Request
 
 from ..diagnostic import run_diagnostic
+from . import get_state, get_engine
 
 router = APIRouter(prefix="/api", tags=["diagnostics"])
 
 
-def _state(request: Request):
-    return request.app.extra["state"]
 
-
-def _engine(request: Request):
-    return request.app.extra["engine"]
 
 
 @router.get("/diagnostic")
 def api_diagnostic(request: Request):
-    return run_diagnostic(_state(request), _engine(request))
+    return run_diagnostic(get_state(request), get_engine(request))

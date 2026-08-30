@@ -2,6 +2,7 @@
 import json
 import logging
 
+from ..utils import safe_float
 from .mode_mappings import (
     ALDES_TO_HA_PRESET, ALDES_WATER_TO_HA,
     profile_mode_labels,
@@ -10,38 +11,26 @@ from .mode_mappings import (
 _log = logging.getLogger("aldes-ha-discovery")
 
 
-def _get_float_val(data, key):
-    if data is None:
-        return None
-    val = data.get(key)
-    if val is None:
-        return None
-    try:
-        return float(val)
-    except (ValueError, TypeError):
-        return None
-
-
 def _get_min_max(data):
     if data is None:
         return 5, 30
     air_mode = str(data.get("UAM", ""))
     is_cooling = air_mode in ("F",)
     if is_cooling:
-        mi = _get_float_val(data, "CMiST")
-        ma = _get_float_val(data, "CMaST")
+        mi = safe_float(data.get("CMiST"))
+        ma = safe_float(data.get("CMaST"))
     else:
-        mi = _get_float_val(data, "FMiST")
-        ma = _get_float_val(data, "FMaST")
+        mi = safe_float(data.get("FMiST"))
+        ma = safe_float(data.get("FMaST"))
     if mi is None:
         mi = min(
-            _get_float_val(data, "CMiST") or 5,
-            _get_float_val(data, "FMiST") or 5,
+            safe_float(data.get("CMiST")) or 5,
+            safe_float(data.get("FMiST")) or 5,
         )
     if ma is None:
         ma = max(
-            _get_float_val(data, "CMaST") or 30,
-            _get_float_val(data, "FMaST") or 30,
+            safe_float(data.get("CMaST")) or 30,
+            safe_float(data.get("FMaST")) or 30,
         )
     return int(mi), int(ma)
 

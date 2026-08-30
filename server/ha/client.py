@@ -9,7 +9,7 @@ import time
 from datetime import datetime, timezone
 
 from .. import mqtt
-from ..utils import iso
+from ..utils import iso, safe_float
 from .mode_mappings import (
     ALDES_TO_HA_MODE, HA_MODE_TO_ALDES,
     ALDES_TO_HA_PRESET, HA_PRESET_TO_ALDES,
@@ -390,6 +390,23 @@ class HADiscoveryClient(threading.Thread):
         if not data:
             return
 
+        self._publish_telemetry_data(data, include_zone_aliases=True)
+
+    def publish_telemetry(self, data):
+        if not self._sock:
+            return
+
+        air_mode_code = self._get_air_mode_code(data)
+        if air_mode_code:
+            ha_mode = ALDES_TO_HA_MODE.get(air_mode_code, "off")
+            if self._last_mode is not None and self._last_mode != ha_mode:
+                _log.info("ha-discovery: mode change %s -> %s, republish discovery", self._last_mode, ha_mode)
+                self._publish_discovery()
+            self._last_mode = ha_mode
+
+        self._publish_telemetry_data(data, include_zone_aliases=False)
+
+    def _publish_telemetry_data(self, data, include_zone_aliases=False):
         air_mode_code = self._get_air_mode_code(data)
         if air_mode_code:
             ha_mode = ALDES_TO_HA_MODE.get(air_mode_code, "off")
@@ -407,19 +424,19 @@ class HADiscoveryClient(threading.Thread):
         consignes = self.state.consignes_state()
         active_zones = detect_active_zones(data)
         for zone_idx in active_zones:
-            temp = self._get_float(data, f"MT{zone_idx}")
+            temp = safe_float(data.get(f"MT{zone_idx}"))
             if temp is not None:
                 self._safe_send(mqtt.build_publish(
                     f"{self.prefix}/state/zone{zone_idx}/temperature",
                     f"{temp:.1f}", qos=1, retain=True
                 ))
-                if zone_idx == 0:
+                if include_zone_aliases and zone_idx == 0:
                     self._safe_send(mqtt.build_publish(
                         f"{self.prefix}/state/sensor/MT0",
                         f"{temp:.1f}", qos=1, retain=True
                     ))
 
-            consigne = self._get_float(data, f"UsC{zone_idx}")
+            consigne = safe_float(data.get(f"UsC{zone_idx}"))
             entry = consignes.get(str(zone_idx))
             if entry and not entry.get("confirmed"):
                 consigne = float(entry["requested"])
@@ -428,17 +445,16 @@ class HADiscoveryClient(threading.Thread):
                     f"{self.prefix}/state/zone{zone_idx}/consigne",
                     f"{consigne:.1f}", qos=1, retain=True
                 ))
-                if zone_idx == 0:
+                if include_zone_aliases and zone_idx == 0:
                     self._safe_send(mqtt.build_publish(
                         f"{self.prefix}/state/consigne",
                         f"{consigne:.1f}", qos=1, retain=True
                     ))
 
-        outdoor_temp = self._get_float(data, "Text")
+        outdoor_temp = safe_float(data.get("Text"))
         if outdoor_temp is not None:
             self._safe_send(mqtt.build_publish(
-                f"{self.prefix}/state/sensor/Text",
-                f"{outdoor_temp:.1f}", qos=1, retain=True
+                f"{self.prefix}/state/sensor/Text", f"{outdoor_temp:.1f}", qos=1, retain=True
             ))
 
         if air_mode_code:
@@ -464,8 +480,6 @@ class HADiscoveryClient(threading.Thread):
             ))
 
         self._publish_vacation_state(data)
-
-    def _publish_vacation_state(self, data):
         dvac = data.get("Dvac")
         fvac = data.get("Fvac")
         start_date = self._epoch_to_date_str(dvac)
@@ -511,89 +525,6 @@ class HADiscoveryClient(threading.Thread):
         except (OSError, ValueError):
             return None
 
-    def publish_telemetry(self, data):
-        if not self._sock:
-            return
-
-        air_mode_code = self._get_air_mode_code(data)
-        if air_mode_code:
-            ha_mode = ALDES_TO_HA_MODE.get(air_mode_code, "off")
-
-            if self._last_mode is not None and self._last_mode != ha_mode:
-                _log.info("ha-discovery: mode change %s -> %s, republish discovery", self._last_mode, ha_mode)
-                profile = getattr(self.state, "profile", None)
-                active_zones = detect_active_zones(data)
-                configs = build_discovery_config(
-                    self._device_id, profile, self.prefix, data,
-                    previous_active_zones=self._last_active_zones,
-                )
-                for topic, payload in configs:
-                    self._safe_send(mqtt.build_publish(topic, payload, qos=1, retain=True))
-                self._last_active_zones = active_zones
-                self._save_zones(active_zones)
-            self._last_mode = ha_mode
-
-            self._safe_send(mqtt.build_publish(
-                f"{self.prefix}/state/mode", ha_mode, qos=1, retain=True
-            ))
-            profile = getattr(self.state, "profile", None)
-            preset = profile_label_for_code(
-                profile, "air_modes", air_mode_code, ALDES_TO_HA_PRESET
-            )
-            self._safe_send(mqtt.build_publish(
-                f"{self.prefix}/state/preset", preset, qos=1, retain=True
-            ))
-
-        consignes = self.state.consignes_state()
-        active_zones = detect_active_zones(data)
-        for zone_idx in active_zones:
-            temp = self._get_float(data, f"MT{zone_idx}")
-            if temp is not None:
-                self._safe_send(mqtt.build_publish(
-                    f"{self.prefix}/state/zone{zone_idx}/temperature",
-                    f"{temp:.1f}", qos=1, retain=True
-                ))
-
-            consigne = self._get_float(data, f"UsC{zone_idx}")
-            entry = consignes.get(str(zone_idx))
-            if entry and not entry.get("confirmed"):
-                consigne = float(entry["requested"])
-            if consigne is not None:
-                self._safe_send(mqtt.build_publish(
-                    f"{self.prefix}/state/zone{zone_idx}/consigne",
-                    f"{consigne:.1f}", qos=1, retain=True
-                ))
-
-        outdoor_temp = self._get_float(data, "Text")
-        if outdoor_temp is not None:
-            self._safe_send(mqtt.build_publish(
-                f"{self.prefix}/state/sensor/Text", f"{outdoor_temp:.1f}", qos=1, retain=True
-            ))
-
-        if air_mode_code:
-            self._safe_send(mqtt.build_publish(
-                f"{self.prefix}/state/sensor/UAM", air_mode_code, qos=1, retain=True
-            ))
-
-        mf_ac = data.get("MfAc")
-        if mf_ac is not None:
-            compressor_state = "1" if str(mf_ac) not in ("0", "", "null") else "0"
-            self._safe_send(mqtt.build_publish(
-                f"{self.prefix}/state/sensor/MfAc", compressor_state, qos=1, retain=True
-            ))
-
-        water_mode_code = self._get_water_mode_code(data)
-        if water_mode_code:
-            profile = getattr(self.state, "profile", None)
-            ha_water = profile_label_for_code(
-                profile, "water_modes", water_mode_code, ALDES_WATER_TO_HA
-            )
-            self._safe_send(mqtt.build_publish(
-                f"{self.prefix}/state/ecs", ha_water, qos=1, retain=True
-            ))
-
-        self._publish_vacation_state(data)
-
     def _get_air_mode_code(self, data):
         try:
             index = int(float(data.get("UAM", -1)))
@@ -610,15 +541,6 @@ class HADiscoveryClient(threading.Thread):
             codes = ["L", "M", "N"]
             if 0 <= index < len(codes):
                 return codes[index]
-        except (TypeError, ValueError):
-            pass
-        return None
-
-    def _get_float(self, data, key):
-        try:
-            v = data.get(key)
-            if v is not None:
-                return float(v)
         except (TypeError, ValueError):
             pass
         return None
