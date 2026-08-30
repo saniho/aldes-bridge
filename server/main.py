@@ -187,6 +187,7 @@ def main(argv=None):
     profile = load_profile(profile_id)
     if profile:
         state.profile = profile
+        rebuild_from_profile(profile)
         _log.info("profil device charge: %s (%s)", profile.id, profile.name)
     # Capture des telemetries : branchee ici pour decoupler appstate (plomberie
     # d'evenements) de aldes (mapping metier). Appelee sur chaque PUBLISH entrant.
@@ -213,7 +214,9 @@ def main(argv=None):
     # Home Assistant MQTT Auto-Discovery
     ha_client = None
     if args.ha_mqtt:
-        from .ha_discovery import HADiscoveryClient, detect_mqtt_broker
+        from .ha.client import HADiscoveryClient
+        from .ha.broker_detection import detect_mqtt_broker
+        from .ha.mode_mappings import rebuild_from_profile
         # Détection auto du broker MQTT via Supervisor API
         mqtt_host = args.ha_mqtt_host
         mqtt_port = args.ha_mqtt_port
