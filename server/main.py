@@ -13,6 +13,7 @@ import sys
 from .appstate import AppState, read_persisted_mode, read_persisted_profile
 from .config import ConfigStore
 from .device_profile import load_profile
+from .ha.mode_mappings import rebuild_from_profile
 from . import __version__ as BACKEND_VERSION
 from .events import EventBus
 from .engine import Engine
@@ -148,7 +149,6 @@ def _setup_ha_client(state, engine, args, config):
     """Configure et demarre le client HA MQTT auto-discovery."""
     from .ha.client import HADiscoveryClient
     from .ha.broker_detection import detect_mqtt_broker
-    from .ha.mode_mappings import rebuild_from_profile
     from .utils import parse_json_payload
 
     mqtt_host = args.ha_mqtt_host
