@@ -6,7 +6,6 @@ Couvre /api/state, /api/config, /api/mode, /api/send, /api/logs,
 """
 import json
 import os
-import random
 import socket
 import sys
 import tempfile
@@ -40,13 +39,20 @@ class _StubEngine:
         return {"ok": True, "session": "test"}
 
 
+def _allocate_free_port():
+    """Alloue un port libre via l'OS (port 0) pour éviter les conflits entre tests."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
 def _start_web(state, engine=None):
     import uvicorn
     from server.api import create_app
     engine = engine or _StubEngine()
     app = create_app(state, engine, "/nonexistent")
     for _ in range(20):
-        port = random.randint(18200, 18999)
+        port = _allocate_free_port()
         cfg = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="error")
         srv = uvicorn.Server(cfg)
         t = threading.Thread(target=srv.run, daemon=True)
