@@ -480,6 +480,8 @@ class HADiscoveryClient(threading.Thread):
             ))
 
         self._publish_vacation_state(data)
+
+    def _publish_vacation_state(self, data):
         dvac = data.get("Dvac")
         fvac = data.get("Fvac")
         start_date = self._epoch_to_date_str(dvac)
