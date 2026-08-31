@@ -240,7 +240,7 @@ def test_profile_program_commands_are_converted_to_aldes_codes():
     client._handle_ecs_command("Boost")
 
     assert injected == [
-        {"id": 1, "jsonrpc": "2.0", "method": "changeMode", "params": ["D"]},
+        {"id": 1, "jsonrpc": "2.0", "method": "changeMode", "params": ["G"]},
         {"id": 1, "jsonrpc": "2.0", "method": "changeMode", "params": ["N"]},
     ]
 

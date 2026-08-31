@@ -45,7 +45,7 @@ function buildQuickAirGroup(modes: DeviceMode[] | undefined, fallback: { code: s
 
 function buildQuickClim(profile: DeviceProfile | null | undefined): { code: string; label: string }[] {
   return buildQuickAirGroup(profile?.air_modes_clim, [
-    { code: 'F', label: 'F · Confort' }, { code: 'D', label: 'D · Boost' },
+    { code: 'F', label: 'F · Confort' }, { code: 'G', label: 'G · Boost' },
     { code: 'H', label: 'H · Programme C' }, { code: 'I', label: 'I · Programme D' },
     { code: 'A', label: 'A · Off' },
   ])
@@ -255,7 +255,7 @@ export default function TempsPanel({ pollMs = 5000, clientId, connected, consign
                   <span className={styles.quickLabel}>Climatisation</span>
                   {QUICK_CLIM.map((q) => (
                     <button
-                      key={q.code}
+                      key={'clim-' + q.code}
                       className={
                         styles.quickBtn +
                         (p.indicator.current_air_mode === q.code ? ' ' + styles.active : '')
@@ -274,7 +274,7 @@ export default function TempsPanel({ pollMs = 5000, clientId, connected, consign
                   <span className={styles.quickLabel}>Chauffage</span>
                   {QUICK_HEAT.map((q) => (
                     <button
-                      key={q.code}
+                      key={'heat-' + q.code}
                       className={
                         styles.quickBtn +
                         (p.indicator.current_air_mode === q.code ? ' ' + styles.active : '')
@@ -288,10 +288,10 @@ export default function TempsPanel({ pollMs = 5000, clientId, connected, consign
                   ))}
                 </div>
               )}
-              {QUICK_CLIM.length === 0 && QUICK_HEAT.length > 0 && (
+              {QUICK_CLIM.length === 0 && QUICK_HEAT.length === 0 && (
                 <div className={styles.quick}>
                   <span className={styles.quickLabel}>Air</span>
-                  {QUICK_HEAT.map((q) => (
+                  {buildQuickAirGroup(profile?.air_modes, []).map((q) => (
                     <button
                       key={q.code}
                       className={

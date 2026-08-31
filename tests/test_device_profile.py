@@ -48,7 +48,7 @@ def test_profile_air_modes():
     assert p.air_modes_clim == [
         {"index": 0, "code": "A", "label": "Off"},
         {"index": 5, "code": "F", "label": "Confort"},
-        {"index": 3, "code": "D", "label": "Boost"},
+        {"index": 6, "code": "G", "label": "Boost"},
         {"index": 7, "code": "H", "label": "Programme C"},
         {"index": 8, "code": "I", "label": "Programme D"},
     ]
