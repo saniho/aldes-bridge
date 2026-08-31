@@ -62,7 +62,9 @@ def build_discovery_config(device_id, profile, prefix="aldes", data=None,
     min_temp, max_temp = _get_min_max(data)
 
     active_zones = detect_active_zones(data)
-    air_programs = profile_mode_labels(profile, "air_modes", ALDES_TO_HA_PRESET)
+    air_programs_clim = profile_mode_labels(profile, "air_modes_clim", ALDES_TO_HA_PRESET)
+    air_programs_heat = profile_mode_labels(profile, "air_modes_heat", ALDES_TO_HA_PRESET)
+    air_programs = list(dict.fromkeys(air_programs_clim + air_programs_heat))
     water_programs = profile_mode_labels(profile, "water_modes", ALDES_WATER_TO_HA)
 
     ha_entities = (profile.ha_discovery.get("entities", {}) if profile else {}) or {}

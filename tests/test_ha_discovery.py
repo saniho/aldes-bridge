@@ -41,16 +41,21 @@ def test_ha_to_aldes_mode_mapping():
 
 
 def test_aldes_to_ha_preset_mapping():
-    assert ALDES_TO_HA_PRESET["A"] == "Arrêt"
+    assert ALDES_TO_HA_PRESET["A"] == "Off"
     assert ALDES_TO_HA_PRESET["C"] == "Éco"
-    assert ALDES_TO_HA_PRESET["D"] == "Chauffage programme A"
-    assert ALDES_TO_HA_PRESET["F"] == "Climatisation"
+    assert ALDES_TO_HA_PRESET["D"] == "Programme A"
+    assert ALDES_TO_HA_PRESET["F"] == "Confort"
 
 
 def test_ha_to_aldes_preset_mapping():
-    assert HA_PRESET_TO_ALDES["Éco"] == "C"
-    assert HA_PRESET_TO_ALDES["Climatisation"] == "F"
-    assert HA_PRESET_TO_ALDES["Confort"] == "B"
+    from server.ha import mode_mappings
+    from server.device_profile import load_profile
+    profile = load_profile("tone-aquaair")
+    mode_mappings.rebuild_from_profile(profile)
+    assert mode_mappings.HA_PRESET_TO_ALDES["Éco"] == "C"
+    assert mode_mappings.HA_PRESET_TO_ALDES["Confort"] == "B"
+    assert mode_mappings.HA_PRESET_TO_ALDES["Programme A"] == "D"
+    assert mode_mappings.HA_PRESET_TO_ALDES["Programme C"] == "H"
 
 
 # --- Tests de la config discovery ---
@@ -94,15 +99,8 @@ def test_build_discovery_config_climate_valid():
     assert "current_temperature_topic" in climate_payload
     assert "preset_modes" in climate_payload
     assert climate_payload["preset_modes"] == [
-        "Arrêt",
-        "Confort",
-        "Éco",
-        "Chauffage programme A",
-        "Chauffage programme B",
-        "Climatisation",
-        "Climatisation boost",
-        "Climatisation programme C",
-        "Climatisation programme D",
+        "Off", "Confort", "Boost", "Programme C", "Programme D",
+        "Éco", "Programme A", "Programme B",
     ]
     assert climate_payload["precision"] == 0.1
     assert climate_payload["temp_step"] == 1
@@ -223,7 +221,7 @@ def test_build_discovery_config_has_ecs_select():
             ecs_topic = topic
             payload = json.loads(payload_str)
             assert payload["name"] == "PAC Aldes Eau Chaude"
-            assert payload["options"] == ["Arrêt", "Marche", "Boost"]
+            assert payload["options"] == ["Off", "On", "Boost"]
             assert "command_topic" in payload
             assert "state_topic" in payload
             break
@@ -238,11 +236,11 @@ def test_profile_program_commands_are_converted_to_aldes_codes():
     state._ha_inject_hook = lambda topic, payload, qos: injected.append(json.loads(payload))
     client = HADiscoveryClient(state, dry_run=False)
 
-    client._handle_preset_command("Climatisation boost")
+    client._handle_preset_command("Boost")
     client._handle_ecs_command("Boost")
 
     assert injected == [
-        {"id": 1, "jsonrpc": "2.0", "method": "changeMode", "params": ["G"]},
+        {"id": 1, "jsonrpc": "2.0", "method": "changeMode", "params": ["D"]},
         {"id": 1, "jsonrpc": "2.0", "method": "changeMode", "params": ["N"]},
     ]
 

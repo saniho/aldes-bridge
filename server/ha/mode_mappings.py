@@ -19,15 +19,15 @@ _FALLBACK_HA_MODE_TO_ALDES = {
 }
 
 _FALLBACK_AIR_MODES = [
-    {"index": 0, "code": "A", "label": "Arrêt"},
+    {"index": 0, "code": "A", "label": "Off"},
     {"index": 1, "code": "B", "label": "Confort"},
     {"index": 2, "code": "C", "label": "Éco"},
-    {"index": 3, "code": "D", "label": "Chauffage programme A"},
-    {"index": 4, "code": "E", "label": "Chauffage programme B"},
-    {"index": 5, "code": "F", "label": "Climatisation"},
-    {"index": 6, "code": "G", "label": "Climatisation boost"},
-    {"index": 7, "code": "H", "label": "Climatisation programme C"},
-    {"index": 8, "code": "I", "label": "Climatisation programme D"},
+    {"index": 3, "code": "D", "label": "Programme A"},
+    {"index": 4, "code": "E", "label": "Programme B"},
+    {"index": 5, "code": "F", "label": "Confort"},
+    {"index": 6, "code": "G", "label": "Boost"},
+    {"index": 7, "code": "H", "label": "Programme C"},
+    {"index": 8, "code": "I", "label": "Programme D"},
 ]
 
 _FALLBACK_WATER_MODES = [
@@ -61,10 +61,14 @@ def _build_ha_mode_to_aldes(profile):
 
 
 def _build_aldes_to_ha_preset(profile):
-    """Aldes code → label preset HA (depuis profile.air_modes)."""
-    modes = getattr(profile, "air_modes", None) if profile else None
-    if modes:
-        return {m["code"]: m["label"] for m in modes}
+    """Aldes code → label preset HA (depuis profile.air_modes_clim + air_modes_heat)."""
+    all_modes = []
+    for field in ["air_modes_clim", "air_modes_heat"]:
+        modes = getattr(profile, field, None) if profile else None
+        if modes:
+            all_modes.extend(modes)
+    if all_modes:
+        return {m["code"]: m["label"] for m in all_modes}
     return {m["code"]: m["label"] for m in _FALLBACK_AIR_MODES}
 
 
@@ -188,12 +192,13 @@ def profile_mode_labels(profile, field, fallback):
 def profile_code_for_label(profile, field, label, fallback):
     """Lookup inverse : label → code via profil ou fallback dict."""
     normalized = label.casefold()
-    modes = getattr(profile, field, None) if profile else None
-    if modes:
-        for mode in modes:
-            if mode.get("label", "").casefold() == normalized:
-                return mode.get("code")
-        return None
+    fields = [field] if isinstance(field, str) else field
+    for f in fields:
+        modes = getattr(profile, f, None) if profile else None
+        if modes:
+            for mode in modes:
+                if mode.get("label", "").casefold() == normalized:
+                    return mode.get("code")
     if isinstance(fallback, dict):
         for candidate, code in fallback.items():
             if candidate.casefold() == normalized:
@@ -203,12 +208,13 @@ def profile_code_for_label(profile, field, label, fallback):
 
 def profile_label_for_code(profile, field, code, fallback):
     """Code → label via profil ou fallback dict."""
-    modes = getattr(profile, field, None) if profile else None
-    if modes:
-        for mode in modes:
-            if mode.get("code") == code:
-                return mode.get("label")
-        return None
+    fields = [field] if isinstance(field, str) else field
+    for f in fields:
+        modes = getattr(profile, f, None) if profile else None
+        if modes:
+            for mode in modes:
+                if mode.get("code") == code:
+                    return mode.get("label")
     if isinstance(fallback, dict):
         return fallback.get(code)
     return None
@@ -216,9 +222,13 @@ def profile_label_for_code(profile, field, code, fallback):
 
 def get_air_mode_codes(profile):
     """Retourne la liste ordonnée des codes air (A-I) depuis le profil."""
-    modes = getattr(profile, "air_modes", None) if profile else None
-    if modes:
-        return [m["code"] for m in sorted(modes, key=lambda m: m.get("index", 0))]
+    all_modes = []
+    for field in ["air_modes_clim", "air_modes_heat", "air_modes"]:
+        modes = getattr(profile, field, None) if profile else None
+        if modes:
+            all_modes.extend(modes)
+    if all_modes:
+        return [m["code"] for m in sorted(all_modes, key=lambda m: m.get("index", 0))]
     return [m["code"] for m in _FALLBACK_AIR_MODES]
 
 

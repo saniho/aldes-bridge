@@ -36,6 +36,14 @@ class DeviceProfile:
         return self._data.get("air_modes", [])
 
     @property
+    def air_modes_clim(self):
+        return self._data.get("air_modes_clim", [])
+
+    @property
+    def air_modes_heat(self):
+        return self._data.get("air_modes_heat", [])
+
+    @property
     def water_modes(self):
         return self._data.get("water_modes", [])
 
@@ -56,7 +64,7 @@ class DeviceProfile:
         return self._data.get("ha_discovery", {})
 
     def get_air_mode_label(self, code):
-        for m in self.air_modes:
+        for m in self.air_modes_clim + self.air_modes_heat + self.air_modes:
             if m.get("code") == code:
                 return m.get("label", code)
         return code
@@ -68,7 +76,7 @@ class DeviceProfile:
         return code
 
     def get_air_mode_by_index(self, index):
-        for m in self.air_modes:
+        for m in self.air_modes_clim + self.air_modes_heat + self.air_modes:
             if m.get("index") == index:
                 return m.get("code")
         return None
@@ -84,7 +92,11 @@ class DeviceProfile:
         for qm in self.ui.get("quick_modes", []):
             field = qm.get("field", "")
             label = qm.get("label", "")
-            if field == "air_modes":
+            if field == "air_modes_clim":
+                modes = self.air_modes_clim
+            elif field == "air_modes_heat":
+                modes = self.air_modes_heat
+            elif field == "air_modes":
                 modes = self.air_modes
             elif field == "water_modes":
                 modes = self.water_modes
@@ -112,6 +124,8 @@ class DeviceProfile:
             "description": self.description,
             "type": self.type,
             "air_modes": self.air_modes,
+            "air_modes_clim": self.air_modes_clim,
+            "air_modes_heat": self.air_modes_heat,
             "water_modes": self.water_modes,
             "commands": self.commands,
             "ui": self.ui,

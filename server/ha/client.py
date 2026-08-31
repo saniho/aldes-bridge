@@ -274,7 +274,7 @@ class HADiscoveryClient(threading.Thread):
         preset = payload.strip()
         profile = getattr(self.state, "profile", None)
         aldes_code = profile_code_for_label(
-            profile, "air_modes", preset, HA_PRESET_TO_ALDES
+            profile, ["air_modes_clim", "air_modes_heat"], preset, HA_PRESET_TO_ALDES
         )
         if not aldes_code:
             _log.warning("ha-discovery: preset inconnu: %s", preset)
@@ -415,7 +415,7 @@ class HADiscoveryClient(threading.Thread):
             ))
             profile = getattr(self.state, "profile", None)
             preset = profile_label_for_code(
-                profile, "air_modes", air_mode_code, ALDES_TO_HA_PRESET
+                profile, ["air_modes_clim", "air_modes_heat"], air_mode_code, ALDES_TO_HA_PRESET
             )
             self._safe_send(mqtt.build_publish(
                 f"{self.prefix}/state/preset", preset, qos=1, retain=True

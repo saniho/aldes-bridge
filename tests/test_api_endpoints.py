@@ -297,7 +297,8 @@ def test_api_profile_set():
     r = _req(port, "/api/profile", "PUT", {"profile_id": "tone-aquaair"})
     assert r["profile"]["id"] == "tone-aquaair"
     assert r["profile"]["name"] == "TONE AquaAIR"
-    assert len(r["profile"]["air_modes"]) == 9
+    assert len(r["profile"]["air_modes_clim"]) == 5
+    assert len(r["profile"]["air_modes_heat"]) == 5
 
 
 def test_api_profile_set_not_found():

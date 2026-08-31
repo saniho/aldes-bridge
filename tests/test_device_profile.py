@@ -45,36 +45,39 @@ def test_profile_products():
 
 def test_profile_air_modes():
     p = load_profile("tone-aquaair")
-    assert p.air_modes == [
-        {"index": 0, "code": "A", "label": "Arrêt"},
+    assert p.air_modes_clim == [
+        {"index": 0, "code": "A", "label": "Off"},
+        {"index": 5, "code": "F", "label": "Confort"},
+        {"index": 3, "code": "D", "label": "Boost"},
+        {"index": 7, "code": "H", "label": "Programme C"},
+        {"index": 8, "code": "I", "label": "Programme D"},
+    ]
+    assert p.air_modes_heat == [
+        {"index": 0, "code": "A", "label": "Off"},
         {"index": 1, "code": "B", "label": "Confort"},
         {"index": 2, "code": "C", "label": "Éco"},
-        {"index": 3, "code": "D", "label": "Chauffage programme A"},
-        {"index": 4, "code": "E", "label": "Chauffage programme B"},
-        {"index": 5, "code": "F", "label": "Climatisation"},
-        {"index": 6, "code": "G", "label": "Climatisation boost"},
-        {"index": 7, "code": "H", "label": "Climatisation programme C"},
-        {"index": 8, "code": "I", "label": "Climatisation programme D"},
+        {"index": 3, "code": "D", "label": "Programme A"},
+        {"index": 4, "code": "E", "label": "Programme B"},
     ]
 
 def test_profile_water_modes():
     p = load_profile("tone-aquaair")
     assert p.water_modes == [
-        {"index": 0, "code": "L", "label": "Arrêt"},
-        {"index": 1, "code": "M", "label": "Marche"},
+        {"index": 0, "code": "L", "label": "Off"},
+        {"index": 1, "code": "M", "label": "On"},
         {"index": 2, "code": "N", "label": "Boost"},
     ]
 
 def test_get_air_mode_label():
     p = load_profile("tone-aquaair")
-    assert p.get_air_mode_label("A") == "Arr\u00eat"
-    assert p.get_air_mode_label("F") == "Climatisation"
+    assert p.get_air_mode_label("A") == "Off"
+    assert p.get_air_mode_label("F") == "Confort"
     assert p.get_air_mode_label("Z") == "Z"
 
 def test_get_water_mode_label():
     p = load_profile("tone-aquaair")
-    assert p.get_water_mode_label("L") == "Arrêt"
-    assert p.get_water_mode_label("M") == "Marche"
+    assert p.get_water_mode_label("L") == "Off"
+    assert p.get_water_mode_label("M") == "On"
     assert p.get_water_mode_label("N") == "Boost"
 
 def test_resolve_reference():
