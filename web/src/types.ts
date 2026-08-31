@@ -163,6 +163,8 @@ export interface DeviceProfile {
   description: string
   type: string
   air_modes: DeviceMode[]
+  air_modes_clim: DeviceMode[]
+  air_modes_heat: DeviceMode[]
   water_modes: DeviceMode[]
   commands: DeviceCommand[]
   ui: DeviceUi

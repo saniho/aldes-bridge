@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getProducts, sendCommand, requestConsigne } from '../api'
-import type { AldesProduct, DeviceProfile } from '../types'
+import type { AldesProduct, DeviceMode, DeviceProfile } from '../types'
 import { fmtParis } from '../parisTime'
 import styles from './TempsPanel.module.css'
 
@@ -13,8 +13,13 @@ interface Props {
 }
 
 function buildAirLabel(profile: DeviceProfile | null | undefined): Record<string, string> {
-  if (profile?.air_modes?.length) {
-    return Object.fromEntries(profile.air_modes.map((m) => [m.code, m.label]))
+  const all = [
+    ...(profile?.air_modes_clim ?? []),
+    ...(profile?.air_modes_heat ?? []),
+    ...(profile?.air_modes ?? []),
+  ]
+  if (all.length) {
+    return Object.fromEntries(all.map((m) => [m.code, m.label]))
   }
   return {
     A: 'Arrêt', B: 'Confort', C: 'Éco', D: 'Auto 1', E: 'Auto 2',
@@ -29,19 +34,29 @@ function buildWaterLabel(profile: DeviceProfile | null | undefined): Record<stri
   return { L: 'Arrêt', M: 'Marche', N: 'Boost' }
 }
 
-function buildQuickAir(profile: DeviceProfile | null | undefined): { code: string; label: string }[] {
-  if (profile?.air_modes?.length) {
-    return profile.air_modes.map((m) => ({
+function buildQuickAirGroup(modes: DeviceMode[] | undefined, fallback: { code: string; label: string }[]): { code: string; label: string }[] {
+  if (modes?.length) {
+    return modes.map((m) => ({
       code: m.code, label: `${m.code} · ${m.label}`
     }))
   }
-  return [
+  return fallback
+}
+
+function buildQuickClim(profile: DeviceProfile | null | undefined): { code: string; label: string }[] {
+  return buildQuickAirGroup(profile?.air_modes_clim, [
+    { code: 'F', label: 'F · Confort' }, { code: 'D', label: 'D · Boost' },
+    { code: 'H', label: 'H · Programme C' }, { code: 'I', label: 'I · Programme D' },
+    { code: 'A', label: 'A · Off' },
+  ])
+}
+
+function buildQuickHeat(profile: DeviceProfile | null | undefined): { code: string; label: string }[] {
+  return buildQuickAirGroup(profile?.air_modes_heat, [
     { code: 'B', label: 'B · Confort' }, { code: 'C', label: 'C · Éco' },
-    { code: 'D', label: 'D · Auto 1' }, { code: 'E', label: 'E · Auto 2' },
-    { code: 'F', label: 'F · Froid conf.' }, { code: 'G', label: 'G · Froid boost' },
-    { code: 'H', label: 'H · Froid a1' }, { code: 'I', label: 'I · Froid a2' },
-    { code: 'A', label: 'A · Arrêt' }
-  ]
+    { code: 'D', label: 'D · Programme A' }, { code: 'E', label: 'E · Programme B' },
+    { code: 'A', label: 'A · Off' },
+  ])
 }
 
 function buildQuickWater(profile: DeviceProfile | null | undefined): { code: string; label: string }[] {
@@ -110,7 +125,8 @@ export default function TempsPanel({ pollMs = 5000, clientId, connected, consign
 
   const AIR_LABEL = buildAirLabel(profile)
   const WATER_LABEL = buildWaterLabel(profile)
-  const QUICK_AIR = buildQuickAir(profile)
+  const QUICK_CLIM = buildQuickClim(profile)
+  const QUICK_HEAT = buildQuickHeat(profile)
   const QUICK_WATER = buildQuickWater(profile)
 
   useEffect(() => {
@@ -234,23 +250,63 @@ export default function TempsPanel({ pollMs = 5000, clientId, connected, consign
             </div>
 
             <div className={styles.quickGroup}>
-              <div className={styles.quick}>
-                <span className={styles.quickLabel}>Air</span>
-                {QUICK_AIR.map((q) => (
-                  <button
-                    key={q.code}
-                    className={
-                      styles.quickBtn +
-                      (p.indicator.current_air_mode === q.code ? ' ' + styles.active : '')
-                    }
-                    onClick={() => quickMode(q.code, false)}
-                    disabled={!canSend || sending !== null}
-                    title={`changeMode ["${q.code}"]`}
-                  >
-                    {q.label}
-                  </button>
-                ))}
-              </div>
+              {QUICK_CLIM.length > 0 && (
+                <div className={styles.quick}>
+                  <span className={styles.quickLabel}>Climatisation</span>
+                  {QUICK_CLIM.map((q) => (
+                    <button
+                      key={q.code}
+                      className={
+                        styles.quickBtn +
+                        (p.indicator.current_air_mode === q.code ? ' ' + styles.active : '')
+                      }
+                      onClick={() => quickMode(q.code, false)}
+                      disabled={!canSend || sending !== null}
+                      title={`changeMode ["${q.code}"]`}
+                    >
+                      {q.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {QUICK_HEAT.length > 0 && (
+                <div className={styles.quick}>
+                  <span className={styles.quickLabel}>Chauffage</span>
+                  {QUICK_HEAT.map((q) => (
+                    <button
+                      key={q.code}
+                      className={
+                        styles.quickBtn +
+                        (p.indicator.current_air_mode === q.code ? ' ' + styles.active : '')
+                      }
+                      onClick={() => quickMode(q.code, false)}
+                      disabled={!canSend || sending !== null}
+                      title={`changeMode ["${q.code}"]`}
+                    >
+                      {q.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {QUICK_CLIM.length === 0 && QUICK_HEAT.length > 0 && (
+                <div className={styles.quick}>
+                  <span className={styles.quickLabel}>Air</span>
+                  {QUICK_HEAT.map((q) => (
+                    <button
+                      key={q.code}
+                      className={
+                        styles.quickBtn +
+                        (p.indicator.current_air_mode === q.code ? ' ' + styles.active : '')
+                      }
+                      onClick={() => quickMode(q.code, false)}
+                      disabled={!canSend || sending !== null}
+                      title={`changeMode ["${q.code}"]`}
+                    >
+                      {q.label}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className={styles.quick}>
                 <span className={styles.quickLabel}>ECS</span>
                 {QUICK_WATER.map((q) => (
