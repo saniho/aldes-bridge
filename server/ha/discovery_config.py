@@ -188,19 +188,64 @@ def build_discovery_config(device_id, profile, prefix="aldes", data=None,
     }
     configs.append((f"{discovery_prefix}/binary_sensor/compressor/config", json.dumps(compressor_config, ensure_ascii=False)))
 
-    ecs_config = {
-        "name": "PAC Aldes Eau Chaude",
-        "unique_id": f"aldes_{device_id}_ecs_mode",
-        "state_topic": f"{prefix}/state/ecs",
-        "command_topic": f"{prefix}/set/ecs",
-        "options": water_programs,
-        "device": {"identifiers": [f"aldes_{device_id}"]},
+    water_heater_config = {
+        "name": "Ballon ECS",
+        "unique_id": f"aldes_{device_id}_water_heater",
+        "device": device_info,
+        "operation_list": water_programs,
+        "operation_mode_state_topic": f"{prefix}/state/ecs",
+        "operation_mode_command_topic": f"{prefix}/set/ecs",
+        "current_temperature_topic": f"{prefix}/state/sensor/TBBa",
+        "current_temperature_unit": "°C",
+        "device_class": "water_heater",
         "icon": "mdi:water-boiler",
         "availability_topic": f"{prefix}/state/available",
         "payload_available": "online",
         "payload_not_available": "offline",
     }
-    configs.append((f"{discovery_prefix}/select/ecs_mode/config", json.dumps(ecs_config, ensure_ascii=False)))
+    configs.append((f"{discovery_prefix}/water_heater/aldes_ballon/config", json.dumps(water_heater_config, ensure_ascii=False)))
+
+    dhw_level_config = {
+        "name": "Niveau ECS",
+        "unique_id": f"aldes_{device_id}_dhw_level",
+        "state_topic": f"{prefix}/state/sensor/NED",
+        "unit_of_measurement": "%",
+        "device_class": "water",
+        "icon": "mdi:water-percent",
+        "device": {"identifiers": [f"aldes_{device_id}"]},
+        "availability_topic": f"{prefix}/state/available",
+        "payload_available": "online",
+        "payload_not_available": "offline",
+    }
+    configs.append((f"{discovery_prefix}/sensor/dhw_level/config", json.dumps(dhw_level_config, ensure_ascii=False)))
+
+    dhw_temp_bottom_config = {
+        "name": "Ballon ECS Bas",
+        "unique_id": f"aldes_{device_id}_dhw_temp_bottom",
+        "state_topic": f"{prefix}/state/sensor/TBBa",
+        "unit_of_measurement": "°C",
+        "device_class": "temperature",
+        "icon": "mdi:thermometer",
+        "device": {"identifiers": [f"aldes_{device_id}"]},
+        "availability_topic": f"{prefix}/state/available",
+        "payload_available": "online",
+        "payload_not_available": "offline",
+    }
+    configs.append((f"{discovery_prefix}/sensor/dhw_temp_bottom/config", json.dumps(dhw_temp_bottom_config, ensure_ascii=False)))
+
+    dhw_temp_top_config = {
+        "name": "Ballon ECS Haut",
+        "unique_id": f"aldes_{device_id}_dhw_temp_top",
+        "state_topic": f"{prefix}/state/sensor/TBHa",
+        "unit_of_measurement": "°C",
+        "device_class": "temperature",
+        "icon": "mdi:thermometer",
+        "device": {"identifiers": [f"aldes_{device_id}"]},
+        "availability_topic": f"{prefix}/state/available",
+        "payload_available": "online",
+        "payload_not_available": "offline",
+    }
+    configs.append((f"{discovery_prefix}/sensor/dhw_temp_top/config", json.dumps(dhw_temp_top_config, ensure_ascii=False)))
 
     vacation_start_config = {
         "name": "PAC Aldes Vacances Début",

@@ -213,19 +213,28 @@ def test_get_water_mode_code_invalid():
 
 # --- Tests des configs ECS et vacances ---
 
-def test_build_discovery_config_has_ecs_select():
+def test_build_discovery_config_has_water_heater():
     configs = _build_discovery_config("dev123", load_profile("tone-aquaair"))
-    ecs_topic = None
+    wh_topic = None
     for topic, payload_str in configs:
-        if "ecs" in topic and "select" in topic:
-            ecs_topic = topic
+        if "water_heater" in topic:
+            wh_topic = topic
             payload = json.loads(payload_str)
-            assert payload["name"] == "PAC Aldes Eau Chaude"
-            assert payload["options"] == ["Off", "On", "Boost"]
-            assert "command_topic" in payload
-            assert "state_topic" in payload
+            assert payload["name"] == "Ballon ECS"
+            assert payload["operation_list"] == ["Off", "On", "Boost"]
+            assert "operation_mode_command_topic" in payload
+            assert "operation_mode_state_topic" in payload
+            assert "current_temperature_topic" in payload
             break
-    assert ecs_topic is not None
+    assert wh_topic is not None
+
+
+def test_build_discovery_config_has_dhw_sensors():
+    configs = _build_discovery_config("dev123", load_profile("tone-aquaair"))
+    topics = {topic for topic, _ in configs}
+    assert any("dhw_level" in t for t in topics), "dhw_level sensor manquant"
+    assert any("dhw_temp_bottom" in t for t in topics), "dhw_temp_bottom sensor manquant"
+    assert any("dhw_temp_top" in t for t in topics), "dhw_temp_top sensor manquant"
 
 
 def test_profile_program_commands_are_converted_to_aldes_codes():

@@ -479,6 +479,24 @@ class HADiscoveryClient(threading.Thread):
                 f"{self.prefix}/state/ecs", ha_water, qos=1, retain=True
             ))
 
+        ned = safe_float(data.get("NED"))
+        if ned is not None:
+            self._safe_send(mqtt.build_publish(
+                f"{self.prefix}/state/sensor/NED", f"{ned:.0f}", qos=1, retain=True
+            ))
+
+        tbb = safe_float(data.get("TBBa"))
+        if tbb is not None:
+            self._safe_send(mqtt.build_publish(
+                f"{self.prefix}/state/sensor/TBBa", f"{tbb:.1f}", qos=1, retain=True
+            ))
+
+        tbh = safe_float(data.get("TBHa"))
+        if tbh is not None:
+            self._safe_send(mqtt.build_publish(
+                f"{self.prefix}/state/sensor/TBHa", f"{tbh:.1f}", qos=1, retain=True
+            ))
+
         self._publish_vacation_state(data)
 
     def _publish_vacation_state(self, data):
