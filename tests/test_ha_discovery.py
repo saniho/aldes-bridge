@@ -237,6 +237,136 @@ def test_build_discovery_config_has_dhw_sensors():
     assert any("dhw_temp_top" in t for t in topics), "dhw_temp_top sensor manquant"
 
 
+def test_water_heater_config_fields():
+    configs = _build_discovery_config("dev123", load_profile("tone-aquaair"))
+    for topic, payload_str in configs:
+        if "water_heater" in topic:
+            payload = json.loads(payload_str)
+            assert payload["current_temperature_topic"] == "aldes/state/sensor/TBBa"
+            assert payload["current_temperature_unit"] == "°C"
+            assert payload["device_class"] == "water_heater"
+            assert payload["icon"] == "mdi:water-boiler"
+            assert payload["availability_topic"] == "aldes/state/available"
+            assert payload["payload_available"] == "online"
+            assert payload["payload_not_available"] == "offline"
+            device = payload["device"]
+            assert "aldes_dev123" in device["identifiers"]
+            assert device["manufacturer"] == "Aldes"
+            return
+    pytest.fail("water_heater config non trouvée")
+
+
+def test_no_select_ecs_in_discovery():
+    configs = _build_discovery_config("dev123", load_profile("tone-aquaair"))
+    for topic, _ in configs:
+        assert "select" not in topic or "ecs" not in topic, \
+            f"L'ancien select ecs ne devrait plus exister: {topic}"
+
+
+def test_dhw_level_sensor_config():
+    configs = _build_discovery_config("dev123", load_profile("tone-aquaair"))
+    for topic, payload_str in configs:
+        if "dhw_level" in topic:
+            payload = json.loads(payload_str)
+            assert payload["name"] == "Niveau ECS"
+            assert payload["unit_of_measurement"] == "%"
+            assert payload["device_class"] == "water"
+            assert payload["icon"] == "mdi:water-percent"
+            assert payload["state_topic"] == "aldes/state/sensor/NED"
+            assert payload["availability_topic"] == "aldes/state/available"
+            assert "aldes_dev123" in payload["device"]["identifiers"]
+            return
+    pytest.fail("dhw_level sensor config non trouvée")
+
+
+def test_dhw_temp_bottom_sensor_config():
+    configs = _build_discovery_config("dev123", load_profile("tone-aquaair"))
+    for topic, payload_str in configs:
+        if "dhw_temp_bottom" in topic:
+            payload = json.loads(payload_str)
+            assert payload["name"] == "Ballon ECS Bas"
+            assert payload["unit_of_measurement"] == "°C"
+            assert payload["device_class"] == "temperature"
+            assert payload["icon"] == "mdi:thermometer"
+            assert payload["state_topic"] == "aldes/state/sensor/TBBa"
+            return
+    pytest.fail("dhw_temp_bottom sensor config non trouvée")
+
+
+def test_dhw_temp_top_sensor_config():
+    configs = _build_discovery_config("dev123", load_profile("tone-aquaair"))
+    for topic, payload_str in configs:
+        if "dhw_temp_top" in topic:
+            payload = json.loads(payload_str)
+            assert payload["name"] == "Ballon ECS Haut"
+            assert payload["unit_of_measurement"] == "°C"
+            assert payload["device_class"] == "temperature"
+            assert payload["state_topic"] == "aldes/state/sensor/TBHa"
+            return
+    pytest.fail("dhw_temp_top sensor config non trouvée")
+
+
+def test_water_heater_uses_profile_labels():
+    configs = _build_discovery_config("dev123", load_profile("tone-aquaair"))
+    for topic, payload_str in configs:
+        if "water_heater" in topic:
+            payload = json.loads(payload_str)
+            assert payload["operation_list"] == ["Off", "On", "Boost"]
+            return
+    pytest.fail("water_heater config non trouvée")
+
+
+def test_ecs_command_all_modes():
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events)
+    state.profile = load_profile("tone-aquaair")
+    injected = []
+    state._ha_inject_hook = lambda topic, payload, qos: injected.append(json.loads(payload))
+    client = HADiscoveryClient(state, dry_run=False)
+
+    client._handle_ecs_command("Off")
+    client._handle_ecs_command("On")
+    client._handle_ecs_command("Boost")
+
+    assert injected == [
+        {"id": 1, "jsonrpc": "2.0", "method": "changeMode", "params": ["L"]},
+        {"id": 1, "jsonrpc": "2.0", "method": "changeMode", "params": ["M"]},
+        {"id": 1, "jsonrpc": "2.0", "method": "changeMode", "params": ["N"]},
+    ]
+
+
+def test_publish_telemetry_ecs_values():
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events)
+    state._connected = True
+    published = []
+
+    class FakeSock:
+        def sendall(self, data):
+            published.append(data)
+            return True
+
+    client = HADiscoveryClient(state)
+    client._sock = FakeSock()
+    client._send_lock = __import__("threading").Lock()
+
+    data = {
+        "UDM": "2",
+        "NED": "75",
+        "TBBa": "52.3",
+        "TBHa": "55.1",
+        "UAM": "1",
+        "UsC0": "21.0",
+    }
+    client._publish_telemetry_data(data)
+
+    payloads = b"".join(published).decode("utf-8", errors="replace")
+    assert "aldes/state/ecs" in payloads
+    assert "aldes/state/sensor/NED" in payloads
+    assert "aldes/state/sensor/TBBa" in payloads
+    assert "aldes/state/sensor/TBHa" in payloads
+
+
 def test_profile_program_commands_are_converted_to_aldes_codes():
     events = EventBus()
     state = AppState("127.0.0.1", 8883, events)
