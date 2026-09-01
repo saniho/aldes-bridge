@@ -21,7 +21,7 @@ RELAY_TIMEOUT = 180.0  # s ; silence >= 3 min d'un cote -> dechirure du relais
 class ProxyHandler(MQTTEndpoint):
     """Relaye box <-> vrai Azure et permet d'injecter des trames PUBLISH vers la box."""
 
-    def __init__(self, state, box_sock, addr, session=None):
+    def __init__(self, state, box_sock, addr, session=None, real_to_box_fn=None):
         self.box_sock = box_sock
         self.state = state
         self.addr = addr
@@ -32,6 +32,7 @@ class ProxyHandler(MQTTEndpoint):
         self._closed = False
         self.stale = False  # marque par l'engine quand une nouvelle connexion prend le relai
         self._pkt_id = 0
+        self._real_to_box_fn = real_to_box_fn
 
     # --- vie ---
     def run(self):
@@ -143,6 +144,8 @@ class ProxyHandler(MQTTEndpoint):
 
     # --- forward real -> box ---
     def _forward_real_to_box(self):
+        if self._real_to_box_fn is not None:
+            return self._real_to_box_fn(self)
         reader = MQTTReader(self.real_tls)
         while not self._closed:
             try:

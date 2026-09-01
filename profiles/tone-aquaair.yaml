@@ -31,22 +31,26 @@ telemetry:
   vacation_start_field: Dvac
   vacation_end_field: Fvac
 
-# ── Modes air (UAM 0..8) ──
-air_modes:
-  - { index: 0, code: "A", label: "Arrêt" }
+# ── Modes air — Climatisation (UAM) ──
+air_modes_clim:
+  - { index: 0, code: "A", label: "Off" }
+  - { index: 5, code: "F", label: "Confort" }
+  - { index: 6, code: "G", label: "Boost" }
+  - { index: 7, code: "H", label: "Programme C" }
+  - { index: 8, code: "I", label: "Programme D" }
+
+# ── Modes air — Chauffage (UAM) ──
+air_modes_heat:
+  - { index: 0, code: "A", label: "Off" }
   - { index: 1, code: "B", label: "Confort" }
   - { index: 2, code: "C", label: "Éco" }
-  - { index: 3, code: "D", label: "Chauffage programme A" }
-  - { index: 4, code: "E", label: "Chauffage programme B" }
-  - { index: 5, code: "F", label: "Climatisation" }
-  - { index: 6, code: "G", label: "Climatisation boost" }
-  - { index: 7, code: "H", label: "Climatisation programme C" }
-  - { index: 8, code: "I", label: "Climatisation programme D" }
+  - { index: 3, code: "D", label: "Programme A" }
+  - { index: 4, code: "E", label: "Programme B" }
 
 # ── Modes eau chaude (UDM 0..2) ──
 water_modes:
-  - { index: 0, code: "L", label: "Arrêt" }
-  - { index: 1, code: "M", label: "Marche" }
+  - { index: 0, code: "L", label: "Off" }
+  - { index: 1, code: "M", label: "On" }
   - { index: 2, code: "N", label: "Boost" }
 
 # ── Labels historique (par famille) ──
@@ -212,8 +216,10 @@ commands:
 # ── Configuration UI ──
 ui:
   quick_modes:
-    - field: air_modes
-      label: "Air"
+    - field: air_modes_clim
+      label: "Climatisation"
+    - field: air_modes_heat
+      label: "Chauffage"
     - field: water_modes
       label: "ECS"
   show_thermostats: true
@@ -225,22 +231,25 @@ ui:
 ha_discovery:
   # Mapping modes Aldes → modes HA HVAC
   mode_mapping:
-    A: "off"        # Arrêt
-    B: "heat"       # Hors gel
-    C: "heat"       # Éco
-    D: "heat"       # Confort
-    E: "heat"       # Anti-condensation (≈ sec)
-    F: "auto"       # Nuit
-    G: "auto"       # Éco nuit
-    H: "fan_only"   # Arrêt ventilateur
-    I: "auto"       # Auto
+    A: "off"        # Off
+    B: "heat"       # Confort (chauffage)
+    C: "heat"       # Éco (chauffage)
+    D: "heat"       # Programme A (chauffage)
+    E: "heat"       # Programme B (chauffage)
+    F: "cool"       # Confort (climatisation)
+    G: "cool"       # Boost (climatisation)
+    H: "cool"       # Programme C (climatisation)
+    I: "cool"       # Programme D (climatisation)
   # Mapping presets HA → codes Aldes
   preset_mapping:
-    none: "D"        # Confort
+    none: "B"        # Confort (chauffage)
     eco: "C"         # Éco
-    comfort: "D"     # Confort
-    night: "F"       # Nuit
-    anti_freeze: "B" # Hors gel
+    comfort: "B"     # Confort (chauffage)
+    boost: "G"       # Boost (climatisation)
+    program_a: "D"   # Programme A (chauffage)
+    program_b: "E"   # Programme B (chauffage)
+    program_c: "H"   # Programme C (climatisation)
+    program_d: "I"   # Programme D (climatisation)
   # Entités HA à créer
   entities:
     climate:

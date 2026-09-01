@@ -13,6 +13,7 @@ import sys
 from .appstate import AppState, read_persisted_mode, read_persisted_profile
 from .config import ConfigStore
 from .device_profile import load_profile
+from .ha.mode_mappings import rebuild_from_profile
 from . import __version__ as BACKEND_VERSION
 from .events import EventBus
 from .engine import Engine
@@ -144,6 +145,60 @@ def build_parser():
     return ap
 
 
+def _setup_ha_client(state, engine, args, config):
+    """Configure et demarre le client HA MQTT auto-discovery."""
+    from .ha.client import HADiscoveryClient
+    from .ha.broker_detection import detect_mqtt_broker
+    from .utils import parse_json_payload
+
+    mqtt_host = args.ha_mqtt_host
+    mqtt_port = args.ha_mqtt_port
+    mqtt_source = "cli"
+    detected = detect_mqtt_broker()
+    if detected:
+        mqtt_host = detected["host"]
+        mqtt_port = detected["port"]
+        mqtt_source = "supervisor"
+    elif args.ha_mqtt_host == "127.0.0.1":
+        mqtt_source = "fallback"
+    state._ha_mqtt_resolved = {
+        "host": mqtt_host, "port": mqtt_port, "source": mqtt_source,
+    }
+    initial_dry_run = _resolve_ha_mqtt_dry_run(args, config)
+    ha_client = HADiscoveryClient(
+        state, host=mqtt_host, port=mqtt_port,
+        username=args.ha_mqtt_user, password=args.ha_mqtt_password,
+        prefix=args.ha_mqtt_prefix, dry_run=initial_dry_run,
+        zones_file=args.zones_file,
+    )
+    def _ha_inject(topic, payload, qos):
+        return engine.inject(topic, payload, qos)
+    state._ha_inject_hook = _ha_inject
+
+    _original_on_publish_in = state.on_publish_in
+    _hook_count = [0]
+    def _on_publish_in_with_ha(state, payload):
+        _hook_count[0] += 1
+        if _original_on_publish_in:
+            _original_on_publish_in(state, payload)
+        try:
+            data = parse_json_payload(payload)
+            if data:
+                ha_client.publish_telemetry(data)
+            elif _hook_count[0] <= 5:
+                _log.info("ha-discovery: hook #%d - payload non-JSON/telemetry ignore (len=%d)",
+                          _hook_count[0], len(payload) if payload else 0)
+        except Exception as exc:
+            _log.warning("ha-discovery: hook #%d - erreur: %s", _hook_count[0], exc)
+    state.on_publish_in = _on_publish_in_with_ha
+    ha_client.start()
+    state._ha_client = ha_client
+    dry_run_msg = " [DRY-RUN]" if initial_dry_run else ""
+    _log.info("HA MQTT auto-discovery active%s: %s:%d via %s (prefix: %s)",
+              dry_run_msg, mqtt_host, mqtt_port, mqtt_source, args.ha_mqtt_prefix)
+    return ha_client
+
+
 def main(argv=None):
     logging.basicConfig(
         level=logging.INFO,
@@ -181,20 +236,16 @@ def main(argv=None):
                      mode_file=args.mode_file, telemetry_file=args.telemetry_file,
                      consigne_file=args.consigne_file, history=history,
                      profile_file=args.profile_file, config=config)
-    # Chargement du profil device (YAML). Priorite : profil persiste > CLI/env > defaut.
     persisted_profile_id = read_persisted_profile(args.profile_file)
     profile_id = persisted_profile_id or args.profile
     profile = load_profile(profile_id)
     if profile:
         state.profile = profile
+        rebuild_from_profile(profile)
         _log.info("profil device charge: %s (%s)", profile.id, profile.name)
-    # Capture des telemetries : branchee ici pour decoupler appstate (plomberie
-    # d'evenements) de aldes (mapping metier). Appelee sur chaque PUBLISH entrant.
     state.on_publish_in = capture_telemetry
-    # Priorite : CLI explicite (depuis config HAOS) > mode.json (WebUI) > defaut bridge.
     state.set_mode(args.mode or read_persisted_mode(args.mode_file) or "bridge")
 
-    # Resolution DNS Azure au demarrage (tous les modes).
     try:
         from .tls import resolve
         azure_ip = resolve(args.real_host, args.real_port)
@@ -203,71 +254,14 @@ def main(argv=None):
     except Exception as exc:
         _log.warning("Azure DNS resolution failed: %s", exc)
 
-    # Purge automatique periodique (toutes les heures).
     state.start_purge_timer()
 
     engine = Engine(state, mqtt_port=args.mqtt_port, bind=args.bind)
     engine.start()
     state.set_error("ecoute MQTT sur %s:%d, web sur %s:%d" % (args.bind, args.mqtt_port, args.bind, args.web_port))
 
-    # Home Assistant MQTT Auto-Discovery
-    ha_client = None
     if args.ha_mqtt:
-        from .ha_discovery import HADiscoveryClient, detect_mqtt_broker
-        # Détection auto du broker MQTT via Supervisor API
-        mqtt_host = args.ha_mqtt_host
-        mqtt_port = args.ha_mqtt_port
-        mqtt_source = "cli"
-        detected = detect_mqtt_broker()
-        if detected:
-            mqtt_host = detected["host"]
-            mqtt_port = detected["port"]
-            mqtt_source = "supervisor"
-        elif args.ha_mqtt_host == "127.0.0.1":
-            mqtt_source = "fallback"
-        state._ha_mqtt_resolved = {
-            "host": mqtt_host,
-            "port": mqtt_port,
-            "source": mqtt_source,
-        }
-        initial_dry_run = _resolve_ha_mqtt_dry_run(args, config)
-        ha_client = HADiscoveryClient(
-            state,
-            host=mqtt_host,
-            port=mqtt_port,
-            username=args.ha_mqtt_user,
-            password=args.ha_mqtt_password,
-            prefix=args.ha_mqtt_prefix,
-            dry_run=initial_dry_run,
-            zones_file=args.zones_file,
-        )
-        # Hook d'injection : les commandes HA → box passent par engine.inject
-        def _ha_inject(topic, payload, qos):
-            return engine.inject(topic, payload, qos)
-        state._ha_inject_hook = _ha_inject
-        # Hook telemetrie : met a jour les topics HA a chaque trame
-        _original_on_publish_in = state.on_publish_in
-        _hook_count = [0]
-        def _on_publish_in_with_ha(state, payload):
-            _hook_count[0] += 1
-            if _original_on_publish_in:
-                _original_on_publish_in(state, payload)
-            try:
-                from .aldes import _parse_telemetry_payload
-                data = _parse_telemetry_payload(payload)
-                if data:
-                    ha_client.publish_telemetry(data)
-                elif _hook_count[0] <= 5:
-                    _log.info("ha-discovery: hook #%d - payload non-JSON/telemetry ignore (len=%d)",
-                              _hook_count[0], len(payload) if payload else 0)
-            except Exception as exc:
-                _log.warning("ha-discovery: hook #%d - erreur: %s", _hook_count[0], exc)
-        state.on_publish_in = _on_publish_in_with_ha
-        ha_client.start()
-        state._ha_client = ha_client
-        dry_run_msg = " [DRY-RUN]" if initial_dry_run else ""
-        _log.info("HA MQTT auto-discovery active%s: %s:%d via %s (prefix: %s)",
-                  dry_run_msg, mqtt_host, mqtt_port, mqtt_source, args.ha_mqtt_prefix)
+        _setup_ha_client(state, engine, args, config)
 
     from .api import create_app
     app = create_app(state, engine, args.web_dir)
