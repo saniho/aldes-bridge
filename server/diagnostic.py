@@ -15,7 +15,7 @@ _PROCESS_START = time.time()
 
 def _check_dns_doh(state):
     try:
-        from ..tls import _doh_query
+        from .tls import _doh_query
         ip = _doh_query(state.real_host, timeout=5)
         return {
             "id": "dns_doh", "label": "DNS DoH (Cloudflare)",
@@ -156,7 +156,7 @@ def _check_ha_mqtt_broker(state):
 
 def _check_tls_cert(state):
     try:
-        from ..tls import _generate
+        from .tls import _generate
         from cryptography import x509 as _x509
         cert_path, key_path = _generate(state.real_host)
         try:
