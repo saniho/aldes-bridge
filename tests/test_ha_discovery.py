@@ -693,3 +693,46 @@ def test_build_discovery_backward_compat_none():
     configs = _build_discovery_config("dev1", None, data=data, previous_active_zones=None)
     empty = [t for t, p in configs if not p]
     assert empty == []
+
+
+def test_build_discovery_config_has_antil_binary_sensor():
+    configs = _build_discovery_config("dev123", load_profile("tone-aquaair"))
+    for topic, payload_str in configs:
+        if "antil" in topic and "binary_sensor" in topic:
+            payload = json.loads(payload_str)
+            assert payload["name"] == "Protection anti-légionelles"
+            assert payload["unique_id"] == "aldes_dev123_antil"
+            assert payload["state_topic"] == "aldes/state/sensor/AntiL"
+            assert payload["payload_on"] == "1"
+            assert payload["payload_off"] == "0"
+            assert payload["device_class"] == "safety"
+            assert payload["icon"] == "mdi:shield-check"
+            assert "aldes_dev123" in payload["device"]["identifiers"]
+            return
+    pytest.fail("antil binary_sensor config non trouvée")
+
+
+def test_publish_telemetry_antil_value():
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events)
+    state._connected = True
+    published = []
+
+    class FakeSock:
+        def sendall(self, data):
+            published.append(data)
+            return True
+
+    client = HADiscoveryClient(state)
+    client._sock = FakeSock()
+    client._send_lock = __import__("threading").Lock()
+
+    data = {
+        "UAM": "1",
+        "UsC0": "21.0",
+        "AntiL": "1",
+    }
+    client._publish_telemetry_data(data)
+
+    payloads = b"".join(published).decode("utf-8", errors="replace")
+    assert "aldes/state/sensor/AntiL" in payloads

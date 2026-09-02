@@ -497,6 +497,13 @@ class HADiscoveryClient(threading.Thread):
                 f"{self.prefix}/state/sensor/TBHa", f"{tbh:.1f}", qos=1, retain=True
             ))
 
+        anti_l = data.get("AntiL")
+        if anti_l is not None:
+            antil_state = "1" if str(anti_l) not in ("0", "", "null") else "0"
+            self._safe_send(mqtt.build_publish(
+                f"{self.prefix}/state/sensor/AntiL", antil_state, qos=1, retain=True
+            ))
+
         self._publish_vacation_state(data)
 
     def _publish_vacation_state(self, data):

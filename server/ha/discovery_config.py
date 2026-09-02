@@ -188,6 +188,21 @@ def build_discovery_config(device_id, profile, prefix="aldes", data=None,
     }
     configs.append((f"{discovery_prefix}/binary_sensor/compressor/config", json.dumps(compressor_config, ensure_ascii=False)))
 
+    antil_config = {
+        "name": "Protection anti-légionelles",
+        "unique_id": f"aldes_{device_id}_antil",
+        "state_topic": f"{prefix}/state/sensor/AntiL",
+        "payload_on": "1",
+        "payload_off": "0",
+        "device_class": "safety",
+        "device": {"identifiers": [f"aldes_{device_id}"]},
+        "icon": "mdi:shield-check",
+        "availability_topic": f"{prefix}/state/available",
+        "payload_available": "online",
+        "payload_not_available": "offline",
+    }
+    configs.append((f"{discovery_prefix}/binary_sensor/antil/config", json.dumps(antil_config, ensure_ascii=False)))
+
     water_heater_config = {
         "name": "Ballon ECS",
         "unique_id": f"aldes_{device_id}_water_heater",
