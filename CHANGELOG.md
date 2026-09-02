@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.13.0] - 2026-09-02
+
+### Ajouté
+- **HA Discovery** : entité `binary_sensor` pour la protection anti-légionelles (`AntiL`) — `device_class: safety`
+
+## [0.12.3] - 2026-09-02
+
+### Ajouté
+- **Infra** : endpoint `/healthz` pour liveness/readiness probes Kubernetes et docker-compose
+- **Infra** : endpoint `/api/health` retourne status, uptime, mqtt_connected, box_connected
+
+### Corrigé
+- **Tests** : `test_dhw_level_sensor_config` mis à jour (device_class water supprimé dans un fix précédent)
+
 ## [0.8.5] - 2026-08-29
 
 ### Fixes
