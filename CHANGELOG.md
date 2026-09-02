@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.12.4] - 2026-09-02
+## [0.12.5] - 2026-09-02
 
 ### Ajouté
 - **HA Discovery** : entité `binary_sensor` pour la protection anti-légionelles (`AntiL`) — `device_class: safety`
