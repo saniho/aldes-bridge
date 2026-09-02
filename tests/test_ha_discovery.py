@@ -270,7 +270,7 @@ def test_dhw_level_sensor_config():
             payload = json.loads(payload_str)
             assert payload["name"] == "Niveau ECS"
             assert payload["unit_of_measurement"] == "%"
-            assert payload["device_class"] == "water"
+            assert "device_class" not in payload
             assert payload["icon"] == "mdi:water-percent"
             assert payload["state_topic"] == "aldes/state/sensor/NED"
             assert payload["availability_topic"] == "aldes/state/available"
