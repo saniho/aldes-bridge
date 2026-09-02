@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.12.7] - 2026-09-02
+
+### Changé
+- **HA Discovery** : `ha_mqtt_dry_run` passe de `True` à `False` par défaut — les commandes HA sont désormais envoyées à la box sans configuration supplémentaire
+
 ## [0.12.5] - 2026-09-02
 
 ### Ajouté
