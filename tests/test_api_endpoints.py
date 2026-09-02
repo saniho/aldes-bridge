@@ -419,6 +419,37 @@ def test_api_diagnostic_uses_configured_mqtt_port():
         listener.close()
 
 
+def test_healthz_returns_200():
+    state = AppState("h", 8883, EventBus())
+    port, _, _ = _start_web(state)
+    url = f"http://127.0.0.1:{port}/healthz"
+    req = urllib.request.Request(url, method="GET")
+    with urllib.request.urlopen(req, timeout=5) as resp:
+        assert resp.status == 200
+        assert resp.read() == b""
+
+
+def test_api_health_returns_json():
+    state = AppState("h", 8883, EventBus())
+    port, _, _ = _start_web(state)
+    result = _req(port, "/api/health")
+    assert "status" in result
+    assert result["status"] in ("ok", "degraded", "error")
+    assert "uptime" in result
+    assert isinstance(result["uptime"], (int, float))
+    assert result["uptime"] >= 0
+    assert "mqtt_connected" in result
+    assert "box_connected" in result
+    assert result["box_connected"] is False
+
+
+def test_api_health_degraded_when_box_not_connected():
+    state = AppState("h", 8883, EventBus())
+    port, _, _ = _start_web(state)
+    result = _req(port, "/api/health")
+    assert result["box_connected"] is False
+
+
 if __name__ == "__main__":
     import traceback
     failures = 0

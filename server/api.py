@@ -12,8 +12,9 @@ Decoupe en routers :
 import asyncio
 import logging
 import os
+import time
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 
 from .version import read_ui_version
@@ -30,6 +31,7 @@ def create_app(state, engine, web_dir):
     # Expose state/engine aux routers via request.app.extra
     app.extra["state"] = state
     app.extra["engine"] = engine
+    _start_time = time.time()
 
     @app.on_event("startup")
     async def _startup():
@@ -38,6 +40,33 @@ def create_app(state, engine, web_dir):
     @app.on_event("shutdown")
     async def _shutdown():
         state.persist_telemetry()
+
+    # --- Health endpoints (doivent etre declares AVANT les routers /api/*) ---
+    @app.get("/healthz")
+    def healthz():
+        """Endpoint leger pour probes Kubernetes/docker-compose."""
+        return Response(status_code=200)
+
+    @app.get("/api/health")
+    def api_health(request: Request):
+        """Endpoint detaille pour diagnostics orchestration."""
+        st = request.app.extra["state"]
+        ha_client = getattr(st, "_ha_client", None)
+        mqtt_connected = ha_client._sock is not None if ha_client else None
+        box_connected = st.connected
+        uptime = time.time() - _start_time
+        if box_connected:
+            status = "ok"
+        elif mqtt_connected is False:
+            status = "degraded"
+        else:
+            status = "ok" if mqtt_connected is None else "degraded"
+        return JSONResponse({
+            "status": status,
+            "uptime": round(uptime, 1),
+            "mqtt_connected": mqtt_connected,
+            "box_connected": box_connected,
+        })
 
     # Include routers
     app.include_router(core.router)
