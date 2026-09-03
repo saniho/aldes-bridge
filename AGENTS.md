@@ -62,6 +62,8 @@ Fichiers à modifier :
 
 Les deux versions doivent être **identiques** et incrémentées **ensemble**.
 
+**Changelog :** mettre à jour `aldes-haos-addons/aldes-bridge-beta/CHANGELOG.md` (ou `aldes-bridge/CHANGELOG.md` pour le stable) à chaque bump de version. Format [Keep a Changelog](https://keepachangelog.com/) avec sections `Ajouté`, `Corrigé`, `Changé`.
+
 ### 3. Commits
 
 Format conventionnel :
@@ -153,6 +155,7 @@ aldes-bridge/
 - [ ] Versions bumpées si nécessaire
 - [ ] Versions bumpées dans `aldes-haos-addons` (config-beta.yaml uniquement si feature, stable + beta si release)
 - [ ] Versions bumpées dans `aldes-haos-addons` (Dockerfile-beta CACHEBUST + ALDES_ADDON_VERSION si feature, les deux si release)
+- [ ] Changelog mis à jour (`aldes-haos-addons/aldes-bridge-beta/CHANGELOG.md`)
 - [ ] Tests passent
 - [ ] Build OK
 - [ ] Commit avec bon format
