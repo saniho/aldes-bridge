@@ -50,6 +50,10 @@ Fichiers à modifier :
 | UI        | `web/package.json` | `"version": "x.y.z"` |
 | Addon     | `aldes-haos-addons/aldes-bridge/config.yaml` | `version: "x.y.z"` |
 | Addon beta| `aldes-haos-addons/aldes-bridge-beta/config.yaml` | `version: "x.y.z"` |
+| Dockerfile stable | `aldes-haos-addons/aldes-bridge/Dockerfile` | `CACHEBUST=vX.Y.Z` + `ALDES_ADDON_VERSION=vX.Y.Z` |
+| Dockerfile beta   | `aldes-haos-addons/aldes-bridge-beta/Dockerfile` | `CACHEBUST=vX.Y.Z-beta` + `ALDES_ADDON_VERSION=vX.Y.Z-beta` |
+
+**IMPORTANT :** les `CACHEBUST` et `ALDES_ADDON_VERSION` dans les Dockerfiles **doivent** être bumpés à chaque changement de version. Sans cela, Docker utilise le cache et ne reclone pas le repo — la version affichée dans les logs reste l'ancienne.
 
 Les deux versions doivent être **identiques** et incrémentées **ensemble**.
 
@@ -143,6 +147,7 @@ aldes-bridge/
 - [ ] Branche feature créée
 - [ ] Versions bumpées si nécessaire
 - [ ] Versions bumpées dans `aldes-haos-addons` (config.yaml + config-beta.yaml)
+- [ ] Versions bumpées dans `aldes-haos-addons` (Dockerfile + Dockerfile-beta : CACHEBUST + ALDES_ADDON_VERSION)
 - [ ] Tests passent
 - [ ] Build OK
 - [ ] Commit avec bon format
