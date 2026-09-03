@@ -194,6 +194,7 @@ def build_product(telemetry, connected):
             "date_debut_vac": _epoch_to_iso(telemetry.get("Dvac")),
             "date_fin_vac": _epoch_to_iso(telemetry.get("Fvac")),
             "hors_gel": air_mode == "H",
+            "antilegionelles": str(telemetry.get("AntiL", "")) not in ("0", "", "null"),
             "settings": {
                 "people": people,
             },
