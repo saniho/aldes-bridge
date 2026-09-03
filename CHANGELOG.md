@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.12.9] - 2026-09-02
+
+### Ajouté
+- **UI** : affichage du statut anti-légionelles (actif/inactif) dans l'onglet températures
+
+### Changé
+- **Nettoyage** : suppression de `deploy.sh` et références SSH (déploiement via addon HA uniquement)
+
 ## [0.12.8] - 2026-09-02
 
 ### Changé

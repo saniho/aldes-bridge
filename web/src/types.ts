@@ -86,6 +86,7 @@ export interface AldesIndicator {
   date_debut_vac: string | null
   date_fin_vac: string | null
   hors_gel: boolean
+  antilegionelles?: boolean
   settings?: { people?: number | null }
   thermostats: AldesThermostat[]
 }

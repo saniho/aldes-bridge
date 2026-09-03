@@ -371,6 +371,12 @@ export default function TempsPanel({ pollMs = 5000, clientId, connected, consign
                   <span className={styles.statValue}>actif</span>
                 </div>
               )}
+              {p.indicator.antilegionelles && (
+                <div className={styles.stat + ' ' + styles.gel}>
+                  <span className={styles.statLabel}>Anti-légionelles</span>
+                  <span className={styles.statValue}>actif</span>
+                </div>
+              )}
             </div>
 
             <div className={styles.tableTitle}>Thermostats</div>
