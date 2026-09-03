@@ -705,7 +705,7 @@ def test_build_discovery_config_has_antil_binary_sensor():
             assert payload["state_topic"] == "aldes/state/sensor/AntiL"
             assert payload["payload_on"] == "1"
             assert payload["payload_off"] == "0"
-            assert payload["device_class"] == "safety"
+            assert payload["device_class"] == "running"
             assert payload["icon"] == "mdi:shield-check"
             assert "aldes_dev123" in payload["device"]["identifiers"]
             return

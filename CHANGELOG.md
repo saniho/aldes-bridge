@@ -1,14 +1,20 @@
 # Changelog
 
+## [0.12.8] - 2026-09-02
+
+### Changé
+- **HA Discovery** : `binary_sensor` anti-légionelles — `device_class` corrigé de `safety` à `running` (ON = "Running", OFF = "Stopped" au lieu de "Danger"/"Safe")
+
 ## [0.12.7] - 2026-09-02
 
 ### Changé
 - **HA Discovery** : `ha_mqtt_dry_run` passe de `True` à `False` par défaut — les commandes HA sont désormais envoyées à la box sans configuration supplémentaire
+- **HA Discovery** : `binary_sensor` anti-légionelles — `device_class` corrigé de `safety` à `running` (ON = "Running", OFF = "Stopped" au lieu de "Danger"/"Safe")
 
 ## [0.12.5] - 2026-09-02
 
 ### Ajouté
-- **HA Discovery** : entité `binary_sensor` pour la protection anti-légionelles (`AntiL`) — `device_class: safety`
+- **HA Discovery** : entité `binary_sensor` pour la protection anti-légionelles (`AntiL`) — `device_class: running`
 
 ## [0.12.3] - 2026-09-02
 
