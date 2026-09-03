@@ -12,6 +12,19 @@ Ce n'est **pas** une VMC. Les modes de ventilation et de température contrôlen
 
 ---
 
+## Repos liés
+
+Deux repos doivent être mis à jour **ensemble** lors de tout changement de version :
+
+| Repo | Rôle | Local |
+|------|------|-------|
+| [`saniho/aldes-bridge`](https://github.com/saniho/aldes-bridge) | Code bridge (backend + frontend + tests) | `/home/ubuntu/aldes-bridge` |
+| [`saniho/aldes-haos-addons`](https://github.com/saniho/aldes-haos-addons) | Add-on Home Assistant OS (config + Dockerfile) | `/home/ubuntu/aldes-haos-addons` |
+
+**Règle :** toute modification de version dans `aldes-bridge` doit être suivie d'un bump de version dans `aldes-haos-addons` (fichiers `aldes-bridge/config.yaml` et `aldes-bridge-beta/config.yaml`).
+
+---
+
 ## Workflow obligatoire
 
 ### 1. Branche feature (jamais de commit direct sur `main`)
@@ -35,6 +48,8 @@ Fichiers à modifier :
 |-----------|---------|-----|
 | Backend   | `server/__init__.py` | `__version__ = "x.y.z"` |
 | UI        | `web/package.json` | `"version": "x.y.z"` |
+| Addon     | `aldes-haos-addons/aldes-bridge/config.yaml` | `version: "x.y.z"` |
+| Addon beta| `aldes-haos-addons/aldes-bridge-beta/config.yaml` | `version: "x.y.z"` |
 
 Les deux versions doivent être **identiques** et incrémentées **ensemble**.
 
@@ -139,6 +154,7 @@ aldes-bridge/
 
 - [ ] Branche feature créée
 - [ ] Versions bumpées si nécessaire
+- [ ] Versions bumpées dans `aldes-haos-addons` (config.yaml + config-beta.yaml)
 - [ ] Tests passent
 - [ ] Build OK
 - [ ] Deploy local vérifié
