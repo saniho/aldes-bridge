@@ -13,11 +13,12 @@ import WrapperPanel from './components/WrapperPanel'
 import ProfileSelector from './components/ProfileSelector'
 import ConfigPanel from './components/ConfigPanel'
 import DiagnosticPanel from './components/DiagnosticPanel'
+import HealthPanel from './components/HealthPanel'
 import './App.css'
 
 const HistoryPanel = lazy(() => import('./components/HistoryPanel'))
 
-type View = 'temps' | 'commande' | 'log' | 'wrapper' | 'historique' | 'config' | 'diagnostic'
+type View = 'temps' | 'health' | 'commande' | 'log' | 'wrapper' | 'historique' | 'config' | 'diagnostic'
 
 function mergeConsignes(
   c: Record<string, { requested: number; confirmed: boolean; ts?: string }>
@@ -35,6 +36,7 @@ function mergeConsignes(
 
 const TABS: { id: View; label: string; title: string }[] = [
   { id: 'temps', label: '🌡 infos aldes', title: 'Températures / infos de la PAC' },
+  { id: 'health', label: '🩺 santé', title: 'État compresseur, pressions & alertes' },
   { id: 'commande', label: '📤 commande', title: 'Envoyer des commandes à la box' }
 ]
 
@@ -57,6 +59,7 @@ export default function App() {
     if (stored === 'flux') return 'log'
     if (
       stored === 'temps' ||
+      stored === 'health' ||
       stored === 'commande' ||
       stored === 'log' ||
       stored === 'wrapper' ||
@@ -123,7 +126,8 @@ export default function App() {
           server_version: cfg.server_version ?? 'dev',
           ui_version: cfg.ui_version ?? 'dev',
           history_days: cfg.history_days ?? null,
-          profile: cfg.profile ?? null
+          profile: cfg.profile ?? null,
+          health: cfg.health ?? null
         })
         if (cfg.consignes) setConsignes(mergeConsignes(cfg.consignes))
       } catch {
@@ -369,6 +373,11 @@ const { messages, lastSnapshot } = useMemo(() => {
               consignes={consignes}
               profile={config?.profile ?? null}
             />
+          </div>
+        )}
+        {view === 'health' && (
+          <div className="streamCol">
+            <HealthPanel health={config?.health ?? null} />
           </div>
         )}
         {view === 'commande' && (

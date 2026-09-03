@@ -25,6 +25,7 @@ export interface Config {
   ui_version?: string
   history_days?: number | null
   profile?: DeviceProfile | null
+  health?: HealthData | null
 }
 
 export interface MsgEvent {
@@ -175,6 +176,16 @@ export interface AppConfig {
   history_retention_days: number
   log_retention_max_bytes: number
   ha_mqtt_dry_run: boolean
+}
+
+export interface HealthData {
+  preh?: number | null
+  dhi?: number | null
+  dlo?: number | null
+  hpc?: number | null
+  mfac?: number | null
+  mfec?: number | null
+  defr?: number | null
 }
 
 export interface DiagnosticCheck {

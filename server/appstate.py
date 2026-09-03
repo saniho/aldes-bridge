@@ -452,6 +452,35 @@ class AppState:
             self._raw.update(update)
             return dict(self._raw)
 
+    def _extract_health(self):
+        """Extrait les cles de sante depuis la telemetrie courante.
+
+        Appeler sous self._lock. Renvoie un dict avec les valeurs ou None.
+        """
+        for data in self.telemetry.values():
+            if not isinstance(data, dict):
+                continue
+            health = {}
+            for key, dst in (
+                ("PreH", "preh"),
+                ("dHi", "dhi"),
+                ("dLo", "dlo"),
+                ("HPC", "hpc"),
+                ("MfAc", "mfac"),
+                ("MfEc", "mfec"),
+                ("Defr", "defr"),
+            ):
+                val = data.get(key)
+                if val is not None:
+                    try:
+                        f = float(val)
+                        health[dst] = int(f) if f == int(f) else f
+                    except (TypeError, ValueError):
+                        pass
+            if health:
+                return health
+        return None
+
     def snapshot(self):
         with self._lock:
             snap = {
@@ -469,6 +498,7 @@ class AppState:
                 "server_version": self.server_version,
                 "ui_version": self.ui_version,
                 "history_days": self.history.retention_days if self.history is not None else None,
+                "health": self._extract_health(),
             }
             if self.profile is not None:
                 snap["profile"] = self.profile.to_dict()
