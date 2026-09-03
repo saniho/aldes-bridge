@@ -736,3 +736,210 @@ def test_publish_telemetry_antil_value():
 
     payloads = b"".join(published).decode("utf-8", errors="replace")
     assert "aldes/state/sensor/AntiL" in payloads
+
+
+# --- Tests des health sensors ---
+
+def test_build_discovery_config_has_health_entities():
+    configs = _build_discovery_config("dev123", None)
+    topics = [t for t, _ in configs]
+    assert any("bridge_status" in t and "binary_sensor" in t for t in topics)
+    assert any("bridge_uptime" in t and "sensor" in t for t in topics)
+    assert any("mqtt_connected" in t and "binary_sensor" in t for t in topics)
+    assert any("box_connected" in t and "binary_sensor" in t for t in topics)
+
+
+def test_bridge_status_config():
+    configs = _build_discovery_config("dev123", None)
+    for topic, payload_str in configs:
+        if "bridge_status" in topic and "binary_sensor" in topic:
+            payload = json.loads(payload_str)
+            assert payload["name"] == "Aldes Bridge Status"
+            assert payload["unique_id"] == "aldes_dev123_bridge_status"
+            assert payload["state_topic"] == "aldes/health/status"
+            assert payload["payload_on"] == "ok"
+            assert payload["payload_off"] == "degraded"
+            assert payload["device_class"] == "problem"
+            assert payload["icon"] == "mdi:heart-pulse"
+            assert payload["availability_topic"] == "aldes/state/available"
+            assert "aldes_dev123" in payload["device"]["identifiers"]
+            return
+    pytest.fail("bridge_status config non trouvée")
+
+
+def test_bridge_uptime_config():
+    configs = _build_discovery_config("dev123", None)
+    for topic, payload_str in configs:
+        if "bridge_uptime" in topic and "sensor" in topic:
+            payload = json.loads(payload_str)
+            assert payload["name"] == "Aldes Bridge Uptime"
+            assert payload["unique_id"] == "aldes_dev123_bridge_uptime"
+            assert payload["state_topic"] == "aldes/health/uptime"
+            assert payload["unit_of_measurement"] == "s"
+            assert payload["device_class"] == "duration"
+            assert payload["icon"] == "mdi:timer-outline"
+            assert payload["availability_topic"] == "aldes/state/available"
+            return
+    pytest.fail("bridge_uptime config non trouvée")
+
+
+def test_mqtt_connected_config():
+    configs = _build_discovery_config("dev123", None)
+    for topic, payload_str in configs:
+        if "mqtt_connected" in topic and "binary_sensor" in topic:
+            payload = json.loads(payload_str)
+            assert payload["name"] == "Aldes MQTT Connected"
+            assert payload["unique_id"] == "aldes_dev123_mqtt_connected"
+            assert payload["state_topic"] == "aldes/health/mqtt_connected"
+            assert payload["payload_on"] == "true"
+            assert payload["payload_off"] == "false"
+            assert payload["device_class"] == "connectivity"
+            assert payload["icon"] == "mdi:lan-connect"
+            assert payload["availability_topic"] == "aldes/state/available"
+            return
+    pytest.fail("mqtt_connected config non trouvée")
+
+
+def test_box_connected_config():
+    configs = _build_discovery_config("dev123", None)
+    for topic, payload_str in configs:
+        if "box_connected" in topic and "binary_sensor" in topic:
+            payload = json.loads(payload_str)
+            assert payload["name"] == "Aldes Box Connected"
+            assert payload["unique_id"] == "aldes_dev123_box_connected"
+            assert payload["state_topic"] == "aldes/health/box_connected"
+            assert payload["payload_on"] == "true"
+            assert payload["payload_off"] == "false"
+            assert payload["device_class"] == "connectivity"
+            assert payload["icon"] == "mdi:router-wireless"
+            assert payload["availability_topic"] == "aldes/state/available"
+            return
+    pytest.fail("box_connected config non trouvée")
+
+
+def test_publish_health_status_ok():
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events)
+    state._connected = True
+    published = []
+
+    class FakeSock:
+        def sendall(self, data):
+            published.append(data)
+            return True
+
+    client = HADiscoveryClient(state)
+    client._sock = FakeSock()
+    client._send_lock = __import__("threading").Lock()
+
+    client._publish_health()
+
+    payloads = b"".join(published).decode("utf-8", errors="replace")
+    assert "aldes/health/status" in payloads
+    assert "aldes/health/uptime" in payloads
+    assert "aldes/health/mqtt_connected" in payloads
+    assert "aldes/health/box_connected" in payloads
+    assert "ok" in payloads
+    assert "true" in payloads
+
+
+def test_publish_health_status_degraded():
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events)
+    state._connected = False
+    published = []
+
+    class FakeSock:
+        def sendall(self, data):
+            published.append(data)
+            return True
+
+    client = HADiscoveryClient(state)
+    client._sock = FakeSock()
+    client._send_lock = __import__("threading").Lock()
+
+    client._publish_health()
+
+    payloads = b"".join(published).decode("utf-8", errors="replace")
+    assert "degraded" in payloads
+    assert "false" in payloads
+
+
+def test_publish_health_no_socket():
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events)
+    state._connected = True
+
+    client = HADiscoveryClient(state)
+    client._sock = None
+
+    # Ne doit pas lever d'erreur
+    client._publish_health()
+
+
+def test_health_status_logic_box_connected():
+    """Box connecte -> status = ok"""
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events)
+    state._connected = True
+    published = []
+
+    class FakeSock:
+        def sendall(self, data):
+            published.append(data)
+            return True
+
+    client = HADiscoveryClient(state)
+    client._sock = FakeSock()
+    client._send_lock = __import__("threading").Lock()
+
+    client._publish_health()
+
+    payloads = b"".join(published).decode("utf-8", errors="replace")
+    assert "aldes/health/status" in payloads
+    assert "ok" in payloads
+
+
+def test_health_status_logic_mqtt_disconnected():
+    """Box deconnecte + MQTT deconnecte -> status = degraded"""
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events)
+    state._connected = False
+    published = []
+
+    class FakeSock:
+        def sendall(self, data):
+            published.append(data)
+            return True
+
+    client = HADiscoveryClient(state)
+    client._sock = FakeSock()
+    client._send_lock = __import__("threading").Lock()
+
+    client._publish_health()
+
+    payloads = b"".join(published).decode("utf-8", errors="replace")
+    assert "degraded" in payloads
+
+
+def test_health_uptime_value():
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events)
+    state._connected = True
+    state._start_time = time.time() - 100  # simule 100s d'uptime
+    published = []
+
+    class FakeSock:
+        def sendall(self, data):
+            published.append(data)
+            return True
+
+    client = HADiscoveryClient(state)
+    client._sock = FakeSock()
+    client._send_lock = __import__("threading").Lock()
+
+    client._publish_health()
+
+    payloads = b"".join(published).decode("utf-8", errors="replace")
+    assert "aldes/health/uptime" in payloads
+    assert "100" in payloads
