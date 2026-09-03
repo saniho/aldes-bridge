@@ -302,4 +302,63 @@ def build_discovery_config(device_id, profile, prefix="aldes", data=None,
     }
     configs.append((f"{discovery_prefix}/switch/vacation_enable/config", json.dumps(vacation_enable_config, ensure_ascii=False)))
 
+    bridge_status_config = {
+        "name": "Aldes Bridge Status",
+        "unique_id": f"aldes_{device_id}_bridge_status",
+        "state_topic": f"{prefix}/health/status",
+        "payload_on": "ok",
+        "payload_off": "degraded",
+        "device_class": "problem",
+        "device": device_info,
+        "icon": "mdi:heart-pulse",
+        "availability_topic": f"{prefix}/state/available",
+        "payload_available": "online",
+        "payload_not_available": "offline",
+    }
+    configs.append((f"{discovery_prefix}/binary_sensor/bridge_status/config", json.dumps(bridge_status_config, ensure_ascii=False)))
+
+    bridge_uptime_config = {
+        "name": "Aldes Bridge Uptime",
+        "unique_id": f"aldes_{device_id}_bridge_uptime",
+        "state_topic": f"{prefix}/health/uptime",
+        "unit_of_measurement": "s",
+        "device_class": "duration",
+        "device": device_info,
+        "icon": "mdi:timer-outline",
+        "availability_topic": f"{prefix}/state/available",
+        "payload_available": "online",
+        "payload_not_available": "offline",
+    }
+    configs.append((f"{discovery_prefix}/sensor/bridge_uptime/config", json.dumps(bridge_uptime_config, ensure_ascii=False)))
+
+    mqtt_connected_config = {
+        "name": "Aldes MQTT Connected",
+        "unique_id": f"aldes_{device_id}_mqtt_connected",
+        "state_topic": f"{prefix}/health/mqtt_connected",
+        "payload_on": "true",
+        "payload_off": "false",
+        "device_class": "connectivity",
+        "device": device_info,
+        "icon": "mdi:lan-connect",
+        "availability_topic": f"{prefix}/state/available",
+        "payload_available": "online",
+        "payload_not_available": "offline",
+    }
+    configs.append((f"{discovery_prefix}/binary_sensor/mqtt_connected/config", json.dumps(mqtt_connected_config, ensure_ascii=False)))
+
+    box_connected_config = {
+        "name": "Aldes Box Connected",
+        "unique_id": f"aldes_{device_id}_box_connected",
+        "state_topic": f"{prefix}/health/box_connected",
+        "payload_on": "true",
+        "payload_off": "false",
+        "device_class": "connectivity",
+        "device": device_info,
+        "icon": "mdi:router-wireless",
+        "availability_topic": f"{prefix}/state/available",
+        "payload_available": "online",
+        "payload_not_available": "offline",
+    }
+    configs.append((f"{discovery_prefix}/binary_sensor/box_connected/config", json.dumps(box_connected_config, ensure_ascii=False)))
+
     return configs

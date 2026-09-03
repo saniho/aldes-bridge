@@ -200,6 +200,7 @@ class AppState:
         self.profile = None
         # Derniere persistance telemetrie (epoch) — throttle d'ecriture.
         self._last_telemetry_save = 0.0
+        self._start_time = time.time()
         self._load_telemetry()
         self._load_consignes()
 

@@ -31,7 +31,6 @@ def create_app(state, engine, web_dir):
     # Expose state/engine aux routers via request.app.extra
     app.extra["state"] = state
     app.extra["engine"] = engine
-    _start_time = time.time()
 
     @app.on_event("startup")
     async def _startup():
@@ -54,7 +53,7 @@ def create_app(state, engine, web_dir):
         ha_client = getattr(st, "_ha_client", None)
         mqtt_connected = ha_client._sock is not None if ha_client else None
         box_connected = st.connected
-        uptime = time.time() - _start_time
+        uptime = time.time() - st._start_time
         if box_connected:
             status = "ok"
         elif mqtt_connected is False:

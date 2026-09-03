@@ -383,6 +383,8 @@ class HADiscoveryClient(threading.Thread):
             f"{self.prefix}/state/available", availability, qos=1, retain=True
         ))
 
+        self._publish_health()
+
         if not telemetry:
             return
 
@@ -391,6 +393,34 @@ class HADiscoveryClient(threading.Thread):
             return
 
         self._publish_telemetry_data(data, include_zone_aliases=True)
+
+    def _publish_health(self):
+        with self.state._lock:
+            box_connected = self.state._connected
+            start_time = self.state._start_time
+
+        mqtt_connected = self._sock is not None
+        uptime = time.time() - start_time
+
+        if box_connected:
+            status = "ok"
+        elif mqtt_connected is False:
+            status = "degraded"
+        else:
+            status = "ok" if mqtt_connected is None else "degraded"
+
+        self._safe_send(mqtt.build_publish(
+            f"{self.prefix}/health/status", status, qos=1, retain=True
+        ))
+        self._safe_send(mqtt.build_publish(
+            f"{self.prefix}/health/uptime", str(round(uptime, 1)), qos=1, retain=True
+        ))
+        self._safe_send(mqtt.build_publish(
+            f"{self.prefix}/health/mqtt_connected", str(mqtt_connected).lower(), qos=1, retain=True
+        ))
+        self._safe_send(mqtt.build_publish(
+            f"{self.prefix}/health/box_connected", str(box_connected).lower(), qos=1, retain=True
+        ))
 
     def publish_telemetry(self, data):
         if not self._sock:
