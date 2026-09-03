@@ -359,10 +359,13 @@ et les trames MQTT s'affichent dans la WebUI (onglet « flux »).
 
 ### Mise à jour
 
+La mise à jour se fait via la **mise à jour de l'addon** dans Home Assistant.
+
 ```bash
+# Alternative : rebuild Docker manuellement
 cd /opt/aldes-bridge
 git pull
-./deploy.sh main   # ou : sudo docker compose up -d --build
+sudo docker compose up -d --build
 ```
 
 ## API
@@ -576,7 +579,7 @@ Ce projet est distribué sous la licence **MIT** — voir [LICENSE](LICENSE).
 ## Notes / historique
 
 - Les prototypes legacy (`dump_mqtt.py`, `mqtt_proxy.py`, `monitor_proxy.py`) ont été retirés — remplacés
-  par les modules `server/*` et `sshrun.py`.
+  par les modules `server/*`.
 - `setup-dns.sh` configure le maskdns dnsmasq (voir « Installation complète sur une nouvelle machine »).
 - La box doit pointer vers cette machine (rediriger `aldesiotsuite.azure-devices.net:8883` vers le pont,
   dans le DNS ou le NAT) pour se connecter au pont — soit réellement au cloud.

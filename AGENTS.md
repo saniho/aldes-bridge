@@ -71,28 +71,17 @@ Exemples :
 
 Ne **jamais** mentionner "IA", "Copilot", "Claude", "GPT" ou similaire dans les commits.
 
-### 4. Déploiement local (dev)
-
-```bash
-# Depuis la branche feature
-./deploy.sh <branche-feature>
-```
-
-Vérifications après deploy :
-- `curl -s http://192.168.1.90:8080/api/state | python3 -m json.tool`
-- Vérifier `server_version` et `ui_version`
-- Tester l'endpoint impacté
-
-### 5. Merge sur main (après validation)
+### 4. Merge sur main (après validation)
 
 ```bash
 git checkout main
 git merge --no-ff feature/<nom> -m "Merge feature branch '<nom>' — <description>"
 git push origin main
-./deploy.sh main
 ```
 
-### 6. Tests
+Le déploiement se fait via la **mise à jour de l'addon** dans Home Assistant (bump de version dans `aldes-haos-addons`).
+
+### 5. Tests
 
 Avant tout commit :
 ```bash
@@ -126,7 +115,6 @@ aldes-bridge/
 │   │   └── components/  # Composants React
 │   └── e2e/             # Tests Playwright BDD
 ├── tests/               # Tests Python unitaires
-├── deploy.sh            # Script de déploiement
 ├── docker-compose.yml   # Config container
 └── AGENTS.md            # Ce fichier
 ```
@@ -157,6 +145,5 @@ aldes-bridge/
 - [ ] Versions bumpées dans `aldes-haos-addons` (config.yaml + config-beta.yaml)
 - [ ] Tests passent
 - [ ] Build OK
-- [ ] Deploy local vérifié
 - [ ] Commit avec bon format
 - [ ] Merge sur main après validation
