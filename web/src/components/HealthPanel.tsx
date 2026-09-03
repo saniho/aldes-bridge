@@ -15,12 +15,6 @@ function fmtRaw(val: number | null | undefined): string {
   return String(val)
 }
 
-function alertLevel(hpc: number | null | undefined, defr: number | null | undefined): 'ok' | 'warn' | 'alert' {
-  if (hpc && hpc !== 0) return 'alert'
-  if (defr && defr !== 0) return 'alert'
-  return 'ok'
-}
-
 function mfacLabel(val: number | null | undefined): string {
   if (val === null || val === undefined) return '—'
   return val === 0 ? 'Arrêt' : 'Marche'
@@ -44,8 +38,6 @@ export default function HealthPanel({ health }: Props) {
       </div>
     )
   }
-
-  const level = alertLevel(health.hpc, health.defr)
 
   return (
     <div className={styles.panel}>
