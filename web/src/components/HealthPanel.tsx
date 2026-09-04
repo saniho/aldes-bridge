@@ -28,6 +28,13 @@ function mfecLabel(val: number | null | undefined): string {
   return String(val)
 }
 
+function fmtDefr(defr: number | null | undefined, uam: number | null | undefined): { text: string; cls: string } {
+  const climOff = uam === 0
+  if (climOff) return { text: 'N/A (clim off)', cls: '' }
+  if (defr && defr !== 0) return { text: 'ALERTE', cls: 'alert' }
+  return { text: 'Pas de défaut', cls: 'ok' }
+}
+
 export default function HealthPanel({ health }: Props) {
   if (!health || Object.keys(health).length === 0) {
     return (
@@ -85,11 +92,11 @@ export default function HealthPanel({ health }: Props) {
               {health.hpc && health.hpc !== 0 ? 'ALERTE' : 'Normal'}
             </span>
           </div>
-          <div className={styles.statusRow + ' ' + (health.defr && health.defr !== 0 ? ' ' + styles.alert : ' ' + styles.ok)}>
-            <span className={'dot ' + (health.defr && health.defr !== 0 ? styles.dotAlert : styles.dotOk)} />
+          <div className={styles.statusRow + ' ' + (fmtDefr(health.defr, health.uam).cls === 'alert' ? ' ' + styles.alert : ' ' + styles.ok)}>
+            <span className={'dot ' + (fmtDefr(health.defr, health.uam).cls === 'alert' ? styles.dotAlert : styles.dotOk)} />
             <span className={styles.statusLabel}>Défaut circuit froid (Defr)</span>
-            <span className={styles.statusValue + ' ' + (health.defr && health.defr !== 0 ? styles.alert : styles.ok)}>
-              {health.defr && health.defr !== 0 ? 'ALERTE' : 'Pas de défaut'}
+            <span className={styles.statusValue + ' ' + (fmtDefr(health.defr, health.uam).cls === 'alert' ? styles.alert : styles.ok)}>
+              {fmtDefr(health.defr, health.uam).text}
             </span>
           </div>
         </div>
