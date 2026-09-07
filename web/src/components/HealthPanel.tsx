@@ -29,9 +29,9 @@ function mfecLabel(val: number | null | undefined): string {
 }
 
 function fmtDefr(defr: number | null | undefined, uam: number | null | undefined): { text: string; cls: string } {
-  const climOff = uam === 0
+  const climOff = Number(uam) === 0
   if (climOff) return { text: 'N/A (clim off)', cls: '' }
-  if (defr && defr !== 0) return { text: 'ALERTE', cls: 'alert' }
+  if (Number(defr) !== 0) return { text: 'ALERTE', cls: 'alert' }
   return { text: 'Pas de défaut', cls: 'ok' }
 }
 
