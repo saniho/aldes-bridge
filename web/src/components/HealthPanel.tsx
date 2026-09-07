@@ -83,6 +83,24 @@ export default function HealthPanel({ health }: Props) {
       </div>
 
       <div className={styles.card}>
+        <div className={styles.cardTitle}>Environnement</div>
+        <div className={styles.grid}>
+          <div className={styles.indicator}>
+            <span className={styles.label}>Temp. extérieure (Text)</span>
+            <span className={styles.value + ' ' + styles.big}>
+              {health.text_ext != null ? `${health.text_ext} °C` : '—'}
+            </span>
+          </div>
+          <div className={styles.indicator}>
+            <span className={styles.label}>Ventilateur (RVeI)</span>
+            <span className={styles.value}>
+              {health.rvei != null ? `${health.rvei} tr/min` : '—'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.card}>
         <div className={styles.cardTitle}>Alertes</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div className={styles.statusRow + ' ' + (health.hpc && health.hpc !== 0 ? ' ' + styles.alert : ' ' + styles.ok)}>

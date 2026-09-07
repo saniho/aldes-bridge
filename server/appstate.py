@@ -470,6 +470,8 @@ class AppState:
                 ("MfEc", "mfec"),
                 ("Defr", "defr"),
                 ("UAM", "uam"),
+                ("Text", "text_ext"),
+                ("RVeI", "rvei"),
             ):
                 val = data.get(key)
                 if val is not None:

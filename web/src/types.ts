@@ -187,6 +187,8 @@ export interface HealthData {
   mfec?: number | null
   defr?: number | null
   uam?: number | null
+  text_ext?: number | null
+  rvei?: number | null
 }
 
 export interface DiagnosticCheck {
