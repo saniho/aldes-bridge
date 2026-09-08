@@ -42,6 +42,16 @@ class RawConfig(BaseModel):
     evt_topic: str
 
 
+class HealthData(BaseModel):
+    preh: float | None = None
+    dhi: float | None = None
+    dlo: float | None = None
+    hpc: int | None = None
+    mfac: int | None = None
+    mfec: int | None = None
+    defr: int | None = None
+
+
 class ConfigSnapshot(BaseModel):
     mode: str
     connected: bool
@@ -58,6 +68,7 @@ class ConfigSnapshot(BaseModel):
     ui_version: str = "dev"
     history_days: int | None = None
     profile: dict | None = None
+    health: HealthData | None = None
 
 
 class StateSnapshot(BaseModel):

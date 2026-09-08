@@ -48,14 +48,21 @@ Fichiers à modifier :
 |-----------|---------|-----|
 | Backend   | `server/__init__.py` | `__version__ = "x.y.z"` |
 | UI        | `web/package.json` | `"version": "x.y.z"` |
-| Addon     | `aldes-haos-addons/aldes-bridge/config.yaml` | `version: "x.y.z"` |
+| Addon stable | `aldes-haos-addons/aldes-bridge/config.yaml` | `version: "x.y.z"` |
 | Addon beta| `aldes-haos-addons/aldes-bridge-beta/config.yaml` | `version: "x.y.z"` |
 | Dockerfile stable | `aldes-haos-addons/aldes-bridge/Dockerfile` | `CACHEBUST=vX.Y.Z` + `ALDES_ADDON_VERSION=vX.Y.Z` |
 | Dockerfile beta   | `aldes-haos-addons/aldes-bridge-beta/Dockerfile` | `CACHEBUST=vX.Y.Z-beta` + `ALDES_ADDON_VERSION=vX.Y.Z-beta` |
 
+**Règle beta vs stable :**
+- **Branche `feature/*` ou `fix/*`** (avant merge sur `main`) → bump **uniquement** `aldes-bridge-beta/config.yaml` + son Dockerfile. Ne PAS toucher au config stable.
+- **Merge sur `main`** (release) → bump `aldes-bridge/config.yaml` + son Dockerfile. Ne PAS toucher au config beta (déjà bumpé sur la feature branch).
+- Le suffixe `.betaN` (ex: `0.13.2.beta1`) s'utilise uniquement pour le beta. Le stable utilise un semver strict (`0.13.2`).
+
 **IMPORTANT :** les `CACHEBUST` et `ALDES_ADDON_VERSION` dans les Dockerfiles **doivent** être bumpés à chaque changement de version. Sans cela, Docker utilise le cache et ne reclone pas le repo — la version affichée dans les logs reste l'ancienne.
 
 Les deux versions doivent être **identiques** et incrémentées **ensemble**.
+
+**Changelog :** mettre à jour `aldes-haos-addons/aldes-bridge-beta/CHANGELOG.md` (ou `aldes-bridge/CHANGELOG.md` pour le stable) à chaque bump de version. Format [Keep a Changelog](https://keepachangelog.com/) avec sections `Ajouté`, `Corrigé`, `Changé`.
 
 ### 3. Commits
 
@@ -146,8 +153,9 @@ aldes-bridge/
 
 - [ ] Branche feature créée
 - [ ] Versions bumpées si nécessaire
-- [ ] Versions bumpées dans `aldes-haos-addons` (config.yaml + config-beta.yaml)
-- [ ] Versions bumpées dans `aldes-haos-addons` (Dockerfile + Dockerfile-beta : CACHEBUST + ALDES_ADDON_VERSION)
+- [ ] Versions bumpées dans `aldes-haos-addons` (config-beta.yaml uniquement si feature, stable + beta si release)
+- [ ] Versions bumpées dans `aldes-haos-addons` (Dockerfile-beta CACHEBUST + ALDES_ADDON_VERSION si feature, les deux si release)
+- [ ] Changelog mis à jour (`aldes-haos-addons/aldes-bridge-beta/CHANGELOG.md`)
 - [ ] Tests passent
 - [ ] Build OK
 - [ ] Commit avec bon format

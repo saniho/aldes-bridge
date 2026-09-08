@@ -1,0 +1,136 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.empty {
+  padding: 24px;
+  text-align: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text-faint);
+}
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.cardTitle {
+  font-size: 12px;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 10px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.indicator {
+  background: var(--bg-node);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.label {
+  font-size: 11px;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.value {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.value.big {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.value.ok {
+  color: var(--green);
+}
+
+.value.warn {
+  color: var(--out);
+}
+
+.value.alert {
+  color: #ef4444;
+}
+
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.dotOk {
+  background: var(--green);
+}
+
+.dotWarn {
+  background: var(--out);
+}
+
+.dotAlert {
+  background: #ef4444;
+}
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-node);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.statusRow.alert {
+  border-color: #ef444455;
+  background: #ef444410;
+}
+
+.statusRow.ok {
+  border-color: var(--line-green);
+  background: transparent;
+}
+
+.statusLabel {
+  font-size: 12px;
+  color: var(--text-soft);
+  flex: 1;
+}
+
+.statusValue {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.sectionSep {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
