@@ -29,8 +29,8 @@ function mfecLabel(val: number | null | undefined): string {
 }
 
 function fmtDefr(defr: number | null | undefined, mfac: number | null | undefined): { text: string; cls: string } {
-  const compOff = Number(mfac) === 0
-  if (compOff) return { text: 'N/A (clim off)', cls: '' }
+  const compressorOff = Number(mfac) === 0
+  if (compressorOff) return { text: 'N/A (clim off)', cls: '' }
   if (Number(defr) !== 0) return { text: 'ALERTE', cls: 'alert' }
   return { text: 'Pas de défaut', cls: 'ok' }
 }
