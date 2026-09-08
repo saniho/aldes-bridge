@@ -14,6 +14,9 @@ from .version import SERVER_VERSION
 # Contexte de connexion : taggé par le thread qui gère une session box.
 _CONN_CTX = threading.local()
 
+# Cles de sante a extraire et persister separement dans telemetry.json.
+_HEALTH_KEYS = {"PreH", "dHi", "dLo", "HPC", "MfAc", "MfEc", "Defr", "UAM", "Text", "RVeI"}
+
 
 def set_conn_ctx(session=None, host=None):
     """Enregistre la session courante (thread du handler) pour tagger les events."""
@@ -167,6 +170,9 @@ class AppState:
         self._last_error = None
         self._raw = dict(AppState.DEFAULT_RAW)
         self.telemetry = {}
+        # Donnees health persistees (PreH, Text, RVeI...) separees des trames
+        # temperature pour garantir la disponibilite au redemarrage.
+        self._health = {}
         # Consignes thermostats demandees (en attente de confirmation box).
         # zone (str "0".."9") -> {"requested": float, "confirmed": bool, "ts": iso}
         self._consignes = {}
@@ -271,11 +277,17 @@ class AppState:
         """Recharge les dernieres telemetries capturees depuis telemetry_file."""
         data = read_json(self._telemetry_file)
         if isinstance(data, dict):
+            # Extraire la section health AVANT le filtre pour eviter qu'elle
+            # ne pollue self.telemetry (le filtre isinstance(v, dict) la laisserait passer).
+            self._health = data.pop("health", {}) or {}
             self.telemetry = {k: v for k, v in data.items() if isinstance(v, dict)}
 
     def _save_telemetry(self):
         """Persiste les telemetries (a appeler sous self._lock)."""
-        atomic_write_json(self._telemetry_file, self.telemetry)
+        payload = dict(self.telemetry)
+        if self._health:
+            payload["health"] = self._health
+        atomic_write_json(self._telemetry_file, payload)
 
     def store_telemetry(self, pid, data):
         """Mes des champs d'une telemetrie T.ONE dans state.telemetry[pid].
@@ -295,6 +307,14 @@ class AppState:
             current["_pid"] = pid
             current["_upd_at"] = time.time()
             self.telemetry[pid] = current
+            # Extraire les cles sante pour persistance separee
+            for key in _HEALTH_KEYS:
+                if key in data:
+                    try:
+                        f = float(data[key])
+                        self._health[key.lower()] = int(f) if f == int(f) else f
+                    except (TypeError, ValueError):
+                        pass
             self._maybe_save_telemetry()
             self._confirm_consignes_from(data)
         if self.history is not None:
@@ -456,7 +476,12 @@ class AppState:
         """Extrait les cles de sante depuis la telemetrie courante.
 
         Appeler sous self._lock. Renvoie un dict avec les valeurs ou None.
+        Priorise self._health (persistance) puis fallback sur telemetry live.
         """
+        # Priorite 1 : donnees persistees (disponibles au demarrage)
+        if self._health:
+            return dict(self._health)
+        # Priorite 2 : donnees live depuis la telemetrie (fallback)
         for data in self.telemetry.values():
             if not isinstance(data, dict):
                 continue
