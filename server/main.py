@@ -8,6 +8,7 @@ pour les modes proxy/bridge/listen (la box se connecte au bridge).
 import argparse
 import logging
 import os
+import signal
 import sys
 
 from .appstate import AppState, read_persisted_mode, read_persisted_profile
@@ -262,6 +263,20 @@ def main(argv=None):
 
     if args.ha_mqtt:
         _setup_ha_client(state, engine, args, config)
+
+    def _handle_sigterm(signum, frame):
+        _log.info("SIGTERM recu, arret propre...")
+        try:
+            engine.stop()
+        except Exception:
+            pass
+        try:
+            state.persist_telemetry()
+        except Exception:
+            pass
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, _handle_sigterm)
 
     from .api import create_app
     app = create_app(state, engine, args.web_dir)
