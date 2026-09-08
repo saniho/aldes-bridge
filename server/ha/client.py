@@ -534,6 +534,13 @@ class HADiscoveryClient(threading.Thread):
                 f"{self.prefix}/state/sensor/AntiL", antil_state, qos=1, retain=True
             ))
 
+        for aldes_key in ("RVeI", "Dno", "Dma", "Dint", "DLN", "DPLe", "DmCO"):
+            val = safe_float(data.get(aldes_key))
+            if val is not None:
+                self._safe_send(mqtt.build_publish(
+                    f"{self.prefix}/state/sensor/{aldes_key}", f"{val:.0f}", qos=1, retain=True
+                ))
+
         self._publish_vacation_state(data)
 
     def _publish_vacation_state(self, data):

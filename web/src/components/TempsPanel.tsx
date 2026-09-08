@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getProducts, sendCommand, requestConsigne } from '../api'
-import type { AldesProduct, DeviceMode, DeviceProfile } from '../types'
+import type { AldesProduct, DeviceMode, DeviceProfile, VentilationData } from '../types'
 import { fmtParis } from '../parisTime'
 import styles from './TempsPanel.module.css'
 
@@ -434,6 +434,75 @@ export default function TempsPanel({ pollMs = 5000, clientId, connected, consign
                 })}
               </tbody>
             </table>
+
+            {p.indicator.ventilation && (() => {
+              const v = p.indicator.ventilation as VentilationData
+              const hasData = v.rvei != null || v.dno != null || v.dma != null || v.dint != null || v.dln != null || v.dple != null || v.dmco != null
+              if (!hasData) return null
+              return (
+                <>
+                  <div className={styles.tableTitle}>Ventilation</div>
+                  <div className={styles.stats}>
+                    {v.rvei != null && (
+                      <div className={styles.stat}>
+                        <span className={styles.statLabel}>Ventilateur</span>
+                        <span className={styles.statValue}>
+                          {v.rvei} <span style={{ fontSize: 12, color: 'var(--text-soft)' }}>tr/min</span>
+                        </span>
+                      </div>
+                    )}
+                    {v.dno != null && (
+                      <div className={styles.stat}>
+                        <span className={styles.statLabel}>Debit nominal</span>
+                        <span className={styles.statValue}>
+                          {v.dno} <span style={{ fontSize: 12, color: 'var(--text-soft)' }}>m&sup3;/h</span>
+                        </span>
+                      </div>
+                    )}
+                    {v.dma != null && (
+                      <div className={styles.stat}>
+                        <span className={styles.statLabel}>Debit max</span>
+                        <span className={styles.statValue}>
+                          {v.dma} <span style={{ fontSize: 12, color: 'var(--text-soft)' }}>m&sup3;/h</span>
+                        </span>
+                      </div>
+                    )}
+                    {v.dint != null && (
+                      <div className={styles.stat}>
+                        <span className={styles.statLabel}>Debit intermediaire</span>
+                        <span className={styles.statValue}>
+                          {v.dint} <span style={{ fontSize: 12, color: 'var(--text-soft)' }}>m&sup3;/h</span>
+                        </span>
+                      </div>
+                    )}
+                    {v.dln != null && (
+                      <div className={styles.stat}>
+                        <span className={styles.statLabel}>Debit nuit</span>
+                        <span className={styles.statValue}>
+                          {v.dln} <span style={{ fontSize: 12, color: 'var(--text-soft)' }}>m&sup3;/h</span>
+                        </span>
+                      </div>
+                    )}
+                    {v.dple != null && (
+                      <div className={styles.stat}>
+                        <span className={styles.statLabel}>Debit plein</span>
+                        <span className={styles.statValue}>
+                          {v.dple} <span style={{ fontSize: 12, color: 'var(--text-soft)' }}>m&sup3;/h</span>
+                        </span>
+                      </div>
+                    )}
+                    {v.dmco != null && (
+                      <div className={styles.stat}>
+                        <span className={styles.statLabel}>Debit max CO2</span>
+                        <span className={styles.statValue}>
+                          {v.dmco} <span style={{ fontSize: 12, color: 'var(--text-soft)' }}>m&sup3;/h</span>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )
+            })()}
 
             <div className={styles.foot}>
               {p.updatedAt ? (

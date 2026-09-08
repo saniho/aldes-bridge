@@ -361,4 +361,27 @@ def build_discovery_config(device_id, profile, prefix="aldes", data=None,
     }
     configs.append((f"{discovery_prefix}/binary_sensor/box_connected/config", json.dumps(box_connected_config, ensure_ascii=False)))
 
+    ventilation_sensors = [
+        ("fan_rpm", "RVeI", "Ventilateur Aldes", "mdi:fan", "rpm"),
+        ("airflow_nominal", "Dno", "Debit nominal Aldes", "mdi:air-filter", "m\u00b3/h"),
+        ("airflow_max", "Dma", "Debit max Aldes", "mdi:air-filter", "m\u00b3/h"),
+        ("airflow_medium", "Dint", "Debit intermediaire Aldes", "mdi:air-filter", "m\u00b3/h"),
+        ("airflow_night", "DLN", "Debit nuit Aldes", "mdi:air-filter", "m\u00b3/h"),
+        ("airflow_full", "DPLe", "Debit plein Aldes", "mdi:air-filter", "m\u00b3/h"),
+        ("airflow_max_co2", "DmCO", "Debit max CO2 Aldes", "mdi:air-filter", "m\u00b3/h"),
+    ]
+    for suffix, aldes_key, name, icon, unit in ventilation_sensors:
+        vent_config = {
+            "name": name,
+            "unique_id": f"aldes_{device_id}_{suffix}",
+            "state_topic": f"{prefix}/state/sensor/{aldes_key}",
+            "unit_of_measurement": unit,
+            "device": {"identifiers": [f"aldes_{device_id}"]},
+            "icon": icon,
+            "availability_topic": f"{prefix}/state/available",
+            "payload_available": "online",
+            "payload_not_available": "offline",
+        }
+        configs.append((f"{discovery_prefix}/sensor/{suffix}/config", json.dumps(vent_config, ensure_ascii=False)))
+
     return configs
