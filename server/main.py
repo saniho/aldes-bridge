@@ -10,6 +10,7 @@ import logging
 import os
 import signal
 import sys
+import uvicorn
 
 from .appstate import AppState, read_persisted_mode, read_persisted_profile
 from .config import ConfigStore
@@ -280,7 +281,9 @@ def main(argv=None):
 
     from .api import create_app
     app = create_app(state, engine, args.web_dir)
-    uvicorn.run(app, host=args.bind, port=args.web_port, log_level="info")
+    config = uvicorn.Config(app, host=args.bind, port=args.web_port, log_level="info", timeout_graceful_shutdown=5)
+    server = uvicorn.Server(config)
+    server.run()
 
 
 if __name__ == "__main__":
