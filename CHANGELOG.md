@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.13.3] — 2026-09-08
+
+### Ajouté
+- **UI** : onglet "Santé" — panneau diagnostic compresseur, pressions circuit, alertes
+- **UI** : température extérieure (Text) et vitesse ventilateur (RVeI) dans le panneau santé
+- **Backend** : nouvelles clés santé extraites depuis la télémétrie (PreH, dHi, dLo, HPC, MfAc, MfEc, Defr, UAM, Text, RVeI)
+- **Backend** : `GET /api/config` retourne `health` dans le snapshot
+
+### Corrigé
+- **UI** : alerte Defr masquée quand compresseur arrêt (MfAc = 0)
+- **UI** : comparaisons Defr/UAM robustifiées avec `Number()` pour gérer les types string/number
+
 ## [0.12.10] - 2026-09-02
 
 ### Changé

@@ -217,6 +217,22 @@ Les 3 indicateurs clés (Box Aldes, Azure Cloud, Mode) sont affichés en haut du
 
 **API** : `GET /api/diagnostic` retourne le résultat JSON de tous les checks.
 
+## Santé (diagnostic compresseur)
+
+Le panneau **Santé** (onglet 🩺 santé dans la barre principale) affiche l'état technique
+de la PAC en temps réel, basé sur les clés santé de la télémétrie Aldes.
+
+| Section | Champs | Description |
+|---------|--------|-------------|
+| État compresseur | MfAc, MfEc | Marche/arrêt compresseur, mode eau (arrêt/marche/boost) |
+| Pressions circuit | PreH, dHi, dLo | Pression haute (bar), delta haut/bas |
+| Environnement | Text, RVeI | Température extérieure (°C), vitesse ventilateur (tr/min) |
+| Alertes | HPC, Defr | Haute pression compresseur, défaut circuit froid |
+
+L'alerte Defr est automatiquement masquée ("N/A (clim off)") quand le compresseur est arrêt.
+
+**API** : `GET /api/config` retourne `health` dans le snapshot avec les clés santé.
+
 ## Démarrage
 
 ### Docker (déploiement)
