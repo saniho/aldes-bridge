@@ -79,6 +79,16 @@ export interface AldesThermostat {
   TemperatureSet: number | null
 }
 
+export interface VentilationData {
+  rvei?: number | null
+  dno?: number | null
+  dma?: number | null
+  dint?: number | null
+  dln?: number | null
+  dple?: number | null
+  dmco?: number | null
+}
+
 export interface AldesIndicator {
   qte_eau_chaude: number | null
   tmp_principal: number | null
@@ -90,6 +100,7 @@ export interface AldesIndicator {
   antilegionelles?: boolean
   settings?: { people?: number | null }
   thermostats: AldesThermostat[]
+  ventilation?: VentilationData | null
 }
 
 export interface HistoryKey {

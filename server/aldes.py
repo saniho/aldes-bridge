@@ -162,6 +162,20 @@ def build_thermostats(telemetry):
     return thermostats
 
 
+def build_ventilation(telemetry):
+    """Construit les donnees de ventilation depuis la telemetrie.
+
+    Renvoie un dict avec les cles ou None si aucune donnee n'est presente.
+    """
+    keys = ("RVeI", "Dno", "Dma", "Dint", "DLN", "DPLe", "DmCO")
+    vent = {}
+    for key in keys:
+        val = _num(telemetry.get(key))
+        if val is not None:
+            vent[key.lower()] = val
+    return vent if vent else None
+
+
 def build_product(telemetry, connected):
     """Construit un product au format consomme par l'integration HA."""
     reference = _derive_reference(telemetry)
@@ -199,6 +213,7 @@ def build_product(telemetry, connected):
                 "people": people,
             },
             "thermostats": build_thermostats(telemetry),
+            "ventilation": build_ventilation(telemetry),
         },
     }
 
