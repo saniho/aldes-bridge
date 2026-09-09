@@ -312,6 +312,8 @@ class AppState:
                 if key in data:
                     try:
                         f = float(data[key])
+                        if key == "PreH":
+                            f = f / 100.0
                         self._health[key.lower()] = int(f) if f == int(f) else f
                     except (TypeError, ValueError):
                         pass
@@ -502,6 +504,8 @@ class AppState:
                 if val is not None:
                     try:
                         f = float(val)
+                        if key == "PreH":
+                            f = f / 100.0
                         health[dst] = int(f) if f == int(f) else f
                     except (TypeError, ValueError):
                         pass
