@@ -282,7 +282,7 @@ Then('le panneau de configuration est visible', async ({ page }) => {
 })
 
 Then('le champ rétention historique affiche {texte}', async ({ page }, value: string) => {
-  const input = page.locator('input[type="number"]')
+  const input = page.locator('input[type="number"]').first()
   await expect(input).toBeVisible({ timeout: 10000 })
   await expect(input).toHaveValue(value)
 })
@@ -309,7 +309,7 @@ Then('la rétention historique est {texte} côté API', async ({ page }, days: s
 // ---------------------------------------------------------------------------
 
 When('je tape {texte} dans le champ rétention historique', async ({ page }, value: string) => {
-  const input = page.locator('input[type="number"]')
+  const input = page.locator('input[type="number"]').first()
   await input.fill(value)
 })
 

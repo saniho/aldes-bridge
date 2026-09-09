@@ -185,6 +185,7 @@ export interface DeviceProfile {
 
 export interface AppConfig {
   history_retention_days: number
+  raw_retention_days: number
   log_retention_max_bytes: number
   ha_mqtt_dry_run: boolean
 }
@@ -217,4 +218,33 @@ export interface DiagnosticResult {
   passed: number
   total: number
   checks: DiagnosticCheck[]
+}
+
+export interface DebugMessage {
+  ts: number
+  source: string
+  destination: string
+  payload: string
+}
+
+export interface DebugSearchResult {
+  total: number
+  limit: number
+  offset: number
+  messages: DebugMessage[]
+}
+
+export interface FieldValue {
+  ts: number
+  value: number | string | boolean
+  source: string
+  destination: string
+}
+
+export interface FieldValuesResult {
+  field: string
+  total: number
+  limit: number
+  offset: number
+  samples: FieldValue[]
 }

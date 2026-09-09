@@ -1,11 +1,13 @@
 """Historisation des valeurs dans une base SQLite.
 
-Deux flux sont persistés :
+Trois flux sont persistés :
 - les télémétries T.ONE (PUBLISH "in" de la box) : chaque champ numérique
   du payload est stocké comme un échantillon (ts, key, value) ;
-- les événements de connexion (box et cloud) : booléen 1/0.
+- les événements de connexion (box et cloud) : booléen 1/0 ;
+- les messages bruts (raw_messages) : payload JSON complet avec
+  source/destination pour recherche textuelle et exploration de champs.
 
-La rétention est paramétrable (jours). La table est purgée périodiquement.
+La rétention est paramétrable (jours). Les tables sont purgées périodiquement.
 Le stockage est thread-safe (verrou autour de chaque transaction).
 """
 import json
@@ -18,9 +20,10 @@ from .utils import parse_json_payload
 
 
 class HistoryDB:
-    def __init__(self, path, retention_days=90):
+    def __init__(self, path, retention_days=90, raw_retention_days=7):
         self._path = os.path.abspath(path)
         self._days = max(1, int(retention_days))
+        self._raw_days = max(1, int(raw_retention_days))
         self._lock = threading.Lock()
         os.makedirs(os.path.dirname(self._path) or ".", exist_ok=True)
         self._conn = sqlite3.connect(self._path, check_same_thread=False)
@@ -43,6 +46,19 @@ class HistoryDB:
                     ON samples (key, ts);
                 CREATE INDEX IF NOT EXISTS idx_samples_ts
                     ON samples (ts);
+
+                CREATE TABLE IF NOT EXISTS raw_messages (
+                    ts REAL NOT NULL,
+                    source TEXT NOT NULL,
+                    destination TEXT NOT NULL,
+                    payload TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_raw_messages_ts
+                    ON raw_messages (ts);
+                CREATE INDEX IF NOT EXISTS idx_raw_messages_src
+                    ON raw_messages (source);
+                CREATE INDEX IF NOT EXISTS idx_raw_messages_dst
+                    ON raw_messages (destination);
                 """
             )
             self._conn.commit()
@@ -50,6 +66,14 @@ class HistoryDB:
     @property
     def retention_days(self):
         return self._days
+
+    @property
+    def raw_retention_days(self):
+        return self._raw_days
+
+    @raw_retention_days.setter
+    def raw_retention_days(self, value):
+        self._raw_days = max(1, int(value))
 
     # --- écriture ---
     def record_telemetry(self, payload):
@@ -80,6 +104,24 @@ class HistoryDB:
             self._conn.execute(
                 "INSERT INTO samples (ts, kind, key, value) VALUES (?, 'status', ?, ?)",
                 (time.time(), key, 1 if value else 0),
+            )
+            self._conn.commit()
+
+    def record_raw(self, payload, source, destination):
+        """Stocke un message brut (JSON) avec source et destination."""
+        if isinstance(payload, dict):
+            try:
+                payload_str = json.dumps(payload, ensure_ascii=False)
+            except (TypeError, ValueError):
+                payload_str = str(payload)
+        elif isinstance(payload, (bytes, bytearray)):
+            payload_str = payload.decode("utf-8", errors="replace")
+        else:
+            payload_str = str(payload)
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO raw_messages (ts, source, destination, payload) VALUES (?, ?, ?, ?)",
+                (time.time(), source, destination, payload_str),
             )
             self._conn.commit()
 
@@ -164,6 +206,82 @@ class HistoryDB:
             ],
         }
 
+    def search_raw(self, text, start=None, end=None, source=None, destination=None,
+                   limit=100, offset=0):
+        """Recherche textuelle dans les messages bruts."""
+        start = start if start is not None else 0.0
+        end = end if end is not None else time.time() + 1
+        limit = max(1, min(limit, 1000))
+        offset = max(0, offset)
+        conditions = ["ts >= ?", "ts <= ?", "payload LIKE ?"]
+        params = [start, end, f"%{text}%"]
+        if source:
+            conditions.append("source = ?")
+            params.append(source)
+        if destination:
+            conditions.append("destination = ?")
+            params.append(destination)
+        where = " AND ".join(conditions)
+        with self._lock:
+            cur = self._conn.execute(
+                f"SELECT COUNT(*) FROM raw_messages WHERE {where}", params
+            )
+            total = cur.fetchone()[0]
+            rows = self._conn.execute(
+                f"SELECT ts, source, destination, payload FROM raw_messages "
+                f"WHERE {where} ORDER BY ts DESC LIMIT ? OFFSET ?",
+                params + [limit, offset],
+            ).fetchall()
+        return {
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "messages": [
+                {"ts": ts, "source": src, "destination": dst, "payload": pl}
+                for ts, src, dst, pl in rows
+            ],
+        }
+
+    def field_values(self, field, start=None, end=None, limit=500, offset=0):
+        """Récupère les valeurs d'un champ spécifique depuis raw_messages."""
+        start = start if start is not None else 0.0
+        end = end if end is not None else time.time() + 1
+        limit = max(1, min(limit, 5000))
+        offset = max(0, offset)
+        with self._lock:
+            cur = self._conn.execute(
+                "SELECT COUNT(*) FROM raw_messages WHERE ts >= ? AND ts <= ?",
+                (start, end),
+            )
+            total = cur.fetchone()[0]
+            rows = self._conn.execute(
+                "SELECT ts, source, destination, payload FROM raw_messages "
+                "WHERE ts >= ? AND ts <= ? ORDER BY ts DESC",
+                (start, end),
+            ).fetchall()
+        results = []
+        for ts, src, dst, pl in rows:
+            try:
+                data = json.loads(pl) if isinstance(pl, str) else pl
+                if isinstance(data, dict) and field in data:
+                    val = data[field]
+                    if isinstance(val, (int, float, str, bool)):
+                        results.append({
+                            "ts": ts, "value": val,
+                            "source": src, "destination": dst,
+                        })
+            except (json.JSONDecodeError, TypeError):
+                continue
+        total_matching = len(results)
+        results = results[offset:offset + limit]
+        return {
+            "field": field,
+            "total": total_matching,
+            "limit": limit,
+            "offset": offset,
+            "samples": results,
+        }
+
     # --- rétention ---
     def purge(self, days=None):
         """Supprime les échantillons plus vieux que `days` (défaut : rétention)."""
@@ -172,6 +290,17 @@ class HistoryDB:
         with self._lock:
             cur = self._conn.execute(
                 "DELETE FROM samples WHERE ts < ?", (cutoff,)
+            )
+            self._conn.commit()
+        return cur.rowcount
+
+    def purge_raw(self, days=None):
+        """Supprime les messages bruts plus vieux que `days` (défaut : rétention raw)."""
+        days = days if days is not None else self._raw_days
+        cutoff = time.time() - days * 86400
+        with self._lock:
+            cur = self._conn.execute(
+                "DELETE FROM raw_messages WHERE ts < ?", (cutoff,)
             )
             self._conn.commit()
         return cur.rowcount

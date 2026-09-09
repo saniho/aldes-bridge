@@ -115,6 +115,7 @@ class ProfileBody(BaseModel):
 
 class SettingsBody(BaseModel):
     history_retention_days: int = None
+    raw_retention_days: int = None
     log_retention_max_bytes: int = None
     ha_mqtt_dry_run: bool = None
 

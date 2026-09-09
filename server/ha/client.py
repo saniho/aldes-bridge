@@ -9,6 +9,7 @@ import time
 from datetime import datetime, timezone
 
 from .. import mqtt
+from ..appstate import emit_message
 from ..utils import iso, safe_float
 from .mode_mappings import (
     ALDES_TO_HA_MODE, HA_MODE_TO_ALDES,
@@ -269,6 +270,12 @@ class HADiscoveryClient(threading.Thread):
                 f"{temp:.1f}", qos=1, retain=True,
             ))
         _log.info("ha-discovery: consigne zone %d -> %.1f°C", zone, temp)
+        # Tracker la commande reçue de HA
+        if self.state and self.state.history is not None:
+            emit_message(self.state, "in", "PUBLISH",
+                         topic=f"{self.prefix}/set/consigne",
+                         payload={"zone": zone, "temperature": temp},
+                         source="ha", destination="box")
 
     def _handle_preset_command(self, payload):
         preset = payload.strip()
@@ -542,6 +549,12 @@ class HADiscoveryClient(threading.Thread):
                 ))
 
         self._publish_vacation_state(data)
+
+        # Tracker les données télémétrie envoyées à HA
+        if self.state and self.state.history is not None:
+            emit_message(self.state, "out", "PUBLISH",
+                         topic=f"{self.prefix}/state/...",
+                         payload=data, source="bridge", destination="ha")
 
     def _publish_vacation_state(self, data):
         dvac = data.get("Dvac")

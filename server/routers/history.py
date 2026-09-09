@@ -47,3 +47,38 @@ def api_history_table(
     if start is not None and end is not None and start >= end:
         raise HTTPException(status_code=400, detail="start doit être inférieur à end")
     return h.table(start=start, end=end, limit=limit, offset=offset)
+
+
+@router.get("/search")
+def api_history_search(
+    request: Request,
+    text: str,
+    start: float | None = None,
+    end: float | None = None,
+    source: str | None = None,
+    destination: str | None = None,
+    limit: int = 100,
+    offset: int = 0,
+):
+    h = _history(request)
+    if start is not None and end is not None and start >= end:
+        raise HTTPException(status_code=400, detail="start doit être inférieur à end")
+    return h.search_raw(
+        text, start=start, end=end, source=source, destination=destination,
+        limit=limit, offset=offset,
+    )
+
+
+@router.get("/field")
+def api_history_field(
+    request: Request,
+    field: str,
+    start: float | None = None,
+    end: float | None = None,
+    limit: int = 500,
+    offset: int = 0,
+):
+    h = _history(request)
+    if start is not None and end is not None and start >= end:
+        raise HTTPException(status_code=400, detail="start doit être inférieur à end")
+    return h.field_values(field, start=start, end=end, limit=limit, offset=offset)

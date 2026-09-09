@@ -9,12 +9,14 @@ import threading
 
 DEFAULTS = {
     "history_retention_days": 90,
+    "raw_retention_days": 7,
     "log_retention_max_bytes": 25 * 1024 * 1024,
     "ha_mqtt_dry_run": False,
 }
 
 RANGES = {
     "history_retention_days": (1, 3650),
+    "raw_retention_days": (1, 90),
     "log_retention_max_bytes": (1024 * 1024, 500 * 1024 * 1024),
 }
 
@@ -71,6 +73,9 @@ class ConfigStore:
 
     def history_retention(self):
         return self.get("history_retention_days")
+
+    def raw_retention(self):
+        return self.get("raw_retention_days")
 
     def log_retention_bytes(self):
         return self.get("log_retention_max_bytes")

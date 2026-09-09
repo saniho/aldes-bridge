@@ -232,3 +232,41 @@ export async function apiCall(opts: ApiCallOptions): Promise<ApiResult> {
   }
   return { ok: res.ok, status: res.status, statusText: res.statusText, ms, data }
 }
+
+export async function searchRawMessages(opts: {
+  text: string
+  start?: number
+  end?: number
+  source?: string
+  destination?: string
+  limit?: number
+  offset?: number
+}): Promise<import('./types').DebugSearchResult> {
+  const params = new URLSearchParams({ text: opts.text })
+  if (opts.start !== undefined) params.set('start', String(opts.start))
+  if (opts.end !== undefined) params.set('end', String(opts.end))
+  if (opts.source) params.set('source', opts.source)
+  if (opts.destination) params.set('destination', opts.destination)
+  if (opts.limit !== undefined) params.set('limit', String(opts.limit))
+  if (opts.offset !== undefined) params.set('offset', String(opts.offset))
+  return json<import('./types').DebugSearchResult>(
+    await fetch(`api/history/search?${params}`)
+  )
+}
+
+export async function getFieldValues(opts: {
+  field: string
+  start?: number
+  end?: number
+  limit?: number
+  offset?: number
+}): Promise<import('./types').FieldValuesResult> {
+  const params = new URLSearchParams({ field: opts.field })
+  if (opts.start !== undefined) params.set('start', String(opts.start))
+  if (opts.end !== undefined) params.set('end', String(opts.end))
+  if (opts.limit !== undefined) params.set('limit', String(opts.limit))
+  if (opts.offset !== undefined) params.set('offset', String(opts.offset))
+  return json<import('./types').FieldValuesResult>(
+    await fetch(`api/history/field?${params}`)
+  )
+}
