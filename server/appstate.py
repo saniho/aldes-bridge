@@ -506,6 +506,8 @@ class AppState:
                         f = float(val)
                         if key == "PreH":
                             f = f / 100.0
+                        if key == "RVeI":
+                            f = f / 10.0
                         health[dst] = int(f) if f == int(f) else f
                     except (TypeError, ValueError):
                         pass

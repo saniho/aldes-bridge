@@ -537,6 +537,8 @@ class HADiscoveryClient(threading.Thread):
         for aldes_key in ("RVeI", "Dno", "Dma", "Dint", "DLN", "DPLe", "DmCO"):
             val = safe_float(data.get(aldes_key))
             if val is not None:
+                if aldes_key == "RVeI":
+                    val = val / 10.0
                 self._safe_send(mqtt.build_publish(
                     f"{self.prefix}/state/sensor/{aldes_key}", f"{val:.0f}", qos=1, retain=True
                 ))
