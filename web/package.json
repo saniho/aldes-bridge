@@ -1,7 +1,7 @@
 {
   "name": "aldes-bridge-web",
   "private": true,
-  "version": "0.13.7-beta1",
+  "version": "0.13.8",
   "type": "module",
   "scripts": {
     "dev": "vite",
