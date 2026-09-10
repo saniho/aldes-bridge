@@ -47,6 +47,12 @@ def decode_payload(payload):
     """Decode un payload PUBLISH : bytes -> str, JSON joliment formate si possible."""
     if payload is None:
         return ""
+    if isinstance(payload, dict):
+        import json
+        return json.dumps(payload, indent=2, ensure_ascii=False)
+    if isinstance(payload, (list, tuple)):
+        import json
+        return json.dumps(payload, indent=2, ensure_ascii=False)
     if isinstance(payload, bytes):
         try:
             payload = payload.decode("utf-8", errors="replace")
