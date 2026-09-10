@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.14.0] — 2026-09-10
+
+### Ajouté
+- **Debug** : panel de recherche de messages bruts (onglet "Messages bruts")
+- **Debug** : exploration des valeurs de champ avec timestamps (onglet "Valeurs du champ")
+- **Debug** : table `raw_messages` en SQLite pour stocker les payloads MQTT
+- **Debug** : endpoints `/api/history/search` et `/api/history/field`
+- **Debug** : rétention configurable (1-90 jours, défaut 7) via ConfigPanel
+- **Backend** : tracking des messages HA (télémétrie bridge→ha, commandes ha→box)
+
+### Changé
+- **Backend** : source/destination corrigés pour le mode proxy
+
 ## [0.13.3] — 2026-09-08
 
 ### Ajouté
