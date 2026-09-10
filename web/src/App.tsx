@@ -17,8 +17,9 @@ import HealthPanel from './components/HealthPanel'
 import './App.css'
 
 const HistoryPanel = lazy(() => import('./components/HistoryPanel'))
+const DebugPanel = lazy(() => import('./components/DebugPanel'))
 
-type View = 'temps' | 'health' | 'commande' | 'log' | 'wrapper' | 'historique' | 'config' | 'diagnostic'
+type View = 'temps' | 'health' | 'commande' | 'log' | 'wrapper' | 'historique' | 'config' | 'diagnostic' | 'debug'
 
 function mergeConsignes(
   c: Record<string, { requested: number; confirmed: boolean; ts?: string }>
@@ -44,6 +45,7 @@ const MORE: { id: View; label: string; title: string }[] = [
   { id: 'log', label: '📜 log', title: 'Trames MQTT en temps réel et historique' },
   { id: 'wrapper', label: '🔌 wrapper', title: 'Appels API du bridge (test interactif)' },
   { id: 'historique', label: '📊 historique', title: 'Historique des valeurs (télémétries & connexions)' },
+  { id: 'debug', label: '🔍 debug', title: 'Recherche de messages bruts' },
   { id: 'config', label: '⚙️ config', title: 'Configuration du bridge' },
   { id: 'diagnostic', label: '🩺 diagnostic', title: 'Check-up du systeme' }
 ]
@@ -65,7 +67,8 @@ export default function App() {
       stored === 'wrapper' ||
       stored === 'historique' ||
       stored === 'config' ||
-      stored === 'diagnostic'
+      stored === 'diagnostic' ||
+      stored === 'debug'
     ) {
       return stored as View
     }
@@ -438,6 +441,15 @@ const { messages, lastSnapshot } = useMemo(() => {
         {view === 'diagnostic' && (
           <div className="streamCol">
             <DiagnosticPanel />
+          </div>
+        )}
+        {view === 'debug' && (
+          <div className="streamCol">
+            <Suspense
+              fallback={<div className="histLabel" style={{ padding: 12 }}>chargement…</div>}
+            >
+              <DebugPanel />
+            </Suspense>
           </div>
         )}
       </div>

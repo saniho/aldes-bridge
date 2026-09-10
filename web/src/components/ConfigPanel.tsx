@@ -24,6 +24,7 @@ function parseBytes(s: string): number | null {
 export default function ConfigPanel() {
   const [cfg, setCfg] = useState<AppConfig | null>(null)
   const [days, setDays] = useState('')
+  const [rawDays, setRawDays] = useState('')
   const [logSize, setLogSize] = useState('')
   const [dryRun, setDryRun] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -33,6 +34,7 @@ export default function ConfigPanel() {
     getAppConfig().then((c) => {
       setCfg(c)
       setDays(String(c.history_retention_days))
+      setRawDays(String(c.raw_retention_days ?? 7))
       setLogSize(fmtBytes(c.log_retention_max_bytes))
       setDryRun(c.ha_mqtt_dry_run)
     })
@@ -45,12 +47,15 @@ export default function ConfigPanel() {
       const updates: Partial<AppConfig> = {}
       const d = parseInt(days, 10)
       if (!isNaN(d)) updates.history_retention_days = d
+      const rd = parseInt(rawDays, 10)
+      if (!isNaN(rd)) updates.raw_retention_days = rd
       const bytes = parseBytes(logSize)
       if (bytes !== null && bytes > 0) updates.log_retention_max_bytes = bytes
       updates.ha_mqtt_dry_run = dryRun
       const c = await setAppConfig(updates)
       setCfg(c)
       setDays(String(c.history_retention_days))
+      setRawDays(String(c.raw_retention_days ?? 7))
       setLogSize(fmtBytes(c.log_retention_max_bytes))
       setDryRun(c.ha_mqtt_dry_run)
       setMsg('Sauvegarde')
@@ -76,6 +81,16 @@ export default function ConfigPanel() {
             max={3650}
             value={days}
             onChange={(e) => setDays(e.target.value)}
+          />
+        </label>
+        <label>
+          Retention debug (jours)
+          <input
+            type="number"
+            min={1}
+            max={90}
+            value={rawDays}
+            onChange={(e) => setRawDays(e.target.value)}
           />
         </label>
         <label>

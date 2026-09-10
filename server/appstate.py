@@ -106,6 +106,31 @@ def emit_message(state, direction, mtype, topic=None, payload=None, qos=None, **
     ev.update(extra)
     state.events.publish(ev)
 
+    # Enregistrer les messages PUBLISH dans raw_messages pour recherche
+    if mtype == "PUBLISH" and payload is not None and state.history is not None:
+        src, dst = _resolve_source_dest(state, direction, extra)
+        state.history.record_raw(payload, src, dst)
+
+
+def _resolve_source_dest(state, direction, extra):
+    """Détermine source et destination à partir du mode et de la direction."""
+    injected = extra.get("injected", False)
+    mode = state.mode
+    if injected:
+        return "webui", "box"
+    if direction == "in":
+        if mode == "raw":
+            return "broker", "bridge"
+        if mode == "bridge":
+            return "box", "bridge"
+        return "azure", "box"
+    else:
+        if mode == "raw":
+            return "bridge", "broker"
+        if mode == "bridge":
+            return "bridge", "box"
+        return "box", "azure"
+
 
 def emit_connect(state, body):
     """Journalise un CONNECT entrant (sans le mot de passe) et leve la session.
@@ -274,6 +299,15 @@ class AppState:
                 _log.info("purge history: %d echantillons supprimes (retention %d jours)", n, days)
         except Exception as exc:
             _log.warning("purge history echouee: %s", exc)
+        # Purge des messages bruts avec retention separee
+        raw_days = self.config.raw_retention()
+        self.history._raw_days = raw_days
+        try:
+            n = self.history.purge_raw(raw_days)
+            if n > 0:
+                _log.info("purge raw_messages: %d messages supprimes (retention %d jours)", n, raw_days)
+        except Exception as exc:
+            _log.warning("purge raw_messages echouee: %s", exc)
 
     def _persist_mode(self):
         """Ecrit le mode courant dans mode_file (atomique, ne casse jamais le runtime)."""
