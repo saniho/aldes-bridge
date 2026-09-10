@@ -121,11 +121,15 @@ def _resolve_source_dest(state, direction, extra):
     if direction == "in":
         if mode == "raw":
             return "broker", "bridge"
-        return "box", "bridge" if mode == "bridge" else "azure"
+        if mode == "bridge":
+            return "box", "bridge"
+        return "azure", "box"
     else:
         if mode == "raw":
             return "bridge", "broker"
-        return "azure" if mode in ("proxy", "listen") else "bridge", "box"
+        if mode == "bridge":
+            return "bridge", "box"
+        return "box", "azure"
 
 
 def emit_connect(state, body):
