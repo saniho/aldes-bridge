@@ -8,7 +8,7 @@ interface Props {
   pollMs?: number
   clientId?: string | null
   connected?: boolean
-  consignes?: Record<string, { requested: number; confirmed: boolean; ts?: string }>
+  consignes?: Record<string, { requested: number; confirmed: boolean; attempts?: number; ts?: string }>
   profile?: DeviceProfile | null
 }
 

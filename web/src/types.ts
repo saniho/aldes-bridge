@@ -20,7 +20,7 @@ export interface Config {
   box_since?: number | null
   cloud_since?: number | null
   azure_ip?: string | null
-  consignes?: Record<string, { requested: number; confirmed: boolean; ts?: string }>
+  consignes?: Record<string, { requested: number; confirmed: boolean; attempts?: number; ts?: string }>
   server_version?: string
   ui_version?: string
   history_days?: number | null
