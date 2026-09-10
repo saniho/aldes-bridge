@@ -205,7 +205,8 @@ class AppState:
         # temperature pour garantir la disponibilite au redemarrage.
         self._health = {}
         # Consignes thermostats demandees (en attente de confirmation box).
-        # zone (str "0".."9") -> {"requested": float, "confirmed": bool, "ts": iso}
+        # zone (str "0".."9") -> {"requested": float, "confirmed": bool,
+        #   "ts": iso, "attempts": int}
         self._consignes = {}
         # Horodatages de connexion (epoch secondes) pour afficher les durees en haut.
         self._box_since = None
@@ -395,7 +396,8 @@ class AppState:
         """Enregistre une consigne demandee pour une zone (en attente box)."""
         with self._lock:
             prev = self._consignes.get(zone)
-            entry = {"requested": float(value), "confirmed": False, "ts": iso()}
+            entry = {"requested": float(value), "confirmed": False, "ts": iso(),
+                     "attempts": 0}
             self._consignes[zone] = entry
             self._save_consignes()
         if prev is None or prev.get("requested") != entry["requested"]:
@@ -405,37 +407,65 @@ class AppState:
             })
 
     def _confirm_consignes_from(self, data):
-        """Confirme les consignes dont la box a rejoue la valeur dans une telemetrie.
+        """Confirme ou rejette les consignes en attente.
 
         A appeler sous self._lock : pour chaque zone dont une UsC<n> est presente
         dans la trame, si elle correspond a une consigne demandee, on la marque
         confirmee (la box a bien applique la valeur) et on persiste.
+        Si la valeur ne correspond pas, on incremente le compteur d'apres 2
+        tentatives sans concordance, la consigne est supprimee (rejetee).
         """
-        changed = []
-        for zone, entry in self._consignes.items():
+        confirmed = []
+        rejected = []
+        for zone, entry in list(self._consignes.items()):
             if entry.get("confirmed"):
                 continue
             try:
                 got = float(data.get("UsC%s" % zone))
             except (TypeError, ValueError):
                 continue
-            _log.debug("confirm_consigne: zone %s requested=%.1f got=%.1f (diff=%.2f)",
-                       zone, entry["requested"], got, abs(got - entry["requested"]))
+            _log.debug("confirm_consigne: zone %s requested=%.1f got=%.1f (diff=%.2f) attempts=%d",
+                       zone, entry["requested"], got, abs(got - entry["requested"]),
+                       entry.get("attempts", 0))
             if abs(got - entry["requested"]) < 0.01:
                 entry["confirmed"] = True
                 entry["ts"] = iso()
-                changed.append(zone)
+                confirmed.append(zone)
                 _log.info("confirm_consigne: zone %s CONFIRMEE -> %.1f", zone, got)
-        if not changed:
+            else:
+                attempts = entry.get("attempts", 0)
+                if attempts >= 1:
+                    _log.warning(
+                        "reject_consigne: zone %s demandee=%.1f got=%.1f -> %d/%d tentatives, "
+                        "suppression de la consigne en attente",
+                        zone, entry["requested"], got, attempts + 1, 2,
+                    )
+                    del self._consignes[zone]
+                    rejected.append({"zone": zone, "requested": entry["requested"], "ts": iso()})
+                else:
+                    entry["attempts"] = attempts + 1
+                    entry["ts"] = iso()
+                    _log.info(
+                        "confirm_consigne: zone %s demandee=%.1f got=%.1f -> "
+                        "tentative %d/2, en attente",
+                        zone, entry["requested"], got, entry["attempts"],
+                    )
+        if not confirmed and not rejected:
             return
         self._save_consignes()
-        if changed:
-            for zone in changed:
-                entry = self._consignes[zone]
-                self.events.publish({
-                    "kind": "consigne", "zone": zone,
-                    "requested": entry["requested"], "confirmed": True, "ts": entry["ts"],
-                })
+        for zone in confirmed:
+            entry = self._consignes[zone]
+            self.events.publish({
+                "kind": "consigne", "zone": zone,
+                "requested": entry["requested"], "confirmed": True,
+                "attempts": entry.get("attempts", 0), "ts": entry["ts"],
+            })
+        for rej in rejected:
+            self.events.publish({
+                "kind": "consigne", "zone": rej["zone"],
+                "requested": rej["requested"], "confirmed": False,
+                "attempts": 2, "status": "rejected", "ts": rej["ts"],
+            })
 
     def consignes_state(self):
         with self._lock:

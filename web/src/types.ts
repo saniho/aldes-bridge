@@ -65,6 +65,8 @@ export interface ConsigneEvent {
   zone: string
   requested: number
   confirmed: boolean
+  attempts?: number
+  status?: 'pending' | 'rejected'
   ts?: string
 }
 
