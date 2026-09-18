@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react'
 import { getProducts } from '../api'
 import type { AldesProduct, DeviceProfile, HealthData } from '../types'
-import { fmtParis } from '../parisTime'
 import styles from './DashboardPanel.module.css'
 
 interface Props {
-  clientId?: string | null
   connected?: boolean
   profile?: DeviceProfile | null
   health?: HealthData | null
@@ -34,7 +32,7 @@ function fmtDefr(defr: number | null | undefined, mfac: number | null | undefine
   return { text: 'OK', cls: 'ok' }
 }
 
-export default function DashboardPanel({ clientId, connected, profile, health }: Props) {
+export default function DashboardPanel({ connected, profile, health }: Props) {
   const [products, setProducts] = useState<AldesProduct[]>([])
 
   useEffect(() => {
@@ -50,21 +48,6 @@ export default function DashboardPanel({ clientId, connected, profile, health }:
   const product = products[0]
   const indicator = product?.indicator
   const temps = indicator?.thermostats ?? []
-
-  const airLabel = (() => {
-    const all = [
-      ...(profile?.air_modes_clim ?? []),
-      ...(profile?.air_modes_heat ?? []),
-      ...(profile?.air_modes ?? []),
-    ]
-    if (all.length) return Object.fromEntries(all.map((m) => [m.code, m.label]))
-    return {}
-  })()
-
-  const waterLabel = (() => {
-    if (profile?.water_modes?.length) return Object.fromEntries(profile.water_modes.map((m) => [m.code, m.label]))
-    return {}
-  })()
 
   const defrStatus = fmtDefr(health?.defr, health?.mfac)
   const hpcAlert = health?.hpc && health.hpc !== 0
