@@ -374,9 +374,7 @@ const { messages, lastSnapshot } = useMemo(() => {
         {view === 'dashboard' && (
           <div className="streamCol">
             <DashboardPanel
-              clientId={config?.client_id ?? null}
               connected={config?.connected ?? false}
-              profile={config?.profile ?? null}
               health={config?.health ?? null}
             />
           </div>

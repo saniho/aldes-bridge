@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
 import { getProducts } from '../api'
-import type { AldesProduct, DeviceProfile, HealthData } from '../types'
+import type { AldesProduct, HealthData } from '../types'
 import styles from './DashboardPanel.module.css'
 
 interface Props {
   connected?: boolean
-  profile?: DeviceProfile | null
   health?: HealthData | null
 }
 
@@ -32,7 +31,7 @@ function fmtDefr(defr: number | null | undefined, mfac: number | null | undefine
   return { text: 'OK', cls: 'ok' }
 }
 
-export default function DashboardPanel({ connected, profile, health }: Props) {
+export default function DashboardPanel({ connected, health }: Props) {
   const [products, setProducts] = useState<AldesProduct[]>([])
 
   useEffect(() => {
