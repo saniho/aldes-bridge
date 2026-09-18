@@ -86,24 +86,25 @@ export default function DashboardPanel({ connected, health }: Props) {
     <div className={styles.panel}>
       {/* Hero */}
       <div className={styles.hero}>
-        <div className={styles.heroMain}>
+        <div className={styles.heroLeft}>
+          <span className={styles.heroLabel}>Extérieur</span>
           <div className={styles.heroTemp + ' ' + tempColor(extTemp)}>
             {fmtDeg(extTemp)}
           </div>
-          <div className={styles.heroMeta}>
-            <span className={styles.heroLabel}>Extérieur</span>
-            <span className={styles.heroSub}>
-              {connected ? 'Box connectée' : 'Box déconnectée'}
+        </div>
+        <div className={styles.heroRight}>
+          <div className={styles.heroStatus + ' ' + (connected ? styles.heroStatusOk : styles.heroStatusOff)}>
+            <span className={styles.heroDot + ' ' + (connected ? styles.dotOk : styles.dotOff)} />
+            {connected ? 'Connectée' : 'Déconnectée'}
+          </div>
+          <div className={styles.heroBadges}>
+            <span className={styles.badge + ' ' + (connected ? styles.badgeOk : styles.badgeOff)}>
+              {airMode.icon} {airMode.code} · {airMode.label}
+            </span>
+            <span className={styles.badge + ' ' + (health?.mfac && health.mfac !== 0 ? styles.badgeOk : styles.badgeOff)}>
+              Compresseur {health?.mfac && health.mfac !== 0 ? 'ON' : 'OFF'}
             </span>
           </div>
-        </div>
-        <div className={styles.heroBadges}>
-          <span className={styles.badge + ' ' + (connected ? styles.badgeOk : styles.badgeOff)}>
-            {airMode.icon} {airMode.code} · {airMode.label}
-          </span>
-          <span className={styles.badge + ' ' + (health?.mfac && health.mfac !== 0 ? styles.badgeOk : styles.badgeOff)}>
-            Compresseur {health?.mfac && health.mfac !== 0 ? 'ON' : 'OFF'}
-          </span>
         </div>
       </div>
 

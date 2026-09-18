@@ -11,22 +11,29 @@
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 14px;
-  padding: 20px 24px;
+  padding: 24px 28px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
+  gap: 24px;
   flex-wrap: wrap;
 }
 
-.heroMain {
+.heroLeft {
   display: flex;
-  align-items: baseline;
-  gap: 12px;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.heroLabel {
+  font-size: 12px;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .heroTemp {
-  font-size: 42px;
+  font-size: 48px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   line-height: 1;
@@ -38,23 +45,33 @@
 .heroTemp.warm { color: var(--green); }
 .heroTemp.hot { color: #f59e0b; }
 
-.heroMeta {
+.heroRight {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  align-items: flex-end;
+  gap: 10px;
 }
 
-.heroLabel {
-  font-size: 12px;
-  color: var(--text-soft);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+.heroStatus {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
 }
 
-.heroSub {
-  font-size: 12px;
-  color: var(--text-faint);
+.heroStatusOk { color: var(--green); }
+.heroStatusOff { color: var(--text-soft); }
+
+.heroDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
+
+.dotOk { background: var(--green); }
+.dotOff { background: var(--text-faint); }
 
 .heroBadges {
   display: flex;
