@@ -14,12 +14,13 @@ import ProfileSelector from './components/ProfileSelector'
 import ConfigPanel from './components/ConfigPanel'
 import DiagnosticPanel from './components/DiagnosticPanel'
 import HealthPanel from './components/HealthPanel'
+import DashboardPanel from './components/DashboardPanel'
 import './App.css'
 
 const HistoryPanel = lazy(() => import('./components/HistoryPanel'))
 const DebugPanel = lazy(() => import('./components/DebugPanel'))
 
-type View = 'temps' | 'health' | 'commande' | 'log' | 'wrapper' | 'historique' | 'config' | 'diagnostic' | 'debug'
+type View = 'dashboard' | 'temps' | 'health' | 'commande' | 'log' | 'wrapper' | 'historique' | 'config' | 'diagnostic' | 'debug'
 
 function mergeConsignes(
   c: Record<string, { requested: number; confirmed: boolean; ts?: string }>
@@ -36,6 +37,7 @@ function mergeConsignes(
 }
 
 const TABS: { id: View; label: string; title: string }[] = [
+  { id: 'dashboard', label: '🏠 vue d\'ensemble', title: 'Dashboard synthèse — vue d\'ensemble' },
   { id: 'temps', label: '🌡 infos aldes', title: 'Températures / infos de la PAC' },
   { id: 'health', label: '🩺 santé', title: 'État compresseur, pressions & alertes' },
   { id: 'commande', label: '📤 commande', title: 'Envoyer des commandes à la box' }
@@ -60,6 +62,7 @@ export default function App() {
     const stored = localStorage.getItem('aldes-view')
     if (stored === 'flux') return 'log'
     if (
+      stored === 'dashboard' ||
       stored === 'temps' ||
       stored === 'health' ||
       stored === 'commande' ||
@@ -368,6 +371,16 @@ const { messages, lastSnapshot } = useMemo(() => {
         connected={config?.connected ?? false}
       />
       <div className="layout">
+        {view === 'dashboard' && (
+          <div className="streamCol">
+            <DashboardPanel
+              clientId={config?.client_id ?? null}
+              connected={config?.connected ?? false}
+              profile={config?.profile ?? null}
+              health={config?.health ?? null}
+            />
+          </div>
+        )}
         {view === 'temps' && (
           <div className="streamCol">
             <TempsPanel
