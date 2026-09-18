@@ -83,7 +83,7 @@ export default function DashboardPanel({ clientId, connected, profile, health }:
           </div>
           <div className={styles.indicator}>
             <span className={styles.label}>Mode</span>
-            <span className={styles.value}>{fmtMode(product?.current_air_mode)}</span>
+            <span className={styles.value}>{fmtMode(product?.indicator?.current_air_mode)}</span>
           </div>
           <div className={styles.indicator}>
             <span className={styles.label}>Compresseur</span>
@@ -137,11 +137,11 @@ export default function DashboardPanel({ clientId, connected, profile, health }:
         <div className={styles.grid}>
           <div className={styles.indicator}>
             <span className={styles.label}>Niveau (NED)</span>
-            <span className={styles.value + ' ' + styles.big}>{product?.qte_eau_chaude ?? '—'} %</span>
+            <span className={styles.value + ' ' + styles.big}>{product?.indicator?.qte_eau_chaude ?? '—'} %</span>
           </div>
           <div className={styles.indicator}>
             <span className={styles.label}>Mode eau</span>
-            <span className={styles.value}>{fmtMode(product?.current_water_mode)}</span>
+            <span className={styles.value}>{fmtMode(product?.indicator?.current_water_mode)}</span>
           </div>
         </div>
       </div>
