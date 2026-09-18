@@ -5,6 +5,7 @@
   padding: 6px 16px;
   border-bottom: 1px solid var(--border);
   background: var(--bg-card);
+  color: var(--text);
   font-size: 13px;
   min-height: 32px;
 }
