@@ -79,6 +79,7 @@ export default function App() {
   })
   const [histOpen, setHistOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
+  const [diagramOpen, setDiagramOpen] = useState(false)
   const [consignes, setConsignes] = useState<
     Record<string, { requested: number; confirmed: boolean; ts?: string }>
   >({})
@@ -359,13 +360,22 @@ const { messages, lastSnapshot } = useMemo(() => {
         onMode={onMode}
         onDisconnect={onDisconnect}
       />
-      <ModeDiagram
-        mode={config?.mode ?? null}
-        connected={config?.connected ?? false}
-        clientId={config?.client_id ?? null}
-        cloudSince={config?.cloud_since ?? null}
-        azureIp={config?.azure_ip ?? null}
-      />
+      <button
+        className="diagramToggle"
+        type="button"
+        onClick={() => setDiagramOpen(!diagramOpen)}
+      >
+        {diagramOpen ? '▾ Masquer le schéma' : '▸ Schéma du flux'}
+      </button>
+      {diagramOpen && (
+        <ModeDiagram
+          mode={config?.mode ?? null}
+          connected={config?.connected ?? false}
+          clientId={config?.client_id ?? null}
+          cloudSince={config?.cloud_since ?? null}
+          azureIp={config?.azure_ip ?? null}
+        />
+      )}
       <StatsBar
         messages={messages}
         connected={config?.connected ?? false}
