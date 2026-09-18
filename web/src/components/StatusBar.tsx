@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { Config, Mode } from '../types'
+import type { Config, HealthData, Mode } from '../types'
 import styles from './StatusBar.module.css'
 
 interface Props {
@@ -15,14 +15,16 @@ function fmtDur(sinceEpochS: number | null | undefined, nowMs: number): string |
   if (!sinceEpochS) return null
   const s = Math.max(0, Math.floor(nowMs / 1000 - sinceEpochS))
   if (s < 60) return `${s}s`
-  if (s < 3600) return `${Math.floor(s / 60)}m ${s % 60}s`
-  return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`
+  if (s < 3600) return `${Math.floor(s / 60)}m${s % 60}s`
+  return `${Math.floor(s / 3600)}h${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}m`
 }
 
 export default function StatusBar({ config, sseAlive, onMode, onDisconnect }: Props) {
   const mode: Mode | null = config?.mode ?? null
   const connected = config?.connected ?? false
   const err = config?.last_error
+  const health: HealthData | null = config?.health ?? null
+  const extTemp = health?.text_ext
   const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
@@ -35,41 +37,37 @@ export default function StatusBar({ config, sseAlive, onMode, onDisconnect }: Pr
 
   return (
     <div className={styles.bar}>
-      <div className={styles.mode}>
+      {/* Left: mode + status */}
+      <div className={styles.left}>
         <span className={styles.dot + (mode ? ' ' + (styles[mode] ?? '') : '')} />
-        <span>Mode : {mode ?? '—'}</span>
-      </div>
-
-      <div className={styles.conn}>
+        <span className={styles.modeLabel}>{mode ?? '—'}</span>
+        <span className={styles.sep}>·</span>
         {connected ? (
-          <>
-            <span className={styles.ok}>connecté</span>
-            {config?.client_id && <code className={styles.cid}>{config.client_id}</code>}
-            <span className={styles.uptime} title="durée depuis la connexion de la box">
-              box depuis {boxDur ?? '…'}
-            </span>
-            {config?.cloud_since != null && (
-              <span className={styles.uptime + ' ' + styles.cloud} title="durée du lien avec le cloud Azure">
-                Azure depuis {cloudDur ?? '…'}
-              </span>
-            )}
-          </>
+          <span className={styles.ok}>
+            connecté
+            {boxDur && <span className={styles.dur}>box {boxDur}</span>}
+            {cloudDur && <span className={styles.dur + ' ' + styles.cloud}>Azure {cloudDur}</span>}
+          </span>
         ) : (
-          <span className={styles.off}>{err ? `erreur : ${err}` : 'aucune box connectée'}</span>
+          <span className={styles.off}>{err ?? 'déconnecté'}</span>
         )}
       </div>
 
-      {config?.topics && config.topics.length > 0 && (
-        <div className={styles.topics}>
-          {config.topics.map((t) => (
-            <span key={t} className={styles.topic}>
-              {t}
-            </span>
-          ))}
+      {/* Center: ext temp */}
+      {extTemp != null && (
+        <div className={styles.center}>
+          <span className={styles.extTemp}>{extTemp.toFixed(1)}°C</span>
+          <span className={styles.extLabel}>ext</span>
         </div>
       )}
 
-      <div className={styles.actions}>
+      {/* Right: actions */}
+      <div className={styles.right}>
+        {config?.topics && config.topics.length > 0 && (
+          <span className={styles.topicsBadge} title={config.topics.join('\n')}>
+            {config.topics.length} topic{config.topics.length > 1 ? 's' : ''}
+          </span>
+        )}
         <span className={styles.sse + (sseAlive ? ' ' + styles.live : '')}>SSE</span>
         <select
           className={styles.modeSel}
@@ -77,12 +75,10 @@ export default function StatusBar({ config, sseAlive, onMode, onDisconnect }: Pr
           onChange={(e) => onMode(e.target.value as Mode)}
         >
           {MODES.map((m) => (
-            <option key={m} value={m}>
-              {m}
-            </option>
+            <option key={m} value={m}>{m}</option>
           ))}
         </select>
-        {connected && <button onClick={onDisconnect}>déconnecter</button>}
+        {connected && <button onClick={onDisconnect}>×</button>}
       </div>
     </div>
   )
