@@ -421,9 +421,27 @@ sudo docker compose up -d --build
 | PUT | `/api/settings` | `{"history_retention_days":30, "log_retention_max_bytes":...}` — met à jour |
 | GET | `/` | SPA (frontend construit) |
 
-La WebUI a deux onglets : **🌊 flux** (trames MQTT en temps réel / historique) et **🌡 températures**
+La WebUI a trois onglets : **📊 vue d'ensemble** (dashboard synthèse), **🌊 flux** (trames MQTT en temps réel / historique) et **🌡 températures**
 (vue des produits Aldes : temp. principale, ECS, modes air/ECS, table des thermostats réel/consigne,
 alimentée par `/aldesoc/v5/users/me/products`, refresh 5 s).
+
+### Dashboard (vue d'ensemble)
+
+Le panneau **Dashboard** affiche les informations essentielles de la PAC en un seul écran :
+
+| Section | Contenu |
+|---------|---------|
+| Header | Nom + badge connexion (Connectée / Hors ligne) |
+| Alertes | Bannière orange si haute pression compresseur ou défaut dégivrage (masqué si compresseur arrêté) |
+| État | Compresseur (marche/arrêt) — indicateur visuel non cliquable |
+| Extérieur | Température + humidité extérieure (2 colonnes) |
+| Zones | Grille 3 colonnes des zones climatisées + moyenne automatique |
+| Eau chaude | Barre de progression NED (%) + modes ventilation/ECS |
+| Consignes | Consignes en attente de confirmation (zone, valeur, statut) |
+| Dernière MAJ | Horodatage de la dernière trame reçue |
+| Système | Infos collapsibles : durée box/Azure, mode, version |
+
+Données mises à jour via polling SSE existant. Mode sombre/clair supporté.
 
 ### Rejeu de l'API Aldes (pour l'intégration Home Assistant « saniho-ha »)
 
