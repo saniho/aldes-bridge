@@ -384,3 +384,60 @@
   text-align: center;
   padding: 4px 0;
 }
+
+/* ── Présence ── */
+.presence {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--bg-node);
+  border: 1px solid var(--border);
+}
+
+.presenceLabel {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.presenceControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.presenceBtn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.presenceBtn:hover:not(:disabled) {
+  background: var(--bg-node);
+}
+
+.presenceBtn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.presenceVal {
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  min-width: 28px;
+  text-align: center;
+}

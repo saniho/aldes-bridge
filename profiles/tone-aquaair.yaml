@@ -202,6 +202,16 @@ commands:
       - name: code
         type: enum
         options_from: water_modes
+  - id: set_people
+    label: "Nombre de personnes"
+    method: changePeople
+    topic_pattern: "device/{device_id}/messages/devicebound"
+    params:
+      - name: index
+        type: number
+        min: 0
+        max: 4
+        step: 1
   - id: set_cmo
     label: "Override CMO"
     method: changeCMO

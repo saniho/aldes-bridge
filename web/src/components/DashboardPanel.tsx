@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getProducts } from '../api'
+import { getProducts, sendCommand } from '../api'
 import type { AldesProduct, AldesThermostat, Config, HealthData } from '../types'
 import styles from './DashboardPanel.module.css'
 
@@ -36,6 +36,13 @@ function waterLabel(code: string | null | undefined): string {
 
 function compressorOn(mfac: number | null | undefined): boolean {
   return mfac != null && mfac !== 0
+}
+
+const PEOPLE_LABELS = ['2', '3', '4', '5', '6+']
+
+function peopleLabel(idx: number | null | undefined): string {
+  if (idx == null || idx < 0 || idx > 4) return '—'
+  return PEOPLE_LABELS[idx]
 }
 
 function tempClass(v: number | null | undefined): string {
@@ -75,6 +82,7 @@ export default function DashboardPanel({ config, connected, health }: Props) {
   const [products, setProducts] = useState<AldesProduct[]>([])
   const [now, setNow] = useState(() => Date.now())
   const [sysOpen, setSysOpen] = useState(false)
+  const [sendingPeople, setSendingPeople] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -108,6 +116,24 @@ export default function DashboardPanel({ config, connected, health }: Props) {
   const avgTemp = zones.length > 0
     ? zones.reduce((s, z) => s + (z.CurrentTemperature ?? 0), 0) / zones.filter((z) => z.CurrentTemperature != null).length
     : null
+
+  const peopleIdx = ind?.settings?.people ?? null
+  const clientId = products[0]?.modem
+
+  const changePeople = async (delta: number) => {
+    if (sendingPeople || !clientId || peopleIdx == null) return
+    const next = Math.max(0, Math.min(4, peopleIdx + delta))
+    if (next === peopleIdx) return
+    const payload = JSON.stringify({ id: 1, jsonrpc: '2.0', method: 'changePeople', params: [String(next)] })
+    setSendingPeople(true)
+    try {
+      await sendCommand(`devices/${clientId}/messages/devicebound`, payload, 1)
+    } catch {
+      // silently ignore
+    } finally {
+      setSendingPeople(false)
+    }
+  }
 
   const consignes = config?.consignes ?? {}
   const pendingConsignes = Object.entries(consignes).filter(([, c]) => !c.confirmed)
@@ -206,6 +232,26 @@ export default function DashboardPanel({ config, connected, health }: Props) {
         <div className={styles.ecsMeta}>
           <span className={styles.ecsMode}>Mode : {waterLabel(ind?.current_water_mode)}</span>
           <span className={styles.ecsMode}>Ventilation : {airLabel(ind?.current_air_mode)}</span>
+        </div>
+      </div>
+
+      {/* ── 6b. Présence ── */}
+      <div className={styles.presence}>
+        <span className={styles.presenceLabel}>Présence</span>
+        <div className={styles.presenceControls}>
+          <button
+            className={styles.presenceBtn}
+            type="button"
+            disabled={sendingPeople || peopleIdx == null || peopleIdx <= 0}
+            onClick={() => changePeople(-1)}
+          >−</button>
+          <span className={styles.presenceVal}>{peopleLabel(peopleIdx)}</span>
+          <button
+            className={styles.presenceBtn}
+            type="button"
+            disabled={sendingPeople || peopleIdx == null || peopleIdx >= 4}
+            onClick={() => changePeople(1)}
+          >+</button>
         </div>
       </div>
 
