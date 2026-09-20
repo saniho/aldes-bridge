@@ -99,23 +99,15 @@
   border: 1px solid var(--border);
   background: var(--bg-card);
   color: var(--text);
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
-}
-
-.btnAction:hover:not(:disabled) {
-  border-color: var(--border-strong);
-  background: var(--bg-node);
-}
-
-.btnAction:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
 }
 
 .btnAction.btnActive {
   border-color: var(--green);
   background: #22c55e12;
+}
+
+.btnStatus {
+  opacity: 0.6;
 }
 
 .btnIcon {
@@ -346,4 +338,49 @@
   font-size: 11px;
   color: var(--text-soft);
   font-variant-numeric: tabular-nums;
+}
+
+/* ── Consignes ── */
+.consigneList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.consigneRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--bg-node);
+  border: 1px solid var(--border);
+}
+
+.consigneZone {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  min-width: 60px;
+}
+
+.consigneVal {
+  font-size: 16px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.consigneStatus {
+  font-size: 11px;
+  color: #f59e0b;
+  margin-left: auto;
+}
+
+/* ── Dernière mise à jour ── */
+.lastUpdate {
+  font-size: 11px;
+  color: var(--text-faint);
+  text-align: center;
+  padding: 4px 0;
 }

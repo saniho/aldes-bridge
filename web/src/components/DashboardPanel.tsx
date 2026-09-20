@@ -59,6 +59,16 @@ function fmtDur(since: number | null | undefined, now: number): string {
   return `${Math.floor(s / 3600)}h${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}`
 }
 
+function fmtTime(ts: string | null | undefined): string {
+  if (!ts) return '—'
+  try {
+    const d = new Date(ts)
+    return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+  } catch {
+    return '—'
+  }
+}
+
 /* ── component ── */
 
 export default function DashboardPanel({ config, connected, health }: Props) {
@@ -99,6 +109,9 @@ export default function DashboardPanel({ config, connected, health }: Props) {
     ? zones.reduce((s, z) => s + (z.CurrentTemperature ?? 0), 0) / zones.filter((z) => z.CurrentTemperature != null).length
     : null
 
+  const consignes = config?.consignes ?? {}
+  const pendingConsignes = Object.entries(consignes).filter(([, c]) => !c.confirmed)
+
   return (
     <div className={styles.dash}>
       {/* ── 1. Header ── */}
@@ -124,19 +137,16 @@ export default function DashboardPanel({ config, connected, health }: Props) {
 
       {/* ── 3. Actions rapides ── */}
       <div className={styles.actions}>
-        <button className={styles.btnAction} type="button" disabled={!connected}>
+        <div className={styles.btnAction + ' ' + styles.btnStatus}>
           <span className={styles.btnIcon}>⏻</span>
           <span className={styles.btnLabel}>Arrêt</span>
-        </button>
-        <button
-          className={styles.btnAction + ' ' + (coOn ? styles.btnActive : '')}
-          type="button"
-          disabled={!connected}
-        >
+          <span className={styles.btnState}>{!connected ? 'Hors ligne' : 'Prêt'}</span>
+        </div>
+        <div className={styles.btnAction + ' ' + (coOn ? styles.btnActive : '')}>
           <span className={styles.btnIcon}>⚙</span>
           <span className={styles.btnLabel}>Compresseur</span>
           <span className={styles.btnState}>{coOn ? 'Marche' : 'Arrêt'}</span>
-        </button>
+        </div>
       </div>
 
       {/* ── 4. Extérieur ── */}
@@ -199,7 +209,30 @@ export default function DashboardPanel({ config, connected, health }: Props) {
         </div>
       </div>
 
-      {/* ── 7. Infos système ── */}
+      {/* ── 7. Consignes actives ── */}
+      {pendingConsignes.length > 0 && (
+        <div className={styles.section}>
+          <div className={styles.sectionTitle}>Consignes en attente</div>
+          <div className={styles.consigneList}>
+            {pendingConsignes.map(([zone, c]) => (
+              <div key={zone} className={styles.consigneRow}>
+                <span className={styles.consigneZone}>Zone {zone}</span>
+                <span className={styles.consigneVal}>{c.requested.toFixed(1)}°C</span>
+                <span className={styles.consigneStatus}>
+                  {c.confirmed ? 'Confirmée' : `En attente${c.attempts && c.attempts > 0 ? ` (essai ${c.attempts})` : ''}`}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── 8. Dernière mise à jour ── */}
+      <div className={styles.lastUpdate}>
+        Dernière mise à jour : {fmtTime(products[0]?.updatedAt) || fmtTime(products[0]?.lastUpdatedDate)}
+      </div>
+
+      {/* ── 9. Infos système ── */}
       <div className={styles.sysSection}>
         <button className={styles.sysToggle} type="button" onClick={() => setSysOpen(!sysOpen)}>
           <span>Infos système</span>
