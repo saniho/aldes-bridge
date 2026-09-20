@@ -38,12 +38,13 @@ function compressorOn(mfac: number | null | undefined): boolean {
   return mfac != null && mfac !== 0
 }
 
-const PEOPLE_LABELS = ['2', '3', '4', '5', '5+']
-
-function peopleLabel(idx: number | null | undefined): string {
-  if (idx == null || idx < 0 || idx > 4) return '—'
-  return PEOPLE_LABELS[idx]
-}
+const PEOPLE_OPTIONS = [
+  { idx: 0, label: '2 personnes' },
+  { idx: 1, label: '3 personnes' },
+  { idx: 2, label: '4 personnes' },
+  { idx: 3, label: '5 personnes' },
+  { idx: 4, label: '5+ personnes' },
+]
 
 function tempClass(v: number | null | undefined): string {
   if (v == null) return ''
@@ -120,11 +121,10 @@ export default function DashboardPanel({ config, connected, health }: Props) {
   const peopleIdx = ind?.settings?.people ?? null
   const clientId = products[0]?.modem
 
-  const changePeople = async (delta: number) => {
+  const changePeople = async (newIdx: number) => {
     if (sendingPeople || !clientId || peopleIdx == null) return
-    const next = Math.max(0, Math.min(4, peopleIdx + delta))
-    if (next === peopleIdx) return
-    const payload = JSON.stringify({ id: 1, jsonrpc: '2.0', method: 'changePeople', params: [String(next)] })
+    if (newIdx === peopleIdx) return
+    const payload = JSON.stringify({ id: 1, jsonrpc: '2.0', method: 'changePeople', params: [String(newIdx)] })
     setSendingPeople(true)
     try {
       await sendCommand(`devices/${clientId}/messages/devicebound`, payload, 1)
@@ -238,21 +238,16 @@ export default function DashboardPanel({ config, connected, health }: Props) {
       {/* ── 6b. Présence ── */}
       <div className={styles.presence}>
         <span className={styles.presenceLabel}>Présence</span>
-        <div className={styles.presenceControls}>
-          <button
-            className={styles.presenceBtn}
-            type="button"
-            disabled={sendingPeople || peopleIdx == null || peopleIdx <= 0}
-            onClick={() => changePeople(-1)}
-          >−</button>
-          <span className={styles.presenceVal}>{peopleLabel(peopleIdx)}</span>
-          <button
-            className={styles.presenceBtn}
-            type="button"
-            disabled={sendingPeople || peopleIdx == null || peopleIdx >= 4}
-            onClick={() => changePeople(1)}
-          >+</button>
-        </div>
+        <select
+          className={styles.presenceSelect}
+          value={peopleIdx ?? 0}
+          disabled={sendingPeople}
+          onChange={(e) => changePeople(Number(e.target.value))}
+        >
+          {PEOPLE_OPTIONS.map((o) => (
+            <option key={o.idx} value={o.idx}>{o.label}</option>
+          ))}
+        </select>
       </div>
 
       {/* ── 7. Consignes actives ── */}
