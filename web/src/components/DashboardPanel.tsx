@@ -84,9 +84,14 @@ export default function DashboardPanel({ config, connected, health }: Props) {
   const extTemp = health?.text_ext
   const extHum = zones[0]?.CurrentHumidity
   const coOn = compressorOn(health?.mfac)
-  const compressorOff = Number(health?.mfac) === 0
-  const hpc = !compressorOff && health?.hpc != null && Number(health.hpc) !== 0
-  const defr = !compressorOff && health?.defr != null && Number(health.defr) !== 0
+
+  const mfacVal = health?.mfac
+  const defrVal = health?.defr
+  const hpcVal = health?.hpc
+
+  const compressorOff = mfacVal == null || Number(mfacVal) === 0
+  const hpc = !compressorOff && hpcVal != null && Number(hpcVal) !== 0
+  const defr = !compressorOff && defrVal != null && Number(defrVal) !== 0
   const alertOn = hpc || defr
   const ned = ind?.qte_eau_chaude
 
