@@ -38,7 +38,7 @@ function compressorOn(mfac: number | null | undefined): boolean {
   return mfac != null && mfac !== 0
 }
 
-const PEOPLE_LABELS = ['2', '3', '4', '5', '6+']
+const PEOPLE_LABELS = ['2', '3', '4', '5', '5+']
 
 function peopleLabel(idx: number | null | undefined): string {
   if (idx == null || idx < 0 || idx > 4) return '—'
