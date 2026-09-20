@@ -1,0 +1,386 @@
+.dash {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+/* ── Header ── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 4px;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--text);
+  margin: 0;
+}
+
+.badgeOk, .badgeOff {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 12px;
+  border-radius: 20px;
+}
+
+.badgeOk {
+  color: var(--green);
+  background: #22c55e18;
+}
+
+.badgeOff {
+  color: #f87171;
+  background: #ef444418;
+}
+
+.dotGreen, .dotRed {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.dotGreen { background: var(--green); }
+.dotRed { background: #ef4444; }
+
+/* ── Alert ── */
+.alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: #f59e0b18;
+  border: 1px solid #f59e0b44;
+}
+
+.alertIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #f59e0b;
+  color: #000;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.alertText {
+  font-size: 13px;
+  font-weight: 500;
+  color: #fbbf24;
+}
+
+/* ── Actions ── */
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.btnAction {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 16px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+}
+
+.btnAction.btnActive {
+  border-color: var(--green);
+  background: #22c55e12;
+}
+
+.btnStatus {
+  opacity: 0.6;
+}
+
+.btnIcon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.btnLabel {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.btnState {
+  font-size: 11px;
+  color: var(--text-soft);
+}
+
+/* ── Section ── */
+.section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.sectionTitle {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 12px;
+}
+
+/* ── Extérieur ── */
+.twoCol {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.statCard {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--bg-node);
+  border: 1px solid var(--border);
+}
+
+.statLabel {
+  font-size: 11px;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.statValue {
+  font-size: 28px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  line-height: 1;
+}
+
+.statValue.cold { color: #60a5fa; }
+.statValue.cool { color: #38bdf8; }
+.statValue.warm { color: var(--green); }
+.statValue.hot { color: #f59e0b; }
+
+.unit {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-soft);
+  margin-left: 2px;
+}
+
+/* ── Zones ── */
+.zoneGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.zoneCell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 8px;
+  border-radius: 10px;
+  background: var(--bg-node);
+  border: 1px solid var(--border);
+}
+
+.zoneName {
+  font-size: 10px;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.zoneTemp {
+  font-size: 20px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.zoneTemp.cold { color: #60a5fa; }
+.zoneTemp.cool { color: #38bdf8; }
+.zoneTemp.warm { color: var(--green); }
+.zoneTemp.hot { color: #f59e0b; }
+
+.zoneAvg {
+  border-style: dashed;
+}
+
+/* ── ECS ── */
+.ecsBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.progressTrack {
+  flex: 1;
+  height: 10px;
+  background: var(--bg-node);
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--green);
+  border-radius: 5px;
+  transition: width 0.4s ease;
+}
+
+.progressFill.progressLow {
+  background: #f59e0b;
+}
+
+.ecsPct {
+  font-size: 16px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  min-width: 40px;
+  text-align: right;
+}
+
+.ecsMeta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+}
+
+.ecsMode {
+  font-size: 12px;
+  color: var(--text-soft);
+}
+
+/* ── Système ── */
+.sysSection {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.sysToggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--bg-card);
+  border: none;
+  color: var(--text-faint);
+  font-size: 11px;
+  font-family: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+.sysToggle:hover {
+  color: var(--text-soft);
+}
+
+.sysArrow {
+  font-size: 12px;
+  transition: transform 0.2s;
+}
+
+.sysArrowOpen {
+  transform: rotate(90deg);
+}
+
+.sysGrid {
+  padding: 0 14px 12px;
+  background: var(--bg-card);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sysRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sysLabel {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.sysVal {
+  font-size: 11px;
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Consignes ── */
+.consigneList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.consigneRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--bg-node);
+  border: 1px solid var(--border);
+}
+
+.consigneZone {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  min-width: 60px;
+}
+
+.consigneVal {
+  font-size: 16px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.consigneStatus {
+  font-size: 11px;
+  color: #f59e0b;
+  margin-left: auto;
+}
+
+/* ── Dernière mise à jour ── */
+.lastUpdate {
+  font-size: 11px;
+  color: var(--text-faint);
+  text-align: center;
+  padding: 4px 0;
+}
