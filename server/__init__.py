@@ -1,3 +1,3 @@
 """Aldes Bridge - serveur (moteur MQTT + API web)."""
 
-__version__ = "0.18.0.beta3"
+__version__ = "0.18.0.beta4"
