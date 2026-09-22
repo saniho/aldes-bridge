@@ -84,6 +84,7 @@ export default function DashboardPanel({ config, connected, health }: Props) {
   const [now, setNow] = useState(() => Date.now())
   const [sysOpen, setSysOpen] = useState(false)
   const [sendingPeople, setSendingPeople] = useState(false)
+  const [localPeopleIdx, setLocalPeopleIdx] = useState<number | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -118,18 +119,16 @@ export default function DashboardPanel({ config, connected, health }: Props) {
     ? zones.reduce((s, z) => s + (z.CurrentTemperature ?? 0), 0) / zones.filter((z) => z.CurrentTemperature != null).length
     : null
 
-  const peopleIdx = ind?.settings?.people ?? null
-  const clientId = products[0]?.modem
+  const peopleIdx = localPeopleIdx ?? ind?.settings?.people ?? 0
 
-  const changePeople = async (newIdx: number) => {
-    if (sendingPeople || !clientId || peopleIdx == null) return
-    if (newIdx === peopleIdx) return
-    const payload = JSON.stringify({ id: 1, jsonrpc: '2.0', method: 'changePeople', params: [String(newIdx)] })
+  async function changePeople(newIdx: number) {
+    if (sendingPeople || newIdx === peopleIdx) return
     setSendingPeople(true)
     try {
-      await sendCommand(`devices/${clientId}/messages/devicebound`, payload, 1)
+      await sendCommand('aldes/set/people', String(newIdx), 1)
+      setLocalPeopleIdx(newIdx)
     } catch {
-      // silently ignore
+      /* ignore */
     } finally {
       setSendingPeople(false)
     }
@@ -235,22 +234,25 @@ export default function DashboardPanel({ config, connected, health }: Props) {
         </div>
       </div>
 
-      {/* ── 6b. Présence ── */}
-      <div className={styles.presence}>
-        <span className={styles.presenceLabel}>Présence</span>
-        <select
-          className={styles.presenceSelect}
-          value={peopleIdx ?? 0}
-          disabled={sendingPeople}
-          onChange={(e) => changePeople(Number(e.target.value))}
-        >
-          {PEOPLE_OPTIONS.map((o) => (
-            <option key={o.idx} value={o.idx}>{o.label}</option>
-          ))}
-        </select>
+      {/* ── 7. Présence ── */}
+      <div className={styles.section}>
+        <div className={styles.sectionTitle}>Présence</div>
+        <div className={styles.presence}>
+          <span className={styles.presenceLabel}>Nombre de personnes</span>
+          <select
+            className={styles.presenceSelect}
+            value={peopleIdx}
+            disabled={sendingPeople}
+            onChange={(e) => changePeople(Number(e.target.value))}
+          >
+            {PEOPLE_OPTIONS.map((o) => (
+              <option key={o.idx} value={o.idx}>{o.label}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
-      {/* ── 7. Consignes actives ── */}
+      {/* ── 8. Consignes actives ── */}
       {pendingConsignes.length > 0 && (
         <div className={styles.section}>
           <div className={styles.sectionTitle}>Consignes en attente</div>
@@ -268,12 +270,12 @@ export default function DashboardPanel({ config, connected, health }: Props) {
         </div>
       )}
 
-      {/* ── 8. Dernière mise à jour ── */}
+      {/* ── 9. Dernière mise à jour ── */}
       <div className={styles.lastUpdate}>
         Dernière mise à jour : {fmtTime(products[0]?.updatedAt) || fmtTime(products[0]?.lastUpdatedDate)}
       </div>
 
-      {/* ── 9. Infos système ── */}
+      {/* ── 10. Infos système ── */}
       <div className={styles.sysSection}>
         <button className={styles.sysToggle} type="button" onClick={() => setSysOpen(!sysOpen)}>
           <span>Infos système</span>
