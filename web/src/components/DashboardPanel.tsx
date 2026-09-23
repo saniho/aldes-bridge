@@ -119,13 +119,23 @@ export default function DashboardPanel({ config, connected, health }: Props) {
     ? zones.reduce((s, z) => s + (z.CurrentTemperature ?? 0), 0) / zones.filter((z) => z.CurrentTemperature != null).length
     : null
 
-  const peopleIdx = localPeopleIdx ?? ind?.settings?.people ?? 0
+  const apiPeopleIdx = ind?.settings?.people ?? 0
+  const peopleIdx = localPeopleIdx ?? apiPeopleIdx
+  const clientId = products[0]?.modem
+
+  useEffect(() => {
+    if (localPeopleIdx !== null && localPeopleIdx === apiPeopleIdx) {
+      setLocalPeopleIdx(null)
+    }
+  }, [apiPeopleIdx])
 
   async function changePeople(newIdx: number) {
     if (sendingPeople || newIdx === peopleIdx) return
+    if (!clientId) return
     setSendingPeople(true)
     try {
-      await sendCommand('aldes/set/people', String(newIdx), 1)
+      const payload = JSON.stringify({ id: 1, jsonrpc: '2.0', method: 'changePeople', params: [String(newIdx)] })
+      await sendCommand(`devices/${clientId}/messages/devicebound`, payload, 1)
       setLocalPeopleIdx(newIdx)
     } catch {
       /* ignore */
