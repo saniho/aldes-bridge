@@ -185,7 +185,7 @@ def build_product(telemetry, connected):
     water_mode = WATER_MODES[water_index] if 0 <= water_index < len(WATER_MODES) else None
     people = _num(telemetry.get("NpiH"))
     if people is not None:
-        people = max(0, min(_HOME_COMPOSITION_MAX - 1, int(people) - 2))
+        people = max(0, min(_HOME_COMPOSITION_MAX - 1, int(people)))
     temp = _num(telemetry.get("MT0"))
 
     return {

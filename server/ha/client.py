@@ -543,7 +543,7 @@ class HADiscoveryClient(threading.Thread):
         npih = data.get("NpiH")
         if npih is not None:
             try:
-                people_idx = max(0, min(4, int(npih) - 2))
+                people_idx = max(0, min(4, int(npih)))
             except (ValueError, TypeError):
                 people_idx = 0
             self._safe_send(mqtt.build_publish(
