@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getProducts } from '../api'
+import { getProducts, sendCommand } from '../api'
 import type { AldesProduct, AldesThermostat, Config, HealthData } from '../types'
 import styles from './DashboardPanel.module.css'
 
@@ -38,6 +38,14 @@ function compressorOn(mfac: number | null | undefined): boolean {
   return mfac != null && mfac !== 0
 }
 
+const PEOPLE_OPTIONS = [
+  { idx: 0, label: '2 personnes' },
+  { idx: 1, label: '3 personnes' },
+  { idx: 2, label: '4 personnes' },
+  { idx: 3, label: '5 personnes' },
+  { idx: 4, label: '5+ personnes' },
+]
+
 function tempClass(v: number | null | undefined): string {
   if (v == null) return ''
   if (v < 5) return styles.cold
@@ -75,6 +83,8 @@ export default function DashboardPanel({ config, connected, health }: Props) {
   const [products, setProducts] = useState<AldesProduct[]>([])
   const [now, setNow] = useState(() => Date.now())
   const [sysOpen, setSysOpen] = useState(false)
+  const [sendingPeople, setSendingPeople] = useState(false)
+  const [localPeopleIdx, setLocalPeopleIdx] = useState<number | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -108,6 +118,31 @@ export default function DashboardPanel({ config, connected, health }: Props) {
   const avgTemp = zones.length > 0
     ? zones.reduce((s, z) => s + (z.CurrentTemperature ?? 0), 0) / zones.filter((z) => z.CurrentTemperature != null).length
     : null
+
+  const apiPeopleIdx = ind?.settings?.people ?? 0
+  const peopleIdx = localPeopleIdx ?? apiPeopleIdx
+  const clientId = products[0]?.modem
+
+  useEffect(() => {
+    if (localPeopleIdx !== null && localPeopleIdx === apiPeopleIdx) {
+      setLocalPeopleIdx(null)
+    }
+  }, [apiPeopleIdx])
+
+  async function changePeople(newIdx: number) {
+    if (sendingPeople || newIdx === peopleIdx) return
+    if (!clientId) return
+    setSendingPeople(true)
+    try {
+      const payload = JSON.stringify({ id: 1, jsonrpc: '2.0', method: 'changePeople', params: [String(newIdx)] })
+      await sendCommand(`devices/${clientId}/messages/devicebound`, payload, 1)
+      setLocalPeopleIdx(newIdx)
+    } catch {
+      /* ignore */
+    } finally {
+      setSendingPeople(false)
+    }
+  }
 
   const consignes = config?.consignes ?? {}
   const pendingConsignes = Object.entries(consignes).filter(([, c]) => !c.confirmed)
@@ -209,7 +244,25 @@ export default function DashboardPanel({ config, connected, health }: Props) {
         </div>
       </div>
 
-      {/* ── 7. Consignes actives ── */}
+      {/* ── 7. Présence ── */}
+      <div className={styles.section}>
+        <div className={styles.sectionTitle}>Présence</div>
+        <div className={styles.presence}>
+          <span className={styles.presenceLabel}>Nombre de personnes</span>
+          <select
+            className={styles.presenceSelect}
+            value={peopleIdx}
+            disabled={sendingPeople}
+            onChange={(e) => changePeople(Number(e.target.value))}
+          >
+            {PEOPLE_OPTIONS.map((o) => (
+              <option key={o.idx} value={o.idx}>{o.label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* ── 8. Consignes actives ── */}
       {pendingConsignes.length > 0 && (
         <div className={styles.section}>
           <div className={styles.sectionTitle}>Consignes en attente</div>
@@ -227,12 +280,12 @@ export default function DashboardPanel({ config, connected, health }: Props) {
         </div>
       )}
 
-      {/* ── 8. Dernière mise à jour ── */}
+      {/* ── 9. Dernière mise à jour ── */}
       <div className={styles.lastUpdate}>
         Dernière mise à jour : {fmtTime(products[0]?.updatedAt) || fmtTime(products[0]?.lastUpdatedDate)}
       </div>
 
-      {/* ── 9. Infos système ── */}
+      {/* ── 10. Infos système ── */}
       <div className={styles.sysSection}>
         <button className={styles.sysToggle} type="button" onClick={() => setSysOpen(!sysOpen)}>
           <span>Infos système</span>

@@ -384,3 +384,32 @@
   text-align: center;
   padding: 4px 0;
 }
+
+/* ── Présence ── */
+.presence {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--bg-node);
+  border: 1px solid var(--border);
+}
+
+.presenceLabel {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.presenceSelect {
+  font-size: 14px;
+  font-weight: 500;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
