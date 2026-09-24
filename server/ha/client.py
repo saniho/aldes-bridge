@@ -140,6 +140,7 @@ class HADiscoveryClient(threading.Thread):
             (f"{self.prefix}/set/vacation_start", 1),
             (f"{self.prefix}/set/vacation_end", 1),
             (f"{self.prefix}/set/vacation_enable", 1),
+            (f"{self.prefix}/set/people", 1),
         ]
         for zi in range(10):
             cmd_topics.append((f"{self.prefix}/set/zone{zi}/consigne", 1))
@@ -240,6 +241,8 @@ class HADiscoveryClient(threading.Thread):
                 self._handle_vacation_end_command(payload)
             elif topic == f"{self.prefix}/set/vacation_enable":
                 self._handle_vacation_enable_command(payload)
+            elif topic == f"{self.prefix}/set/people":
+                self._handle_people_command(payload)
         except Exception as exc:
             _log.warning("ha-discovery: erreur commande %s: %s", topic, exc)
 
@@ -343,6 +346,19 @@ class HADiscoveryClient(threading.Thread):
         else:
             self._inject_aldes_command("changeVacation", ["0", "0"])
             _log.info("ha-discovery: vacances desactivees")
+
+    def _handle_people_command(self, payload):
+        try:
+            idx = int(payload)
+        except (ValueError, TypeError):
+            _log.warning("ha-discovery: people index invalide: %s", payload)
+            return
+        idx = max(0, min(4, idx))
+        self._inject_aldes_command("changePeople", [str(idx)])
+        self._safe_send(mqtt.build_publish(
+            f"{self.prefix}/state/people", str(idx), qos=1, retain=True
+        ))
+        _log.info("ha-discovery: people -> index %d (%d personnes)", idx, idx + 2)
 
     def _inject_aldes_command(self, method, params):
         body = {
@@ -524,6 +540,16 @@ class HADiscoveryClient(threading.Thread):
                 f"{self.prefix}/state/sensor/NED", f"{ned:.0f}", qos=1, retain=True
             ))
 
+        npih = data.get("NpiH")
+        if npih is not None:
+            try:
+                people_idx = max(0, min(4, int(npih)))
+            except (ValueError, TypeError):
+                people_idx = 0
+            self._safe_send(mqtt.build_publish(
+                f"{self.prefix}/state/people", str(people_idx), qos=1, retain=True
+            ))
+
         tbb = safe_float(data.get("TBBa"))
         if tbb is not None:
             self._safe_send(mqtt.build_publish(
@@ -546,7 +572,7 @@ class HADiscoveryClient(threading.Thread):
         for aldes_key in ("RVeI", "Dno", "Dma", "Dint", "DLN", "DPLe", "DmCO"):
             val = safe_float(data.get(aldes_key))
             if val is not None:
-                if aldes_key == "RVeI":
+                if aldes_key != "RVeI":
                     val = val / 10.0
                 self._safe_send(mqtt.build_publish(
                     f"{self.prefix}/state/sensor/{aldes_key}", f"{val:.0f}", qos=1, retain=True

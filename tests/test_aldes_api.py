@@ -155,9 +155,9 @@ def test_modes_letters():
 
 
 def test_people_isf_home_composition_index():
-    # NpiH=4 personnes -> index enum (people+2 affiche = 4)
-    assert build_product(TELEMETRY, True)["indicator"]["settings"]["people"] == 2
-    assert build_product({**TELEMETRY, "NpiH": 2}, True)["indicator"]["settings"]["people"] == 0
+    # NpiH est directement l'index (0-4)
+    assert build_product(TELEMETRY, True)["indicator"]["settings"]["people"] == 4
+    assert build_product({**TELEMETRY, "NpiH": 2}, True)["indicator"]["settings"]["people"] == 2
     assert build_product({**TELEMETRY, "NpiH": 9}, True)["indicator"]["settings"]["people"] == 4
 
 

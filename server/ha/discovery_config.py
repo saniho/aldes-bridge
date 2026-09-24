@@ -309,6 +309,23 @@ def build_discovery_config(device_id, profile, prefix="aldes", data=None,
     }
     configs.append((f"{discovery_prefix}/switch/vacation_enable/config", json.dumps(vacation_enable_config, ensure_ascii=False)))
 
+    people_config = {
+        "name": "Nombre de personnes",
+        "unique_id": f"aldes_{device_id}_people",
+        "state_topic": f"{prefix}/state/people",
+        "command_topic": f"{prefix}/set/people",
+        "min": 0,
+        "max": 4,
+        "step": 1,
+        "mode": "slider",
+        "device": {"identifiers": [f"aldes_{device_id}"]},
+        "icon": "mdi:account-group",
+        "availability_topic": f"{prefix}/state/available",
+        "payload_available": "online",
+        "payload_not_available": "offline",
+    }
+    configs.append((f"{discovery_prefix}/number/aldes_people/config", json.dumps(people_config, ensure_ascii=False)))
+
     bridge_status_config = {
         "name": "Aldes Bridge Status",
         "unique_id": f"aldes_{device_id}_bridge_status",
