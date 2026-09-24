@@ -215,7 +215,7 @@ def test_api_consigne_post():
 
 def test_api_history_series_start_ge_end_returns_400():
     import tempfile
-    db = HistoryDB(tempfile.mktemp(), retention_days=30)
+    db = HistoryDB(tempfile.NamedTemporaryFile(suffix=".db", delete=False).name, retention_days=30)
     state = AppState("h", 8883, EventBus(), history=db)
     port, _, _ = _start_web(state)
     try:
@@ -230,7 +230,7 @@ def test_api_history_series_start_ge_end_returns_400():
 
 def test_api_history_table_start_ge_end_returns_400():
     import tempfile
-    db = HistoryDB(tempfile.mktemp(), retention_days=30)
+    db = HistoryDB(tempfile.NamedTemporaryFile(suffix=".db", delete=False).name, retention_days=30)
     state = AppState("h", 8883, EventBus(), history=db)
     port, _, _ = _start_web(state)
     try:
@@ -243,7 +243,7 @@ def test_api_history_table_start_ge_end_returns_400():
 
 def test_api_history_series_bucket_negative_returns_400():
     import tempfile
-    db = HistoryDB(tempfile.mktemp(), retention_days=30)
+    db = HistoryDB(tempfile.NamedTemporaryFile(suffix=".db", delete=False).name, retention_days=30)
     state = AppState("h", 8883, EventBus(), history=db)
     port, _, _ = _start_web(state)
     try:

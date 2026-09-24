@@ -95,7 +95,9 @@ def create_app(state, engine, web_dir):
     def spa_fallback(rest: str):
         if rest.startswith("api/"):
             return JSONResponse(status_code=404, content={"error": "not found"})
-        full = os.path.join(web_dir, rest)
+        full = os.path.normpath(os.path.join(web_dir, rest))
+        if not full.startswith(web_dir):
+            return JSONResponse(status_code=403, content={"error": "forbidden"})
         if os.path.isfile(full):
             return FileResponse(full)
         idx = _build_index()
