@@ -166,11 +166,15 @@ def build_ventilation(telemetry):
     """Construit les donnees de ventilation depuis la telemetrie.
 
     Renvoie un dict avec les cles ou None si aucune donnee n'est presente.
+    Les debits (Dno, Dma, Dint, DLN, DPLe, DmCO) sont divises par 10
+    car le box Aldes les renvoie en dixieme de m3/h.
     """
     keys = ("RVeI", "Dno", "Dma", "Dint", "DLN", "DPLe", "DmCO")
     vent = {}
     for key in keys:
         val = _num(telemetry.get(key))
+        if val is not None and key != "RVeI":
+            val = val / 10
         if val is not None:
             vent[key.lower()] = val
     return vent if vent else None
