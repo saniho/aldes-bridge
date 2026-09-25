@@ -106,13 +106,11 @@ export default function DashboardPanel({ config, connected, health }: Props) {
   const coOn = compressorOn(health?.mfac)
 
   const mfacVal = health?.mfac
-  const defrVal = health?.defr
   const hpcVal = health?.hpc
 
   const compressorOff = mfacVal == null || Number(mfacVal) === 0
   const hpc = !compressorOff && hpcVal != null && Number(hpcVal) !== 0
-  const defr = !compressorOff && defrVal != null && Number(defrVal) !== 0
-  const alertOn = hpc || defr
+  const alertOn = hpc
   const ned = ind?.qte_eau_chaude
 
   const avgTemp = zones.length > 0
@@ -164,8 +162,6 @@ export default function DashboardPanel({ config, connected, health }: Props) {
           <span className={styles.alertIcon}>!</span>
           <span className={styles.alertText}>
             {hpc && 'Pression circuit haute'}
-            {hpc && defr && ' · '}
-            {defr && 'Défaut dégivrage'}
           </span>
         </div>
       )}

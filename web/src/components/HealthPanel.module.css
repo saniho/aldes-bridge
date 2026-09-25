@@ -93,6 +93,10 @@
   background: var(--out);
 }
 
+.dotMuted {
+  background: var(--text-faint);
+}
+
 .dotAlert {
   background: #ef4444;
 }
@@ -112,8 +116,17 @@
   background: #ef444410;
 }
 
+.statusRow.warn {
+  border-color: var(--line-out);
+  background: #f59e0b11;
+}
+
 .statusRow.ok {
   border-color: var(--line-green);
+  background: transparent;
+}
+
+.statusRow.muted {
   background: transparent;
 }
 
@@ -127,6 +140,10 @@
   font-size: 13px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+}
+
+.statusValue.muted {
+  color: var(--text-faint);
 }
 
 .sectionSep {

@@ -229,9 +229,9 @@ de la PAC en temps réel, basé sur les clés santé de la télémétrie Aldes.
 | Pressions circuit | PreH, dHi, dLo | Pression haute (bar), delta haut/bas |
 | Environnement | Text, RVeI | Température extérieure (°C), vitesse ventilateur (tr/min) |
 | Températures avancées | TAin, TAHU, TAHL, TEHG, TEHL, TEHU, TUeH, THGa | Air entrée, échangeur (bas/haut/gaz/liquide/haut), unité extérieure, gaine air |
-| Alertes | HPC, Defr | Haute pression compresseur, défaut circuit froid |
+| Alertes | HPC, Defr | Haute pression compresseur, état du dégivrage |
 
-L'alerte Defr est automatiquement masquée ("N/A (clim off)") quand le compresseur est arrêté.
+`Defr` est affiché comme un état de dégivrage : `Inactif`, `Actif` ou `Inconnu`. Une valeur active ne déclenche pas une alerte du dashboard.
 
 Les valeurs sentinelles (≤ -40 °C) des capteurs non connectés sont automatiquement filtrées.
 
@@ -432,7 +432,7 @@ Le panneau **Dashboard** affiche les informations essentielles de la PAC en un s
 | Section | Contenu |
 |---------|---------|
 | Header | Nom + badge connexion (Connectée / Hors ligne) |
-| Alertes | Bannière orange si haute pression compresseur ou défaut dégivrage (masqué si compresseur arrêté) |
+| Alertes | Bannière orange uniquement si haute pression compresseur (HPC) |
 | État | Compresseur (marche/arrêt) — indicateur visuel non cliquable |
 | Extérieur | Température + humidité extérieure (2 colonnes) |
 | Zones | Grille 3 colonnes des zones climatisées + moyenne automatique |
