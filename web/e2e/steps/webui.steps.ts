@@ -342,3 +342,40 @@ When('je change le profil pour {texte}', async ({ page }, profileId: string) => 
   const select = page.locator('.profileSelect, select').filter({ has: page.locator(`option[value="${profileId}"]`) }).first()
   await select.selectOption(profileId)
 })
+
+Given('le snapshot simule un dégivrage actif', async ({ page }) => {
+  const config = {
+    mode: 'proxy',
+    connected: false,
+    client_id: null,
+    topics: [],
+    consignes: {},
+    server_version: '0.18.3',
+    ui_version: '0.18.3',
+    health: { mfac: 3, defr: 1, hpc: 0 }
+  }
+  const snapshot = { kind: 'snapshot', config, messages: [] }
+  const jsonHeaders = { 'content-type': 'application/json' }
+  await page.route('**/api/config', async (route) => {
+    await route.fulfill({ status: 200, headers: jsonHeaders, body: JSON.stringify(config) })
+  })
+  await page.route('**/api/events', async (route) => {
+    await route.fulfill({
+      status: 200,
+      headers: { 'content-type': 'text/event-stream' },
+      body: `data: ${JSON.stringify(snapshot)}\n\n`
+    })
+  })
+  await page.route('**/aldesoc/v5/users/me/products', async (route) => {
+    await route.fulfill({ status: 200, headers: jsonHeaders, body: '[]' })
+  })
+})
+
+Then('aucune alerte de dégivrage n’est affichée', async ({ page }) => {
+  await expect(page.getByText('Défaut dégivrage', { exact: false })).not.toBeVisible({ timeout: 10000 })
+})
+
+Then('le statut de dégivrage est Actif', async ({ page }) => {
+  await expect(page.getByText('Dégivrage (Defr)')).toBeVisible({ timeout: 10000 })
+  await expect(page.getByText('Actif', { exact: true })).toBeVisible()
+})

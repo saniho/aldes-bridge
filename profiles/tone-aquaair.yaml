@@ -148,7 +148,7 @@ history_labels:
         - { key: NbME, label: "Nombre de modes éco" }
         - { key: dt, label: "Horodatage dernier relevé (epoch)" }
         - { key: Ddef, label: "Compteur dégivrage" }
-        - { key: Defr, label: "Défaut circuit froid (état)" }
+        - { key: Defr, label: "Dégivrage (état)" }
         - { key: Dev, label: "État (non documenté)" }
     - name: "Divers / non documenté"
       keys:

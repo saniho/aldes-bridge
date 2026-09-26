@@ -97,7 +97,7 @@ const EXACT: Record<string, KeyMeta> = {
   NbME: { family: 'Système & connexion', label: 'Nombre de modes éco' },
   dt: { family: 'Système & connexion', label: 'Horodatage dernier relevé (epoch)' },
   Ddef: { family: 'Système & connexion', label: 'Compteur dégivrage' },
-  Defr: { family: 'Système & connexion', label: 'Défaut circuit froid (état)' },
+  Defr: { family: 'Système & connexion', label: 'Dégivrage (état)' },
   Dev: { family: 'Système & connexion', label: 'État (non documenté)' },
 
   // Divers / non documenté

@@ -54,6 +54,23 @@ def test_capture_telemetry_merges_by_product():
     assert state.telemetry["X_TONE"]["UAM"] == 3
 
 
+def test_health_exposes_defr_as_state_not_alert():
+    state = make_state()
+    capture_telemetry(state, json.dumps({
+        "productid": "X_TONE",
+        "MfAc": 3,
+        "Defr": 1,
+        "Ddef": 0,
+        "HPC": 0,
+    }))
+
+    health = state.snapshot()["health"]
+    assert health["mfac"] == 3
+    assert health["defr"] == 1
+    assert health["hpc"] == 0
+    assert "ddef" not in health
+
+
 def test_capture_telemetry_ignores_non_telemetry():
     state = make_state()
     capture_telemetry(state, "pas du json")

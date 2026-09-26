@@ -17,6 +17,7 @@ from .config import ConfigStore
 from .device_profile import load_profile
 from .ha.mode_mappings import rebuild_from_profile
 from . import __version__ as BACKEND_VERSION
+from .version import format_banner, read_ui_version
 from .events import EventBus
 from .engine import Engine
 from .eventlog import EventLog
@@ -222,9 +223,9 @@ def main(argv=None):
     events = EventBus(args.history_size, log=log)
     restored = events.restore_from_log(args.history_size)
 
-    ui_version = os.environ.get("ALDES_UI_VERSION", "?")
+    ui_version = os.environ.get("ALDES_UI_VERSION") or read_ui_version(args.web_dir)
     addon_version = os.environ.get("ALDES_ADDON_VERSION", "?")
-    _log.info("=== Aldes Bridge v%s | UI v%s | Add-on v%s ===", BACKEND_VERSION, ui_version, addon_version)
+    _log.info("%s", format_banner(BACKEND_VERSION, ui_version, addon_version))
 
     config = ConfigStore(args.config_file)
 

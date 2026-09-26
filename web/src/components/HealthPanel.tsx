@@ -33,11 +33,14 @@ function mfecLabel(val: number | null | undefined): string {
   return String(val)
 }
 
-function fmtDefr(defr: number | null | undefined, mfac: number | null | undefined): { text: string; cls: string } {
-  const compressorOff = Number(mfac) === 0
-  if (compressorOff) return { text: 'N/A (clim off)', cls: '' }
-  if (Number(defr) !== 0) return { text: 'ALERTE', cls: 'alert' }
-  return { text: 'Pas de défaut', cls: 'ok' }
+type StatusTone = 'ok' | 'warn' | 'muted'
+
+function fmtDefr(defr: number | null | undefined, mfac: number | null | undefined): { text: string; tone: StatusTone } {
+  if (mfac === 0) return { text: 'N/A (clim off)', tone: 'muted' }
+  if (defr === null || defr === undefined) return { text: 'Inconnu', tone: 'muted' }
+  if (defr === 0) return { text: 'Inactif', tone: 'ok' }
+  if (defr === 1) return { text: 'Actif', tone: 'warn' }
+  return { text: `Valeur inattendue (${defr})`, tone: 'muted' }
 }
 
 export default function HealthPanel({ health }: Props) {
@@ -50,6 +53,12 @@ export default function HealthPanel({ health }: Props) {
       </div>
     )
   }
+
+  const hpcActive = health.hpc != null && health.hpc !== 0
+  const defrStatus = fmtDefr(health.defr, health.mfac)
+  const defrRowTone = defrStatus.tone === 'ok' ? styles.ok : defrStatus.tone === 'warn' ? styles.warn : styles.muted
+  const defrValueTone = defrStatus.tone === 'ok' ? styles.ok : defrStatus.tone === 'warn' ? styles.warn : styles.muted
+  const defrDotTone = defrStatus.tone === 'ok' ? styles.dotOk : defrStatus.tone === 'warn' ? styles.dotWarn : styles.dotMuted
 
   const advancedTemps: { key: keyof HealthData; label: string }[] = [
     { key: 'tain', label: 'Air entrée' },
@@ -131,18 +140,18 @@ export default function HealthPanel({ health }: Props) {
       <div className={styles.card}>
         <div className={styles.cardTitle}>Alertes</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div className={styles.statusRow + ' ' + (health.hpc && health.hpc !== 0 ? ' ' + styles.alert : ' ' + styles.ok)}>
-            <span className={'dot ' + (health.hpc && health.hpc !== 0 ? styles.dotAlert : styles.dotOk)} />
+          <div className={styles.statusRow + ' ' + (hpcActive ? styles.alert : styles.ok)}>
+            <span className={'dot ' + (hpcActive ? styles.dotAlert : styles.dotOk)} />
             <span className={styles.statusLabel}>Haute pression compresseur (HPC)</span>
-            <span className={styles.statusValue + ' ' + (health.hpc && health.hpc !== 0 ? styles.alert : styles.ok)}>
-              {health.hpc && health.hpc !== 0 ? 'ALERTE' : 'Normal'}
+            <span className={styles.statusValue + ' ' + (hpcActive ? styles.alert : styles.ok)}>
+              {hpcActive ? 'ALERTE' : 'Normal'}
             </span>
           </div>
-          <div className={styles.statusRow + ' ' + (fmtDefr(health.defr, health.mfac).cls === 'alert' ? ' ' + styles.alert : ' ' + styles.ok)}>
-            <span className={'dot ' + (fmtDefr(health.defr, health.mfac).cls === 'alert' ? styles.dotAlert : styles.dotOk)} />
-            <span className={styles.statusLabel}>Défaut circuit froid (Defr)</span>
-            <span className={styles.statusValue + ' ' + (fmtDefr(health.defr, health.mfac).cls === 'alert' ? styles.alert : styles.ok)}>
-              {fmtDefr(health.defr, health.mfac).text}
+          <div className={styles.statusRow + ' ' + defrRowTone}>
+            <span className={'dot ' + defrDotTone} />
+            <span className={styles.statusLabel}>Dégivrage (Defr)</span>
+            <span className={styles.statusValue + ' ' + defrValueTone}>
+              {defrStatus.text}
             </span>
           </div>
         </div>
