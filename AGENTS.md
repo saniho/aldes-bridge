@@ -51,12 +51,13 @@ Fichiers à modifier :
 | Addon stable | `aldes-haos-addons/aldes-bridge/config.yaml` | `version: "x.y.z"` |
 | Addon beta| `aldes-haos-addons/aldes-bridge-beta/config.yaml` | `version: "x.y.z"` |
 | Dockerfile stable | `aldes-haos-addons/aldes-bridge/Dockerfile` | `CACHEBUST=vX.Y.Z` + `ALDES_ADDON_VERSION=vX.Y.Z` |
-| Dockerfile beta   | `aldes-haos-addons/aldes-bridge-beta/Dockerfile` | `CACHEBUST=vX.Y.Z-beta` + `ALDES_ADDON_VERSION=vX.Y.Z-beta` |
+| Dockerfile beta   | `aldes-haos-addons/aldes-bridge-beta/Dockerfile` | `CACHEBUST=vX.Y.Z-betaN` + `ALDES_ADDON_VERSION=vX.Y.Z-betaN` |
 
 **Règle beta vs stable :**
 - **Branche `feature/*` ou `fix/*`** (avant merge sur `main`) → bump **uniquement** `aldes-bridge-beta/config.yaml` + son Dockerfile. Ne PAS toucher au config stable.
 - **Merge sur `main`** (release) → bump `aldes-bridge/config.yaml` + son Dockerfile. Ne PAS toucher au config beta (déjà bumpé sur la feature branch).
-- Le suffixe `.betaN` (ex: `0.13.2.beta1`) s'utilise uniquement pour le beta. Le stable utilise un semver strict (`0.13.2`).
+- Le suffixe `-betaN` (ex: `0.13.2-beta1`) s'utilise uniquement pour le beta. Le stable utilise un semver strict (`0.13.2`).
+- Le format est **unique** : la même chaîne est utilisée dans `server/__init__.py`, `web/package.json` et le `config.yaml` de l'add-on (`0.19.1.beta1` / `0.19.1-beta.1` / `0.19.1-beta1` sont interdits). `tests/test_version.py` vérifie cette cohérence.
 
 **IMPORTANT :** les `CACHEBUST` et `ALDES_ADDON_VERSION` dans les Dockerfiles **doivent** être bumpés à chaque changement de version. Sans cela, Docker utilise le cache et ne reclone pas le repo — la version affichée dans les logs reste l'ancienne.
 
