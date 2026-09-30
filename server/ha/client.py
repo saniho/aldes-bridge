@@ -422,14 +422,14 @@ class HADiscoveryClient(threading.Thread):
             "method": method,
             "params": params if isinstance(params, list) else [params],
         }
-        dry_run = self.state.config.get("ha_mqtt_dry_run") if self.state.config else self.dry_run
-        if dry_run:
+        # The settings API updates self.dry_run on toggle; state.config would override the startup value with its False default.
+        if self.dry_run:
             _log.info("ha-discovery [DRY-RUN]: commande simulée: %s", json.dumps(body, ensure_ascii=False))
             return
         hook = getattr(self.state, "_ha_inject_hook", None)
         if hook:
             hook(
-                f"devices/{self._device_id}/messages/devicebound",
+                f"devices/{self.state._client_id or self._device_id}/messages/devicebound",
                 json.dumps(body, ensure_ascii=False),
                 1,
             )
