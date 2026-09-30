@@ -137,7 +137,7 @@ DEFAULT_PROFILE_ID = "tone-aquaair"
 
 
 def load_profile(profile_id=None, profiles_dir=None):
-    """Charge un profil par son ID (defaut : tone-aquaair, sinon le premier disponible)."""
+    """Charge un profil par son ID. Si profile_id est None, charge le premier profil disponible."""
     d = profiles_dir or PROFILES_DIR
     if profile_id is None:
         return _load_profile(DEFAULT_PROFILE_ID, d) or _load_profile(None, d)

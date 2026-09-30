@@ -9,7 +9,7 @@ _log = logging.getLogger("aldes-ha-discovery")
 def detect_mqtt_broker():
     """Détecte le broker MQTT via l'API Supervisor (HA OS).
 
-    Retourne {"host", "port", "username", "password"} ou None si pas en mode add-on HA.
+    Retourne {"host": ..., "port": ...} ou None si pas en mode add-on HA.
     """
     token = os.environ.get("SUPERVISOR_TOKEN")
     if not token:
