@@ -62,33 +62,28 @@ class ProxyHandler(MQTTEndpoint):
         try:
             t1.join(); t2.join()
         finally:
+            for s in (self.real_tls, self.real_sock):
+                try:
+                    s.close()
+                except Exception:
+                    pass
             if not self.stale:
                 self.state.cloud_down()
 
     def _teardown(self):
         """Dechire tout le relais quand un cote meurt : shutdown() de chaque
-        socket pour reveiller les threads bloques en recv/sendall (un simple
-        close() depuis un autre thread ne reveille pas un recv sous Linux),
-        puis fermeture."""
+        socket reveille les threads bloques en recv/sendall. Pas de close() ici :
+        fermer un fd pendant qu'un autre thread attend en poll() dans une lecture
+        SSL le laisse bloque jusqu'a son timeout. run() et l'engine ferment."""
         self._closed = True
         for s in (self.real_sock, self.real_tls, self.box_sock):
             try:
                 s.shutdown(socket.SHUT_RDWR)
             except Exception:
                 pass
-        for s in (self.real_sock, self.real_tls, self.box_sock):
-            try:
-                s.close()
-            except Exception:
-                pass
 
     def shutdown(self):
-        self._closed = True
-        for s in (self.box_sock, self.real_tls, self.real_sock):
-            try:
-                s.close()
-            except Exception:
-                pass
+        self._teardown()
 
     def _send_box(self, data):
         with self._box_write_lock:
