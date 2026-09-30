@@ -133,9 +133,18 @@ class DeviceProfile:
         }
 
 
+DEFAULT_PROFILE_ID = "tone-aquaair"
+
+
 def load_profile(profile_id=None, profiles_dir=None):
-    """Charge un profil par son ID. Si profile_id est None, charge le premier profil disponible."""
+    """Charge un profil par son ID (defaut : tone-aquaair, sinon le premier disponible)."""
     d = profiles_dir or PROFILES_DIR
+    if profile_id is None:
+        return _load_profile(DEFAULT_PROFILE_ID, d) or _load_profile(None, d)
+    return _load_profile(profile_id, d)
+
+
+def _load_profile(profile_id, d):
     if not os.path.isdir(d):
         return None
     for fname in sorted(os.listdir(d)):
