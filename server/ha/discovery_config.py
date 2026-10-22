@@ -438,6 +438,27 @@ def build_discovery_config(device_id, profile, prefix="aldes", data=None,
         }
         configs.append((f"{discovery_prefix}/sensor/{suffix}/config", json.dumps(vent_config, ensure_ascii=False)))
 
+    energy_sensors = [
+        ("energy_ecs", "Consommation ECS", "mdi:water-boiler", "energy_ecs"),
+        ("energy_heating_c", "Consommation Chauffage C", "mdi:fire", "energy_heating_c"),
+        ("energy_heating_h", "Consommation Chauffage H", "mdi:fire", "energy_heating_h"),
+    ]
+    for suffix, name, icon, topic_key in energy_sensors:
+        energy_config = {
+            "name": name,
+            "unique_id": f"aldes_{device_id}_{suffix}",
+            "state_topic": f"{prefix}/state/energy/{topic_key}",
+            "unit_of_measurement": "kWh",
+            "device_class": "energy",
+            "state_class": "total_increasing",
+            "device": {"identifiers": [f"aldes_{device_id}"]},
+            "icon": icon,
+            "availability_topic": f"{prefix}/state/available",
+            "payload_available": "online",
+            "payload_not_available": "offline",
+        }
+        configs.append((f"{discovery_prefix}/sensor/{suffix}/config", json.dumps(energy_config, ensure_ascii=False)))
+
     if zone_sensors:
         for zone_idx in active_zones:
             zone_temp_config = {

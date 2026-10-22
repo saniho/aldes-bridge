@@ -582,6 +582,23 @@ class HADiscoveryClient(threading.Thread):
                     f"{self.prefix}/state/sensor/{aldes_key}", f"{val:.0f}", qos=1, retain=True
                 ))
 
+        for counter_prefix, topic_key in (
+            ("CoE", "energy_ecs"),
+            ("CoC", "energy_heating_c"),
+            ("CoH", "energy_heating_h"),
+        ):
+            total = 0.0
+            has_value = False
+            for i in range(1, 13):
+                val = safe_float(data.get(f"{counter_prefix}{i}"))
+                if val is not None:
+                    total += val
+                    has_value = True
+            if has_value:
+                self._safe_send(mqtt.build_publish(
+                    f"{self.prefix}/state/energy/{topic_key}", f"{total:.0f}", qos=1, retain=True
+                ))
+
         self._publish_vacation_state(data)
 
         # Tracker les données télémétrie envoyées à HA

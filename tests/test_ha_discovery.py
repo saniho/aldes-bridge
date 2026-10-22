@@ -1180,3 +1180,71 @@ def test_publish_telemetry_people_count(monkeypatch):
     published.clear()
     client._publish_telemetry_data({"NpiH": "abc"})
     assert ("aldes/state/people", "2") in published
+
+
+# --- Tests des capteurs énergie (issue #62) ---
+
+def test_build_discovery_config_has_energy_sensors():
+    configs = _build_discovery_config("dev123", None)
+    topics = [t for t, _ in configs]
+    assert any("sensor/energy_ecs" in t for t in topics)
+    assert any("sensor/energy_heating_c" in t for t in topics)
+    assert any("sensor/energy_heating_h" in t for t in topics)
+
+
+def test_build_discovery_config_energy_sensor_details():
+    configs = _build_discovery_config("dev123", None)
+    for topic, payload_str in configs:
+        if "sensor/energy_ecs" in topic:
+            payload = json.loads(payload_str)
+            assert payload["unit_of_measurement"] == "kWh"
+            assert payload["device_class"] == "energy"
+            assert payload["state_class"] == "total_increasing"
+            assert payload["state_topic"] == "aldes/state/energy/energy_ecs"
+            assert payload["unique_id"] == "aldes_dev123_energy_ecs"
+            assert payload["availability_topic"] == "aldes/state/available"
+            break
+
+
+def test_publish_telemetry_energy_sums(monkeypatch):
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events)
+    client = HADiscoveryClient(state)
+    published = _spy_build_publish(monkeypatch)
+
+    data = {}
+    for i in range(1, 13):
+        data[f"CoE{i}"] = "10"
+        data[f"CoC{i}"] = "20"
+        data[f"CoH{i}"] = "30"
+    client._publish_telemetry_data(data)
+
+    assert ("aldes/state/energy/energy_ecs", "120") in published
+    assert ("aldes/state/energy/energy_heating_c", "240") in published
+    assert ("aldes/state/energy/energy_heating_h", "360") in published
+
+
+def test_publish_telemetry_energy_partial_zones(monkeypatch):
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events)
+    client = HADiscoveryClient(state)
+    published = _spy_build_publish(monkeypatch)
+
+    data = {"CoE8": "340", "CoC8": "378", "CoH8": "799"}
+    client._publish_telemetry_data(data)
+
+    assert ("aldes/state/energy/energy_ecs", "340") in published
+    assert ("aldes/state/energy/energy_heating_c", "378") in published
+    assert ("aldes/state/energy/energy_heating_h", "799") in published
+
+
+def test_publish_telemetry_energy_absent_keys(monkeypatch):
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events)
+    client = HADiscoveryClient(state)
+    published = _spy_build_publish(monkeypatch)
+
+    client._publish_telemetry_data({"NED": "75"})
+
+    energy_published = [t for t, _ in published if "energy" in t]
+    assert energy_published == []
