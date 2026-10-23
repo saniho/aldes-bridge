@@ -191,6 +191,7 @@ server/
   aldes.py       # mapping telemetrie → indicateurs Aldes
 profiles/        # profils device (YAML)
   tone-aquaair.yaml  # profil TONE AquaAIR (PAC air-air)
+  inspirair-home-s.yaml  # profil InspirAIR Home S (VMC double flux)
 web/             # frontend React/Vite
 tests/           # tests pytest
 Dockerfile
@@ -466,6 +467,7 @@ Un profil décrit les modes, commandes et le mapping telemetrie d'un appareil sp
 | ID | Appareil | Type | Description |
 |---|---|---|---|
 | `tone-aquaair` | TONE AquaAIR | PAC air-air | Profil par défaut, 9 modes air, 3 modes eau, 5 commandes |
+| `inspirair-home-s` | InspirAIR Home S | VMC double flux | 5 modes (select HA), capteurs ventilation + diagnostics bruts |
 
 **API profils** :
 

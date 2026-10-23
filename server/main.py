@@ -157,11 +157,17 @@ def _setup_ha_client(state, engine, args, config):
     mqtt_host = args.ha_mqtt_host
     mqtt_port = args.ha_mqtt_port
     mqtt_source = "cli"
-    detected = detect_mqtt_broker()
+    mqtt_user = args.ha_mqtt_user
+    mqtt_password = args.ha_mqtt_password
+    # An explicitly configured broker must win over Supervisor discovery.
+    detected = detect_mqtt_broker() if mqtt_host == "127.0.0.1" else None
     if detected:
         mqtt_host = detected["host"]
         mqtt_port = detected["port"]
         mqtt_source = "supervisor"
+        if not mqtt_user:
+            mqtt_user = detected.get("username")
+            mqtt_password = detected.get("password")
     elif args.ha_mqtt_host == "127.0.0.1":
         mqtt_source = "fallback"
     state._ha_mqtt_resolved = {
@@ -170,7 +176,7 @@ def _setup_ha_client(state, engine, args, config):
     initial_dry_run = _resolve_ha_mqtt_dry_run(args, config)
     ha_client = HADiscoveryClient(
         state, host=mqtt_host, port=mqtt_port,
-        username=args.ha_mqtt_user, password=args.ha_mqtt_password,
+        username=mqtt_user, password=mqtt_password,
         prefix=args.ha_mqtt_prefix, dry_run=initial_dry_run,
         zones_file=args.zones_file,
     )

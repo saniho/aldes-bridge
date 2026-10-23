@@ -7,8 +7,10 @@ Ce document définit les règles à respecter pour toute modification du code.
 
 ## Équipement
 
-Le bridge Aldes connecte une **PAC air-air** (pompe à chaleur réversible) au cloud Aldes T.ONE AquaAir.
-Ce n'est **pas** une VMC. Les modes de ventilation et de température contrôlent le ventilateur et le compresseur de la PAC.
+Le bridge Aldes connecte une box AldesConnect au cloud Aldes (Azure IoT Hub). L'équipement dépend du profil (`profiles/*.yaml`, champ `type`) :
+
+- `pac` (`tone-aquaair`) : **PAC air-air** T.ONE AquaAir. Les modes de ventilation et de température contrôlent le ventilateur et le compresseur de la PAC.
+- `vmc` (`inspirair-home-s`) : **VMC double flux** InspirAIR. Un select de mode et des sensors, pas de climate ni de ballon ECS.
 
 ---
 

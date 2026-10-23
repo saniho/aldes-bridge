@@ -6,7 +6,7 @@ import socket
 import struct
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from .. import mqtt
 from ..appstate import emit_message
@@ -141,6 +141,7 @@ class HADiscoveryClient(threading.Thread):
             (f"{self.prefix}/set/vacation_end", 1),
             (f"{self.prefix}/set/vacation_enable", 1),
             (f"{self.prefix}/set/people", 1),
+            (f"{self.prefix}/set/vmc_mode", 1),
         ]
         for zi in range(10):
             cmd_topics.append((f"{self.prefix}/set/zone{zi}/consigne", 1))
@@ -243,6 +244,8 @@ class HADiscoveryClient(threading.Thread):
                 self._handle_vacation_enable_command(payload)
             elif topic == f"{self.prefix}/set/people":
                 self._handle_people_command(payload)
+            elif topic == f"{self.prefix}/set/vmc_mode":
+                self._handle_vmc_mode_command(payload)
         except Exception as exc:
             _log.warning("ha-discovery: erreur commande %s: %s", topic, exc)
 
@@ -254,6 +257,42 @@ class HADiscoveryClient(threading.Thread):
             return
         self._inject_aldes_command("changeMode", [aldes_code])
         _log.info("ha-discovery: mode %s -> Aldes %s", ha_mode, aldes_code)
+
+    def _handle_vmc_mode_command(self, payload):
+        code = profile_code_for_label(self._profile(), "air_modes", payload, None)
+        if not code:
+            _log.warning("ha-discovery: mode VMC inconnu: %s", payload)
+            return
+        if code == "W":
+            # InspirAIR ignores W without the UTC holiday window used by its app.
+            hours = float(self._profile().ha_discovery.get("holiday_duration_hours", 24))
+            if not 0 < hours <= 8760:
+                _log.warning("ha-discovery: invalid holiday duration: %s", hours)
+                return
+            start = datetime.now(timezone.utc)
+            end = start + timedelta(hours=hours)
+            code += start.strftime("%Y%m%d%H%M%SZ") + end.strftime("%Y%m%d%H%M%SZ")
+        self._inject_aldes_command("changeMode", [code])
+        _log.info("ha-discovery: mode VMC %s -> Aldes %s", payload, code)
+
+    def _profile(self):
+        return getattr(self.state, "profile", None)
+
+    def _is_vmc(self):
+        profile = self._profile()
+        return profile is not None and profile.type == "vmc"
+
+    def _publish_vmc_telemetry(self, data):
+        profile = self._profile()
+        label = profile_label_for_code(profile, "air_modes", data.get("current_mode"), None)
+        if label:
+            self._safe_send(mqtt.build_publish(f"{self.prefix}/state/vmc_mode", label, qos=1, retain=True))
+        for sensor in (profile.ha_discovery.get("entities", {}) or {}).get("sensors", []) or []:
+            val = data.get(sensor["key"])
+            if val is not None:
+                self._safe_send(mqtt.build_publish(
+                    f"{self.prefix}/state/sensor/{sensor['key']}", str(val), qos=1, retain=True
+                ))
 
     def _handle_consigne_command(self, payload, zone=0):
         try:
@@ -371,14 +410,14 @@ class HADiscoveryClient(threading.Thread):
             "method": method,
             "params": params if isinstance(params, list) else [params],
         }
-        dry_run = self.state.config.get("ha_mqtt_dry_run") if self.state.config else self.dry_run
-        if dry_run:
+        # The settings API updates self.dry_run on toggle; state.config would override the startup value with its False default.
+        if self.dry_run:
             _log.info("ha-discovery [DRY-RUN]: commande simulée: %s", json.dumps(body, ensure_ascii=False))
             return
         hook = getattr(self.state, "_ha_inject_hook", None)
         if hook:
             hook(
-                f"devices/{self._device_id}/messages/devicebound",
+                f"devices/{self.state._client_id or self._device_id}/messages/devicebound",
                 json.dumps(body, ensure_ascii=False),
                 1,
             )
@@ -421,6 +460,9 @@ class HADiscoveryClient(threading.Thread):
         if not data:
             return
 
+        if self._is_vmc():
+            self._publish_vmc_telemetry(data)
+            return
         self._publish_telemetry_data(data, include_zone_aliases=True)
 
     def _publish_health(self):
@@ -453,6 +495,9 @@ class HADiscoveryClient(threading.Thread):
 
     def publish_telemetry(self, data):
         if not self._sock:
+            return
+        if self._is_vmc():
+            self._publish_vmc_telemetry(data)
             return
 
         air_mode_code = self._get_air_mode_code(data)
