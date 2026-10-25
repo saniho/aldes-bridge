@@ -1224,6 +1224,19 @@ def test_publish_telemetry_energy_sums(monkeypatch):
     assert ("aldes/state/energy/energy_heating_h", "360") in published
 
 
+def _energy_published(published, topic_key):
+    return [v for t, v in published if t == f"aldes/state/energy/{topic_key}"]
+
+
+def _full_counters(ecs, heating_c, heating_h):
+    data = {}
+    for i in range(1, 13):
+        data[f"CoE{i}"] = str(ecs / 12)
+        data[f"CoC{i}"] = str(heating_c / 12)
+        data[f"CoH{i}"] = str(heating_h / 12)
+    return data
+
+
 def test_publish_telemetry_energy_partial_zones(monkeypatch):
     events = EventBus()
     state = AppState("127.0.0.1", 8883, events)
@@ -1233,9 +1246,39 @@ def test_publish_telemetry_energy_partial_zones(monkeypatch):
     data = {"CoE8": "340", "CoC8": "378", "CoH8": "799"}
     client._publish_telemetry_data(data)
 
-    assert ("aldes/state/energy/energy_ecs", "340") in published
-    assert ("aldes/state/energy/energy_heating_c", "378") in published
-    assert ("aldes/state/energy/energy_heating_h", "799") in published
+    assert _energy_published(published, "energy_ecs") == []
+    assert _energy_published(published, "energy_heating_c") == []
+    assert _energy_published(published, "energy_heating_h") == []
+
+
+def test_publish_telemetry_energy_partial_after_complete(monkeypatch):
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events)
+    client = HADiscoveryClient(state)
+    published = _spy_build_publish(monkeypatch)
+
+    client._publish_telemetry_data(_full_counters(120, 240, 360))
+    assert _energy_published(published, "energy_ecs") == ["120"]
+
+    client._publish_telemetry_data({"CoE8": "340", "CoC8": "378", "CoH8": "799"})
+
+    assert _energy_published(published, "energy_ecs") == ["120"]
+    assert _energy_published(published, "energy_heating_c") == ["240"]
+    assert _energy_published(published, "energy_heating_h") == ["360"]
+
+
+def test_publish_telemetry_energy_never_decreases(monkeypatch):
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events)
+    client = HADiscoveryClient(state)
+    published = _spy_build_publish(monkeypatch)
+
+    client._publish_telemetry_data(_full_counters(120, 240, 360))
+    client._publish_telemetry_data(_full_counters(60, 120, 180))
+
+    assert _energy_published(published, "energy_ecs") == ["120"]
+    assert _energy_published(published, "energy_heating_c") == ["240"]
+    assert _energy_published(published, "energy_heating_h") == ["360"]
 
 
 def test_publish_telemetry_energy_absent_keys(monkeypatch):
