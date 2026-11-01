@@ -1206,6 +1206,20 @@ def test_build_discovery_config_energy_sensor_details():
             break
 
 
+def test_build_discovery_config_energy_sensor_names():
+    configs = _build_discovery_config("dev123", None)
+    names = {}
+    for topic, payload_str in configs:
+        if "sensor/energy_" in topic:
+            payload = json.loads(payload_str)
+            names[topic] = payload["name"]
+    assert len(names) == 3
+    assert any(n == "Consommation Chauffage H" for n in names.values())
+    assert any(n == "Consommation ECS" for n in names.values())
+    assert any(n == "Consommation Climatisation" for n in names.values())
+    assert not any("Chauffage C" in n for n in names.values())
+
+
 def test_publish_telemetry_energy_sums(monkeypatch):
     events = EventBus()
     state = AppState("127.0.0.1", 8883, events)

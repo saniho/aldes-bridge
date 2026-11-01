@@ -440,7 +440,7 @@ def build_discovery_config(device_id, profile, prefix="aldes", data=None,
 
     energy_sensors = [
         ("energy_ecs", "Consommation ECS", "mdi:water-boiler", "energy_ecs"),
-        ("energy_heating_c", "Consommation Chauffage C", "mdi:fire", "energy_heating_c"),
+        ("energy_heating_c", "Consommation Climatisation", "mdi:snowflake", "energy_heating_c"),
         ("energy_heating_h", "Consommation Chauffage H", "mdi:fire", "energy_heating_h"),
     ]
     for suffix, name, icon, topic_key in energy_sensors:
