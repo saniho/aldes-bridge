@@ -46,7 +46,6 @@ class HADiscoveryClient(threading.Thread):
         self._pkt = 0
         self._device_id = "aldes_bridge"
         self._last_mode = None
-        self._energy_totals = {}
         self._zones_file = zones_file
         self._last_active_zones = self._load_zones()
         if dry_run:
@@ -591,11 +590,9 @@ class HADiscoveryClient(threading.Thread):
             values = [safe_float(data.get(f"{counter_prefix}{i}")) for i in range(1, 13)]
             if any(v is None for v in values):
                 continue
-            total = sum(values)
-            last_total = self._energy_totals.get(topic_key)
-            if last_total is not None and total < last_total:
+            total = self.state.update_energy_total(topic_key, values)
+            if total is None:
                 continue
-            self._energy_totals[topic_key] = total
             self._safe_send(mqtt.build_publish(
                 f"{self.prefix}/state/energy/{topic_key}", f"{total:.0f}", qos=1, retain=True
             ))

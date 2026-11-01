@@ -1267,18 +1267,23 @@ def test_publish_telemetry_energy_partial_after_complete(monkeypatch):
     assert _energy_published(published, "energy_heating_h") == ["360"]
 
 
-def test_publish_telemetry_energy_never_decreases(monkeypatch):
+def test_publish_telemetry_energy_never_decreases(tmp_path, monkeypatch):
     events = EventBus()
-    state = AppState("127.0.0.1", 8883, events)
+    state = AppState("127.0.0.1", 8883, events,
+                     energy_file=str(tmp_path / "energy_totals.json"))
     client = HADiscoveryClient(state)
     published = _spy_build_publish(monkeypatch)
 
     client._publish_telemetry_data(_full_counters(120, 240, 360))
-    client._publish_telemetry_data(_full_counters(60, 120, 180))
+    client._publish_telemetry_data(_slots_payload(
+        ecs=[10] * 11 + [0], cooling=[20] * 11 + [0], heating=[30] * 11 + [0]))
+    client._publish_telemetry_data(_slots_payload(
+        ecs=[10] * 11 + [1], cooling=[20] * 11 + [2], heating=[30] * 11 + [3]))
 
-    assert _energy_published(published, "energy_ecs") == ["120"]
-    assert _energy_published(published, "energy_heating_c") == ["240"]
-    assert _energy_published(published, "energy_heating_h") == ["360"]
+    for key in ("energy_ecs", "energy_heating_c", "energy_heating_h"):
+        values = [int(v) for v in _energy_published(published, key)]
+        assert values, key
+        assert values == sorted(values), f"{key}: {values} n'est pas monotone"
 
 
 def test_publish_telemetry_energy_absent_keys(monkeypatch):
@@ -1291,3 +1296,95 @@ def test_publish_telemetry_energy_absent_keys(monkeypatch):
 
     energy_published = [t for t, _ in published if "energy" in t]
     assert energy_published == []
+
+
+# --- Tests fenetre glissante 12 mois des compteurs Co* (issue #78) ---
+
+def _slots_payload(ecs=None, cooling=None, heating=None):
+    """Payload complet (12 compteurs par famille) construit a partir de slots."""
+    data = {}
+    for prefix, slots in (("CoE", ecs), ("CoC", cooling), ("CoH", heating)):
+        for i, v in enumerate(slots if slots is not None else [0] * 12, start=1):
+            data[f"{prefix}{i}"] = str(v)
+    return data
+
+
+def test_energy_rollover_capitalizes_departing_month(tmp_path, monkeypatch):
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events,
+                     energy_file=str(tmp_path / "energy_totals.json"))
+    client = HADiscoveryClient(state)
+    published = _spy_build_publish(monkeypatch)
+
+    client._publish_telemetry_data(_slots_payload(heating=[0] * 10 + [102, 0]))
+    assert _energy_published(published, "energy_heating_h") == ["102"]
+
+    client._publish_telemetry_data(_slots_payload(heating=[0] * 10 + [1, 0]))
+
+    assert _energy_published(published, "energy_heating_h") == ["102", "103"]
+
+
+def test_energy_rollover_survives_restart(tmp_path, monkeypatch):
+    energy_file = str(tmp_path / "energy_totals.json")
+    published = _spy_build_publish(monkeypatch)
+
+    state = AppState("127.0.0.1", 8883, EventBus(), energy_file=energy_file)
+    HADiscoveryClient(state)._publish_telemetry_data(
+        _slots_payload(heating=[0] * 10 + [102, 0]))
+    assert _energy_published(published, "energy_heating_h") == ["102"]
+
+    state2 = AppState("127.0.0.1", 8883, EventBus(), energy_file=energy_file)
+    HADiscoveryClient(state2)._publish_telemetry_data(
+        _slots_payload(heating=[0] * 10 + [1, 0]))
+
+    assert _energy_published(published, "energy_heating_h") == ["102", "103"]
+
+
+def test_energy_first_run_without_file_uses_raw_sum(tmp_path, monkeypatch):
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events,
+                     energy_file=str(tmp_path / "missing.json"))
+    client = HADiscoveryClient(state)
+    published = _spy_build_publish(monkeypatch)
+
+    client._publish_telemetry_data(_slots_payload(heating=[10] * 12))
+
+    assert _energy_published(published, "energy_heating_h") == ["120"]
+
+
+def test_energy_incomplete_payload_keeps_previous_state(tmp_path, monkeypatch):
+    events = EventBus()
+    energy_file = str(tmp_path / "energy_totals.json")
+    state = AppState("127.0.0.1", 8883, events, energy_file=energy_file)
+    client = HADiscoveryClient(state)
+    published = _spy_build_publish(monkeypatch)
+
+    client._publish_telemetry_data(_slots_payload(heating=[10] * 12))
+    assert _energy_published(published, "energy_heating_h") == ["120"]
+
+    partial = _slots_payload(heating=[10] * 12)
+    del partial["CoH12"]
+    client._publish_telemetry_data(partial)
+
+    assert _energy_published(published, "energy_heating_h") == ["120"]
+    with open(energy_file, encoding="utf-8") as f:
+        assert json.load(f)["energy_heating_h"]["total"] == 120
+
+
+def test_energy_simultaneous_rollover_multiple_families(tmp_path, monkeypatch):
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events,
+                     energy_file=str(tmp_path / "energy_totals.json"))
+    client = HADiscoveryClient(state)
+    published = _spy_build_publish(monkeypatch)
+
+    client._publish_telemetry_data(
+        _slots_payload(ecs=[0] * 10 + [18, 0], heating=[0] * 10 + [102, 0]))
+    assert _energy_published(published, "energy_ecs") == ["18"]
+    assert _energy_published(published, "energy_heating_h") == ["102"]
+
+    client._publish_telemetry_data(
+        _slots_payload(ecs=[0] * 10 + [0, 0], heating=[0] * 10 + [1, 0]))
+
+    assert _energy_published(published, "energy_ecs") == ["18", "18"]
+    assert _energy_published(published, "energy_heating_h") == ["102", "103"]
