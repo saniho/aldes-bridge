@@ -9,7 +9,14 @@ from .mqtt import build_publish, parse_connect
 from .utils import atomic_write_json, iso, read_json
 
 _log = logging.getLogger("aldes-appstate")
+
 from .version import SERVER_VERSION
+
+# Detection d'un reset usine Aldes : les 12 compteurs Co* sous ce seuil sont
+# consideres nuls. Un rollover de mois ne vide qu'un seul slot, jamais les 12.
+ENERGY_ZERO_EPS = 0.5
+# Nombre de payloads consecutifs a zero requis avant de conclure a un reset.
+ENERGY_RESET_STREAK = 3
 
 # Contexte de connexion : taggé par le thread qui gère une session box.
 _CONN_CTX = threading.local()
@@ -222,6 +229,10 @@ class AppState:
         # Persistance des totaux d'energie (offset + slots des compteurs Co*).
         self._energy_file = energy_file
         self._energy = {}
+        # Planchers energetiques issus des messages MQTT retenus du broker.
+        # Non persistes : relus du broker a chaque demarrage, ce qui permet de
+        # reconstruire l'offset apres la perte du fichier de persistance.
+        self._energy_floors = {}
         # Persistance du profil device (survit au redemarrage du conteneur).
         self._profile_file = profile_file
         # Configuration persistante (logs/config.json).
@@ -408,6 +419,21 @@ class AppState:
         """Persiste les totaux d'energie (a appeler sous self._lock)."""
         atomic_write_json(self._energy_file, self._energy)
 
+    def seed_energy_floor(self, topic_key, value):
+        """Memorise le plancher energetique issu d'un message MQTT retenu.
+
+        Le broker conserve la derniere valeur publiee, c'est-à-dire exactement
+        ce que HA a vu. Le plancher n'est pas persiste : il est relu du broker
+        a chaque demarrage, ce qui reconstruit l'offset meme apres une
+        reinstallation de l'add-on ou la perte du fichier de persistance.
+        """
+        try:
+            value = float(value)
+        except (TypeError, ValueError):
+            return
+        with self._lock:
+            self._energy_floors[topic_key] = value
+
     def update_energy_total(self, topic_key, slots):
         """Total a vie d'une famille de compteurs Co* (fenetre glissante 12 mois).
 
@@ -417,25 +443,56 @@ class AppState:
         que le total reste monotone (state_class total_increasing) et survive aux
         redemarrages du conteneur.
 
+        Un plancher issu des messages retenus du broker (seed_energy_floor) est
+        applique en dernier recours pour compenser la perte de l'offset.
+
         Retourne le total a publier, ou None si une garde-monotone bloque.
         """
         with self._lock:
             entry = self._energy.get(topic_key)
             entry = entry if isinstance(entry, dict) else {}
             prev_slots = entry.get("slots")
-            offset = float(entry.get("offset") or 0.0)
-            last_total = entry.get("total")
-            if isinstance(prev_slots, list) and len(prev_slots) == len(slots):
-                for prev, cur in zip(prev_slots, slots):
-                    if cur < prev:
-                        offset += prev
+            zero_streak = int(entry.get("zero_streak") or 0)
+
+            # Soupape de reset usine Aldes : les 12 compteurs a zero sur plusieurs
+            # payloads consecutifs. Un rollover de mois ne vide qu'un seul slot,
+            # donc ce signal est discriminant.
+            if all(abs(float(v)) < ENERGY_ZERO_EPS for v in slots):
+                zero_streak += 1
+            else:
+                zero_streak = 0
+            if zero_streak >= ENERGY_RESET_STREAK:
+                _log.warning(
+                    "energie: reset usine detecte sur %s (%d payloads a zero) "
+                    "— offset et total reinitialises", topic_key, zero_streak)
+                offset = 0.0
+                last_total = None
+            else:
+                offset = float(entry.get("offset") or 0.0)
+                last_total = entry.get("total")
+                if isinstance(prev_slots, list) and len(prev_slots) == len(slots):
+                    for prev, cur in zip(prev_slots, slots):
+                        if cur < prev:
+                            offset += prev
+
             total = offset + sum(slots)
+
+            floor = self._energy_floors.get(topic_key)
+            if floor is not None and total < floor:
+                _log.info(
+                    "energie: plancher broker %.0f applique sur %s (%.0f -> %.0f) "
+                    "— offset reconstruit apres perte locale",
+                    floor, topic_key, total, floor)
+                offset += floor - total
+                total = floor
+
             if last_total is not None and total < float(last_total):
                 return None
             self._energy[topic_key] = {
                 "slots": [float(v) for v in slots],
                 "offset": offset,
                 "total": total,
+                "zero_streak": zero_streak,
             }
             self._save_energy()
             return total

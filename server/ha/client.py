@@ -30,6 +30,10 @@ class HADiscoveryClient(threading.Thread):
 
     KEEPALIVE = 30
     PUBLISH_INTERVAL = 60
+    # Delai maximal d'attente des messages retenus d'energie au demarrage.
+    # Au-dela, la publication est autorisee meme sans plancher complet.
+    ENERGY_SEED_TIMEOUT = 5.0
+    ENERGY_KEYS = ("energy_ecs", "energy_heating_c", "energy_heating_h")
 
     def __init__(self, state, host="127.0.0.1", port=1883, username=None, password=None, prefix="aldes", dry_run=True, zones_file=None):
         super().__init__(daemon=True, name="ha-discovery")
@@ -46,6 +50,10 @@ class HADiscoveryClient(threading.Thread):
         self._pkt = 0
         self._device_id = "aldes_bridge"
         self._last_mode = None
+        # Etat du reseed energetique a partir des messages retenus du broker.
+        self._energy_seen = set()
+        self._energy_seeded = False
+        self._energy_seed_deadline = None
         self._zones_file = zones_file
         self._last_active_zones = self._load_zones()
         if dry_run:
@@ -144,6 +152,10 @@ class HADiscoveryClient(threading.Thread):
         ]
         for zi in range(10):
             cmd_topics.append((f"{self.prefix}/set/zone{zi}/consigne", 1))
+        # Plancher energetique : le broker renvoie les valeurs retenues de nos
+        # propres capteurs des la souscription, ce qui reconstruit l'offset apres
+        # la perte du fichier de persistance (reinstallation, backup ancien).
+        cmd_topics.append((f"{self.prefix}/state/energy/+", 1))
         topic_list = [t for t, _ in cmd_topics]
         _log.info("ha-discovery: souscription a %d topics: %s", len(topic_list), topic_list)
         try:
@@ -162,6 +174,10 @@ class HADiscoveryClient(threading.Thread):
         except Exception as exc:
             _log.warning("ha-discovery: erreur SUBACK: %s", exc)
 
+        self._energy_seen = set()
+        self._energy_seeded = False
+        self._energy_seed_deadline = time.time() + self.ENERGY_SEED_TIMEOUT
+
         self._publish_discovery()
         self._publish_state()
 
@@ -174,6 +190,12 @@ class HADiscoveryClient(threading.Thread):
                 try:
                     pkt = reader.read_packet()
                 except socket.timeout:
+                    if not self._energy_seeded and self._energy_seed_deadline \
+                            and time.time() >= self._energy_seed_deadline:
+                        self._energy_seeded = True
+                        _log.info("ha-discovery: reseed energie termine (%d/%d retenues recues, "
+                                  "delai ecoule) — publication energie autorisee",
+                                  len(self._energy_seen), len(self.ENERGY_KEYS))
                     if time.time() - last_ping >= self.KEEPALIVE / 2:
                         self._safe_send(mqtt.build_pingreq())
                         last_ping = time.time()
@@ -202,7 +224,10 @@ class HADiscoveryClient(threading.Thread):
                 self._safe_send(mqtt.build_puback(pid))
             elif qos == mqtt.QOS_EXACTLY_ONCE:
                 self._safe_send(mqtt.build_pubrec(pid))
-            self._handle_command(topic, payload)
+            if topic.startswith(f"{self.prefix}/state/energy/"):
+                self._handle_energy_retained(topic, payload)
+            else:
+                self._handle_command(topic, payload)
         elif ptype == mqtt.PT_PUBREC:
             pid = struct.unpack_from(">H", body, 0)[0]
             self._safe_send(mqtt.build_pubrel(pid))
@@ -245,6 +270,32 @@ class HADiscoveryClient(threading.Thread):
                 self._handle_people_command(payload)
         except Exception as exc:
             _log.warning("ha-discovery: erreur commande %s: %s", topic, exc)
+
+    def _handle_energy_retained(self, topic, payload):
+        """Capte les messages retenus de nos propres capteurs energie.
+
+        Le broker conserve la derniere valeur publiee, c'est-à-dire exactement ce
+        que HA a vu. Elle sert de plancher pour reconstruire l'offset apres la
+        perte du fichier de persistance (reinstallation de l'add-on, restauration
+        d'un backup ancien).
+        """
+        if isinstance(payload, bytes):
+            payload = payload.decode("utf-8", errors="replace")
+        key = topic.rsplit("/", 1)[-1]
+        if key not in self.ENERGY_KEYS:
+            return
+        value = safe_float(payload)
+        if value is None:
+            return
+        self._energy_seen.add(key)
+        if self.state is not None:
+            self.state.seed_energy_floor(key, value)
+        _log.info("ha-discovery: plancher energie %s = %.0f (retenue broker, %d/%d)",
+                  key, value, len(self._energy_seen), len(self.ENERGY_KEYS))
+        if len(self._energy_seen) >= len(self.ENERGY_KEYS) and not self._energy_seeded:
+            self._energy_seeded = True
+            _log.info("ha-discovery: reseed energie termine (%d/%d retenues recues)",
+                      len(self._energy_seen), len(self.ENERGY_KEYS))
 
     def _handle_mode_command(self, payload):
         ha_mode = payload.lower().strip()
@@ -582,20 +633,24 @@ class HADiscoveryClient(threading.Thread):
                     f"{self.prefix}/state/sensor/{aldes_key}", f"{val:.0f}", qos=1, retain=True
                 ))
 
-        for counter_prefix, topic_key in (
-            ("CoE", "energy_ecs"),
-            ("CoC", "energy_heating_c"),
-            ("CoH", "energy_heating_h"),
-        ):
-            values = [safe_float(data.get(f"{counter_prefix}{i}")) for i in range(1, 13)]
-            if any(v is None for v in values):
-                continue
-            total = self.state.update_energy_total(topic_key, values)
-            if total is None:
-                continue
-            self._safe_send(mqtt.build_publish(
-                f"{self.prefix}/state/energy/{topic_key}", f"{total:.0f}", qos=1, retain=True
-            ))
+        if not self._energy_seeded:
+            _log.debug("ha-discovery: publication energie en attente du reseed "
+                       "(messages retenus du broker)")
+        else:
+            for counter_prefix, topic_key in (
+                ("CoE", "energy_ecs"),
+                ("CoC", "energy_heating_c"),
+                ("CoH", "energy_heating_h"),
+            ):
+                values = [safe_float(data.get(f"{counter_prefix}{i}")) for i in range(1, 13)]
+                if any(v is None for v in values):
+                    continue
+                total = self.state.update_energy_total(topic_key, values)
+                if total is None:
+                    continue
+                self._safe_send(mqtt.build_publish(
+                    f"{self.prefix}/state/energy/{topic_key}", f"{total:.0f}", qos=1, retain=True
+                ))
 
         self._publish_vacation_state(data)
 
