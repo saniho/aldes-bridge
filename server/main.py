@@ -32,6 +32,7 @@ DEFAULT_TELEMETRY_FILE = os.path.join(APP_ROOT, "logs", "telemetry.json")
 DEFAULT_CONSIGNE_FILE = os.path.join(APP_ROOT, "logs", "consigne.json")
 DEFAULT_HISTORY_FILE = os.path.join(APP_ROOT, "logs", "history.db")
 DEFAULT_PROFILE_FILE = os.path.join(APP_ROOT, "logs", "profile.json")
+DEFAULT_ENERGY_FILE = os.path.join(APP_ROOT, "logs", "energy_totals.json")
 DEFAULT_CONFIG_FILE = os.path.join(APP_ROOT, "logs", "config.json")
 DEFAULT_ZONES_FILE = os.path.join(APP_ROOT, "logs", "zones.json")
 DEFAULT_HISTORY_DAYS = 90
@@ -121,6 +122,8 @@ def build_parser():
                     help="ID du profil device (defaut: tone-aquaair ou le premier disponible)")
     ap.add_argument("--profile-file", default=os.environ.get("ALDES_PROFILE_FILE", DEFAULT_PROFILE_FILE),
                     help="fichier de persistance du profil (survit au redemarrage)")
+    ap.add_argument("--energy-file", default=os.environ.get("ALDES_ENERGY_FILE", DEFAULT_ENERGY_FILE),
+                    help="fichier de persistance des totaux d'energie (offset des compteurs Co*)")
     ap.add_argument("--config-file", default=os.environ.get("ALDES_CONFIG_FILE", DEFAULT_CONFIG_FILE),
                     help="fichier de configuration persistante (survit au redemarrage)")
     ap.add_argument("--zones-file", default=os.environ.get("ALDES_ZONES_FILE", DEFAULT_ZONES_FILE),
@@ -238,7 +241,8 @@ def main(argv=None):
     state = AppState(args.real_host, args.real_port, events,
                      mode_file=args.mode_file, telemetry_file=args.telemetry_file,
                      consigne_file=args.consigne_file, history=history,
-                     profile_file=args.profile_file, config=config)
+                     profile_file=args.profile_file, config=config,
+                     energy_file=args.energy_file)
     persisted_profile_id = read_persisted_profile(args.profile_file)
     profile_id = persisted_profile_id or args.profile
     profile = load_profile(profile_id)
