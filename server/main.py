@@ -162,7 +162,7 @@ def _setup_ha_client(state, engine, args, config):
     mqtt_source = "cli"
     mqtt_user = args.ha_mqtt_user
     mqtt_password = args.ha_mqtt_password
-    # An explicitly configured broker must win over Supervisor discovery.
+    # Un broker configure explicitement doit primer sur la detection Supervisor.
     detected = detect_mqtt_broker() if mqtt_host == "127.0.0.1" else None
     if detected:
         mqtt_host = detected["host"]

@@ -76,7 +76,7 @@ def test_vmc_telemetry_publishes_mode_label_and_sensors():
     client._send_lock = threading.Lock()
     client.publish_telemetry(TELEMETRY)
 
-    # MQTT PUBLISH QoS1 frame: topic, 2-byte packet id, payload.
+    # Trame MQTT PUBLISH QoS1 : topic, packet id sur 2 octets, payload.
     frames = {p[4:4 + p[3]].decode(): p[6 + p[3]:].decode() for p in published}
     assert frames["aldes/state/vmc_mode"] == "Guest"
     assert frames["aldes/state/sensor/outside_tpt"] == "22.5"

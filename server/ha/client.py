@@ -315,7 +315,7 @@ class HADiscoveryClient(threading.Thread):
             _log.warning("ha-discovery: mode VMC inconnu: %s", payload)
             return
         if code == "W":
-            # InspirAIR ignores W without the UTC holiday window used by its app.
+            # InspirAIR ignore W sans la fenetre UTC que son application utilise.
             hours = float(self._profile().ha_discovery.get("holiday_duration_hours", 24))
             if not 0 < hours <= 8760:
                 _log.warning("ha-discovery: invalid holiday duration: %s", hours)
@@ -462,7 +462,8 @@ class HADiscoveryClient(threading.Thread):
             "method": method,
             "params": params if isinstance(params, list) else [params],
         }
-        # The settings API updates self.dry_run on toggle; state.config would override the startup value with its False default.
+        # L'API settings met a jour self.dry_run au toggle ; state.config ecraserait
+        # la valeur de demarrage avec son defaut False.
         if self.dry_run:
             _log.info("ha-discovery [DRY-RUN]: commande simulée: %s", json.dumps(body, ensure_ascii=False))
             return

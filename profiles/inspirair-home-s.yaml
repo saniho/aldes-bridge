@@ -39,7 +39,7 @@ ui:
 
 # Unites deduites des valeurs observees, pas d'une documentation Aldes.
 ha_discovery:
-  # Selecting Holidays starts a bounded window; another mode cancels it.
+  # Selectionner Holidays ouvre une fenetre bornee ; un autre mode l'annule.
   holiday_duration_hours: 24
   entities:
     sensors:

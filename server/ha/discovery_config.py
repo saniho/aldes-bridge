@@ -117,7 +117,7 @@ def build_vmc_discovery_config(device_id, profile, prefix="aldes"):
             "device": device,
             **availability,
         }
-        # Diagnostics are raw modem fields (ids, versions, dates): not measurements.
+        # Les diagnostics sont des champs modem bruts (ids, versions, dates) : pas des mesures.
         if sensor.get("entity_category") != "diagnostic":
             config["state_class"] = "measurement"
         for src, dst in (
