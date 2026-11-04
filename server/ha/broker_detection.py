@@ -23,11 +23,13 @@ def detect_mqtt_broker():
         )
         with urllib.request.urlopen(req, timeout=3) as resp:
             data = json.loads(resp.read())
-            host = data.get("data", {}).get("host")
-            port = data.get("data", {}).get("port")
+            svc = data.get("data", {})
+            host = svc.get("host")
+            port = svc.get("port")
             if host and port:
                 _log.info("ha-discovery: broker MQTT détecté via Supervisor: %s:%d", host, port)
-                return {"host": host, "port": int(port)}
+                return {"host": host, "port": int(port),
+                        "username": svc.get("username"), "password": svc.get("password")}
     except Exception as exc:
         _log.debug("ha-discovery: détection Supervisor échouée (normal si pas add-on HA): %s", exc)
     return None
