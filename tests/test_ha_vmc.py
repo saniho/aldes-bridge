@@ -87,6 +87,33 @@ def test_vmc_telemetry_publishes_mode_label_and_sensors():
     assert "aldes/state/sensor/UAM" not in frames
 
 
+def test_vmc_telemetry_reads_mode_from_profile_air_mode_field():
+    state = _state()
+    state.profile.telemetry["air_mode_field"] = "ConVe"
+    published = []
+
+    class FakeSock:
+        def sendall(self, data):
+            published.append(data)
+
+    client = HADiscoveryClient(state)
+    client._sock = FakeSock()
+    client._send_lock = threading.Lock()
+    client.publish_telemetry({"ConVe": "Y", "current_mode": "X"})
+
+    frames = {p[4:4 + p[3]].decode(): p[6 + p[3]:].decode() for p in published}
+    assert frames["aldes/state/vmc_mode"] == "Boost"
+
+
+def test_pac_air_mode_code_reads_profile_air_mode_field():
+    state = _state("tone-aquaair")
+    state.profile.telemetry["air_mode_field"] = "ModeIdx"
+    client = HADiscoveryClient(state)
+
+    assert client._get_air_mode_code({"ModeIdx": 2, "UAM": 0}) == "C"
+    assert client._get_air_mode_code({"UAM": 2}) is None
+
+
 def test_holidays_command_includes_configurable_utc_window():
     from datetime import datetime, timezone, timedelta
 

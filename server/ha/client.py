@@ -335,7 +335,8 @@ class HADiscoveryClient(threading.Thread):
 
     def _publish_vmc_telemetry(self, data):
         profile = self._profile()
-        label = profile_label_for_code(profile, "air_modes", data.get("current_mode"), None)
+        mode_field = (profile.telemetry.get("air_mode_field") or "current_mode") if profile else "current_mode"
+        label = profile_label_for_code(profile, "air_modes", data.get(mode_field), None)
         if label:
             self._safe_send(mqtt.build_publish(f"{self.prefix}/state/vmc_mode", label, qos=1, retain=True))
         for sensor in (profile.ha_discovery.get("entities", {}) or {}).get("sensors", []) or []:
@@ -752,8 +753,10 @@ class HADiscoveryClient(threading.Thread):
             return None
 
     def _get_air_mode_code(self, data):
+        profile = self._profile()
+        mode_field = (profile.telemetry.get("air_mode_field") or "UAM") if profile else "UAM"
         try:
-            index = int(float(data.get("UAM", -1)))
+            index = int(float(data.get(mode_field, -1)))
             modes = ["A", "B", "C", "D", "E", "F", "G", "H", "I"]
             if 0 <= index < len(modes):
                 return modes[index]
