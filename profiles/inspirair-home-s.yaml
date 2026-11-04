@@ -1,0 +1,71 @@
+# Profil device : InspirAIR Home S (VMC double flux)
+# Telemetrie observee sur une box AldesConnect (productid <MAC>_AIR, Vers_UC 53).
+# Codes modes : hugz/homeassistant-aldes et aalmazanarbs/hassio_aldes (const.py / product.py).
+id: inspirair-home-s
+name: "InspirAIR Home S"
+description: "VMC double flux Aldes InspirAIR"
+type: vmc
+
+telemetry:
+  modemid: product.modem
+  productid: product.serial_number
+  air_mode_field: current_mode
+
+air_modes:
+  - { index: 0, code: "V", label: "Daily" }
+  - { index: 1, code: "W", label: "Holidays" }
+  - { index: 2, code: "X", label: "Guest" }
+  - { index: 3, code: "Y", label: "Boost" }
+  - { index: 4, code: "Z", label: "Air Prog" }
+
+commands:
+  - id: set_mode
+    label: "Changer le mode"
+    method: changeMode
+    topic_pattern: "device/{device_id}/messages/devicebound"
+    params:
+      - name: code
+        type: enum
+        options_from: air_modes
+
+ui:
+  quick_modes:
+    - field: air_modes
+      label: "Ventilation"
+  show_thermostats: false
+  show_vacations: false
+  show_people: false
+  show_hot_water: false
+
+# Unites deduites des valeurs observees, pas d'une documentation Aldes.
+ha_discovery:
+  # Selecting Holidays starts a bounded window; another mode cancels it.
+  holiday_duration_hours: 24
+  entities:
+    sensors:
+      - { key: outside_tpt, name: "Température air neuf", unit: "°C", device_class: temperature }
+      - { key: ext_tpt, name: "Température air extrait", unit: "°C", device_class: temperature }
+      - { key: reject_tpt, name: "Température air rejeté", unit: "°C", device_class: temperature }
+      - { key: vi_spd, name: "Ventilateur insufflation", unit: "rpm", icon: "mdi:fan" }
+      - { key: extf_spd, name: "Ventilateur extraction", unit: "rpm", icon: "mdi:fan" }
+      - { key: ffe_flw, name: "Débit insufflation", unit: "m³/h", icon: "mdi:air-filter" }
+      - { key: extf_flw, name: "Débit extraction", unit: "m³/h", icon: "mdi:air-filter" }
+      - { key: set_spd, name: "Vitesse consigne", icon: "mdi:speedometer" }
+      - { key: ff_cpt, name: "Compteur filtre", icon: "mdi:air-filter" }
+      - { key: echange_pwr, name: "Puissance échangée", icon: "mdi:flash" }
+      - { key: Co2_vmc, name: "CO2", icon: "mdi:molecule-co2" }
+      - { key: Pm25_Vmc, name: "PM2.5", icon: "mdi:blur" }
+      - { key: Voc_Vmc, name: "COV", icon: "mdi:chemical-weapon" }
+      # Champs bruts non documentes, exposes en diagnostic.
+      - { key: modemid, name: "modemid", entity_category: diagnostic }
+      - { key: productid, name: "productid", entity_category: diagnostic }
+      - { key: Vers_W, name: "Vers_W", entity_category: diagnostic }
+      - { key: Vers_UC, name: "Vers_UC", entity_category: diagnostic }
+      - { key: RSSI, name: "RSSI", entity_category: diagnostic, value_template: "{{ 'unknown' if value in ['', '--%%'] else value }}" }
+      - { key: dep_ind, name: "dep_ind", entity_category: diagnostic }
+      - { key: cve_csn, name: "cve_csn", entity_category: diagnostic }
+      - { key: vi_csn, name: "vi_csn", entity_category: diagnostic }
+      - { key: tte_csn, name: "tte_csn", entity_category: diagnostic }
+      - { key: dtb_ind, name: "dtb_ind", entity_category: diagnostic }
+      - { key: Start_date_mode, name: "Start_date_mode", entity_category: diagnostic, value_template: "{{ 'unknown' if value in ['', '--%%'] else value }}" }
+      - { key: End_date_mode, name: "End_date_mode", entity_category: diagnostic, value_template: "{{ 'unknown' if value in ['', '--%%'] else value }}" }
