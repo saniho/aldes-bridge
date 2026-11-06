@@ -1,8 +1,19 @@
-import type { HealthData } from '../types'
+import { useEffect, useState } from 'react'
+import { getProducts } from '../api'
+import type { AldesProduct, DeviceProfile, HealthData } from '../types'
 import styles from './HealthPanel.module.css'
 
 interface Props {
   health: HealthData | null | undefined
+  profile?: DeviceProfile | null
+}
+
+function fmtSensor(v: string | number | boolean | undefined): string {
+  if (v == null || v === '') return '—'
+  if (typeof v === 'number') return Number.isInteger(v) ? String(v) : v.toFixed(1)
+  const s = String(v)
+  if (s === 'null' || s === '--%%') return '—'
+  return s
 }
 
 function fmtBar(val: number | null | undefined): string {
@@ -43,7 +54,48 @@ function fmtDefr(defr: number | null | undefined, mfac: number | null | undefine
   return { text: `Valeur inattendue (${defr})`, tone: 'muted' }
 }
 
-export default function HealthPanel({ health }: Props) {
+export default function HealthPanel({ health, profile }: Props) {
+  const [products, setProducts] = useState<AldesProduct[]>([])
+
+  useEffect(() => {
+    let alive = true
+    const poll = () => {
+      getProducts().then((p) => { if (alive) setProducts(p) }).catch(() => {})
+    }
+    poll()
+    const id = setInterval(poll, 5000)
+    return () => { alive = false; clearInterval(id) }
+  }, [])
+
+  const cards = profile?.health?.cards ?? []
+  if (cards.length > 0) {
+    const sensorMeta = profile?.ha_discovery?.entities?.sensors ?? []
+    const sensorValues = products[0]?.indicator?.sensors ?? {}
+    return (
+      <div className={styles.panel}>
+        {cards.map((card) => (
+          <div key={card.title} className={styles.card}>
+            <div className={styles.cardTitle}>{card.title}</div>
+            <div className={styles.grid}>
+              {card.sensors.map((key) => {
+                const meta = sensorMeta.find((s) => s.key === key)
+                return (
+                  <div key={key} className={styles.indicator}>
+                    <span className={styles.label}>{meta?.name || key}</span>
+                    <span className={styles.value}>
+                      {fmtSensor(sensorValues[key])}
+                      {meta?.unit ? ` ${meta.unit}` : ''}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
   if (!health || Object.keys(health).length === 0) {
     return (
       <div className={styles.panel}>

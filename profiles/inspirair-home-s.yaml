@@ -38,6 +38,18 @@ ui:
   show_hot_water: false
   show_sensors: true
 
+# La VMC n'a pas de donnees de sante PAC : rien a extraire de la telemetrie.
+health_keys: []
+
+# Onglet sante : sous-selection "etat" des capteurs. Le dashboard expose
+# tous les capteurs non-diagnostic, la sante uniquement ceux-ci.
+health:
+  cards:
+    - title: "Qualité d'air"
+      sensors: [Co2_vmc, Pm25_Vmc, Voc_Vmc]
+    - title: "État de l'installation"
+      sensors: [ff_cpt, RSSI]
+
 # Unites deduites des valeurs observees, pas d'une documentation Aldes.
 ha_discovery:
   # Selectionner Holidays ouvre une fenetre bornee ; un autre mode l'annule.

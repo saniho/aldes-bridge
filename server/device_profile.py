@@ -60,6 +60,16 @@ class DeviceProfile:
         return self._data.get("ui", {})
 
     @property
+    def health(self):
+        """Configuration de l'onglet sante (cartes) : {"cards": [...]}."""
+        return self._data.get("health") or {}
+
+    @property
+    def health_keys(self):
+        """Cles de telemetrie de sante a extraire, ou None si non declarees."""
+        return self._data.get("health_keys")
+
+    @property
     def ha_discovery(self):
         return self._data.get("ha_discovery", {})
 
@@ -129,6 +139,7 @@ class DeviceProfile:
             "water_modes": self.water_modes,
             "commands": self.commands,
             "ui": self.ui,
+            "health": self.health,
             "ha_discovery": self.ha_discovery,
         }
 

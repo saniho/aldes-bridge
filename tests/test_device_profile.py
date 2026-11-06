@@ -410,3 +410,37 @@ def test_config_store_helpers():
         assert cfg.log_retention_bytes() == 25 * 1024 * 1024
     finally:
         os.unlink(path)
+
+
+# --- Onglet sante pilote par le profil ---
+
+def test_profile_health_cards():
+    vmc = load_profile("inspirair-home-s")
+    cards = vmc.to_dict()["health"]["cards"]
+    assert [c["title"] for c in cards] == ["Qualité d'air", "État de l'installation"]
+    assert cards[0]["sensors"] == ["Co2_vmc", "Pm25_Vmc", "Voc_Vmc"]
+    assert cards[1]["sensors"] == ["ff_cpt", "RSSI"]
+    assert vmc.health_keys == []
+
+    tone = load_profile("tone-aquaair")
+    assert tone.to_dict()["health"] == {}
+    assert tone.health_keys is None
+
+
+def test_extract_health_filtered_by_profile():
+    state = AppState("h", 8883, EventBus())
+    state._health = {"mfac": 3, "defr": 1, "preh": 15.0}
+    state.profile = load_profile("tone-aquaair")
+    assert state._extract_health() == {"mfac": 3, "defr": 1, "preh": 15.0}
+
+    state.profile = load_profile("inspirair-home-s")
+    assert state._extract_health() == {}
+
+
+def test_set_profile_drops_stale_health():
+    state = AppState("h", 8883, EventBus())
+    state._health = {"mfac": 3, "defr": 1}
+    state.set_profile(load_profile("inspirair-home-s"))
+    assert state._health == {}
+    state.set_profile(load_profile("tone-aquaair"))
+    assert state._health == {}

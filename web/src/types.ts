@@ -165,6 +165,11 @@ export interface DeviceCommand {
   }>
 }
 
+export interface HealthCard {
+  title: string
+  sensors: string[]
+}
+
 export interface DeviceUi {
   quick_modes?: Array<{ field: string; label: string }>
   show_thermostats?: boolean
@@ -199,6 +204,7 @@ export interface DeviceProfile {
   water_modes: DeviceMode[]
   commands: DeviceCommand[]
   ui: DeviceUi
+  health?: { cards?: HealthCard[] } | null
   ha_discovery?: HaDiscovery | null
 }
 

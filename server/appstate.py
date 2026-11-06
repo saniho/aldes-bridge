@@ -282,7 +282,27 @@ class AppState:
     def set_profile(self, profile):
         """Change le profil device et persiste le choix."""
         self.profile = profile
+        allowed = self._health_keys()
+        with self._lock:
+            self._health = {
+                k: v for k, v in self._health.items() if k.lower() in allowed
+            }
         self._persist_profile()
+
+    def _health_keys(self):
+        """Cles de telemetrie de sante autorisees pour le profil actif.
+
+        Un profil peut declarer health_keys (liste vide comprise pour un
+        appareil sans donnees de sante PAC) ; sans declaration, le jeu
+        legacy s'applique, ce qui preserve les installations existantes.
+        """
+        declared = None
+        profile = getattr(self, "profile", None)
+        if profile is not None:
+            declared = getattr(profile, "health_keys", None)
+        if declared is None:
+            return {k.lower() for k in _HEALTH_KEYS}
+        return {str(k).lower() for k in declared}
 
     def _persist_profile(self):
         """Ecrit le profil courant dans profile_file (atomique, ne casse jamais le runtime)."""
@@ -658,11 +678,20 @@ class AppState:
 
         Appeler sous self._lock. Renvoie un dict avec les valeurs ou None.
         Priorise self._health (persistance) puis fallback sur telemetry live.
+        Seules les cles autorisees par le profil actif sont exposees : des
+        valeurs PAC persistees ne doivent pas survivre a un changement de
+        profil vers un appareil sans donnees de sante.
         Les valeurs sentinelles (<= -40) sont filtrees.
         """
+        allowed = self._health_keys()
         # Priorite 1 : donnees persistees (disponibles au demarrage)
         if self._health:
-            return {k: v for k, v in self._health.items() if not isinstance(v, (int, float)) or v > -40}
+            return {
+                k: v
+                for k, v in self._health.items()
+                if k.lower() in allowed
+                and (not isinstance(v, (int, float)) or v > -40)
+            }
         # Priorite 2 : donnees live depuis la telemetrie (fallback)
         for data in self.telemetry.values():
             if not isinstance(data, dict):
@@ -688,6 +717,8 @@ class AppState:
                 ("TUeH", "tueh"),
                 ("THGa", "thga"),
             ):
+                if key.lower() not in allowed:
+                    continue
                 val = data.get(key)
                 if val is not None:
                     try:
