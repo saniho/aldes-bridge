@@ -4,6 +4,7 @@ import logging
 import threading
 import time
 
+from .device_profile import telemetry_field
 from .events import EventBus
 from .mqtt import build_publish, parse_connect
 from .utils import atomic_write_json, iso, read_json
@@ -354,7 +355,9 @@ class AppState:
         with self._lock:
             current = dict(self.telemetry.get(pid, {}))
             # Log les changements de temperature/consigne
-            temp_keys = [k for k in data if k.startswith("MT") or k.startswith("UsC")]
+            temp_prefix = telemetry_field(self.profile, "zone_temp_prefix", "MT")
+            setpoint_prefix = telemetry_field(self.profile, "zone_setpoint_prefix", "UsC")
+            temp_keys = [k for k in data if k.startswith(temp_prefix) or k.startswith(setpoint_prefix)]
             if temp_keys:
                 changes = {k: data[k] for k in temp_keys if str(data.get(k)) != str(current.get(k))}
                 if changes:
@@ -514,19 +517,20 @@ class AppState:
     def _confirm_consignes_from(self, data):
         """Confirme ou rejette les consignes en attente.
 
-        A appeler sous self._lock : pour chaque zone dont une UsC<n> est presente
-        dans la trame, si elle correspond a une consigne demandee, on la marque
-        confirmee (la box a bien applique la valeur) et on persiste.
+        A appeler sous self._lock : pour chaque zone dont une setpoint<n> est
+        presente dans la trame, si elle correspond a une consigne demandee, on
+        la marque confirmee (la box a bien applique la valeur) et on persiste.
         Si la valeur ne correspond pas, on incremente le compteur d'apres 2
         tentatives sans concordance, la consigne est supprimee (rejetee).
         """
+        setpoint_prefix = telemetry_field(self.profile, "zone_setpoint_prefix", "UsC")
         confirmed = []
         rejected = []
         for zone, entry in list(self._consignes.items()):
             if entry.get("confirmed"):
                 continue
             try:
-                got = float(data.get("UsC%s" % zone))
+                got = float(data.get("%s%s" % (setpoint_prefix, zone)))
             except (TypeError, ValueError):
                 continue
             _log.debug("confirm_consigne: zone %s requested=%.1f got=%.1f (diff=%.2f) attempts=%d",

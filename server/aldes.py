@@ -19,6 +19,9 @@ Mapping de la telemetrie brute (payload PUBLISH boxward) vers le product :
     NpiH        -> indicator.settings.people (index HomeComposition, 0..4)
     dt          -> lastUpdatedDate / lastUpdatedAt
     Dvac/Fvac   -> indicator.date_debut_vac / date_fin_vac (epoch, 0 = off)
+
+Ces noms sont ceux par defaut : le profil (bloc telemetry de profiles/*.yaml)
+peut les renommer, cf. device_profile.telemetry_field.
 """
 import json
 import logging
@@ -26,6 +29,7 @@ import os
 import uuid
 from datetime import datetime, timezone
 
+from .device_profile import telemetry_field, telemetry_key_for
 from .utils import parse_json_payload
 
 _log = logging.getLogger("aldes-telemetry")
@@ -76,12 +80,18 @@ def capture_telemetry(state, payload):
     if data is None:
         _log.debug("capture_telemetry: payload non reconnu (pas du JSON?), len=%d", len(payload) if payload else 0)
         return
-    pid = data.get("productid") or data.get("modemid")
+    profile = getattr(state, "profile", None)
+    pid = (
+        data.get(telemetry_key_for(profile, "product.serial_number", "productid"))
+        or data.get(telemetry_key_for(profile, "product.modem", "modemid"))
+    )
     if not pid:
         _log.debug("capture_telemetry: pid manquant, keys=%s", list(data.keys()))
         return
     # Log les champs temperature/consigne pour debug
-    temp_keys = [k for k in data if k.startswith("MT") or k.startswith("UsC")]
+    temp_prefix = telemetry_field(profile, "zone_temp_prefix", "MT")
+    setpoint_prefix = telemetry_field(profile, "zone_setpoint_prefix", "UsC")
+    temp_keys = [k for k in data if k.startswith(temp_prefix) or k.startswith(setpoint_prefix)]
     if temp_keys:
         _log.info("capture_telemetry: pid=%s temp/consigne: %s", pid, {k: data[k] for k in temp_keys})
     # La fusion des champs + horodatage de mise a jour + persistance vivent
@@ -131,26 +141,33 @@ def _num(value, default=None):
         return default
 
 
-def _derive_reference(telemetry):
-    """reference du product : la box possede de l'ECS (UAM/UDM/NED) ->
+def _derive_reference(telemetry, profile=None):
+    """reference du product : la box possede de l'ECS (hot_water/water mode) ->
     AquaAIR, sinon TONE_AIR."""
-    if any(k in telemetry for k in ("NED", "UDM")):
+    fields = (
+        telemetry_field(profile, "hot_water_field", "NED"),
+        telemetry_field(profile, "water_mode_field", "UDM"),
+    )
+    if any(k in telemetry for k in fields):
         return "TONE_AQUA_AIR"
     return "TONE_AIR"
 
 
-def build_thermostats(telemetry):
-    """Construit la liste des thermostats depuis MTx/UsCx.
+def build_thermostats(telemetry, profile=None):
+    """Construit la liste des thermostats depuis <temp_prefix>x/<setpoint_prefix>x.
 
-    Un thermostat est actif si sa temperature mesuree (MTx) est non nulle.
+    Un thermostat est actif si sa temperature mesuree est non nulle.
     L'id (ThermostatId) est l'index de zone, stable entre 2 appels.
     """
+    temp_prefix = telemetry_field(profile, "zone_temp_prefix", "MT")
+    setpoint_prefix = telemetry_field(profile, "zone_setpoint_prefix", "UsC")
+    zone_count = int(telemetry_field(profile, "zone_count", 10))
     thermostats = []
-    for i in range(10):
-        measured = _num(telemetry.get("MT%d" % i))
+    for i in range(zone_count):
+        measured = _num(telemetry.get("%s%d" % (temp_prefix, i)))
         if measured is None or measured <= 0:
             continue
-        setpoint = _num(telemetry.get("UsC%d" % i))
+        setpoint = _num(telemetry.get("%s%d" % (setpoint_prefix, i)))
         thermostats.append({
             "ThermostatId": str(i),
             "thermostatId": str(i),
@@ -180,43 +197,45 @@ def build_ventilation(telemetry):
     return vent if vent else None
 
 
-def build_product(telemetry, connected):
+def build_product(telemetry, connected, profile=None):
     """Construit un product au format consomme par l'integration HA."""
-    reference = _derive_reference(telemetry)
-    air_index = int(_num(telemetry.get("UAM"), -1))
-    water_index = int(_num(telemetry.get("UDM"), -1))
+    reference = _derive_reference(telemetry, profile)
+    air_index = int(_num(telemetry.get(telemetry_field(profile, "air_mode_field", "UAM")), -1))
+    water_index = int(_num(telemetry.get(telemetry_field(profile, "water_mode_field", "UDM")), -1))
     air_mode = AIR_MODES[air_index] if 0 <= air_index < len(AIR_MODES) else None
     water_mode = WATER_MODES[water_index] if 0 <= water_index < len(WATER_MODES) else None
-    people = _num(telemetry.get("NpiH"))
+    people = _num(telemetry.get(telemetry_field(profile, "people_field", "NpiH")))
     if people is not None:
         people = max(0, min(_HOME_COMPOSITION_MAX - 1, int(people)))
-    temp = _num(telemetry.get("MT0"))
+    temp_prefix = telemetry_field(profile, "zone_temp_prefix", "MT")
+    temp = _num(telemetry.get("%s0" % temp_prefix))
+    dt_field = telemetry_key_for(profile, "product.lastUpdatedDate", "dt")
 
     return {
-        "modem": telemetry.get("modemid") or "N/A",
-        "serial_number": telemetry.get("productid") or "N/A",
+        "modem": telemetry.get(telemetry_key_for(profile, "product.modem", "modemid")) or "N/A",
+        "serial_number": telemetry.get(telemetry_key_for(profile, "product.serial_number", "productid")) or "N/A",
         "reference": reference,
         "name": FRIENDLY_NAMES.get(reference, reference),
         "type": reference,
         "isConnected": bool(connected),
-        "lastUpdatedDate": _epoch_to_iso(telemetry.get("dt")) or "",
-        "lastUpdatedAt": _epoch_to_iso(telemetry.get("dt")),
+        "lastUpdatedDate": _epoch_to_iso(telemetry.get(dt_field)) or "",
+        "lastUpdatedAt": _epoch_to_iso(telemetry.get(dt_field)),
         "updatedAt": _utc_iso(telemetry.get("_upd_at")),
         "gpsLatitude": 0.0,
         "gpsLongitude": 0.0,
         "indicator": {
-            "qte_eau_chaude": _num(telemetry.get("NED"), 0),
+            "qte_eau_chaude": _num(telemetry.get(telemetry_field(profile, "hot_water_field", "NED")), 0),
             "tmp_principal": temp,
             "current_air_mode": air_mode,
             "current_water_mode": water_mode,
-            "date_debut_vac": _epoch_to_iso(telemetry.get("Dvac")),
-            "date_fin_vac": _epoch_to_iso(telemetry.get("Fvac")),
+            "date_debut_vac": _epoch_to_iso(telemetry.get(telemetry_field(profile, "vacation_start_field", "Dvac"))),
+            "date_fin_vac": _epoch_to_iso(telemetry.get(telemetry_field(profile, "vacation_end_field", "Fvac"))),
             "hors_gel": air_mode == "H",
             "antilegionelles": str(telemetry.get("AntiL", "")) not in ("0", "", "null"),
             "settings": {
                 "people": people,
             },
-            "thermostats": build_thermostats(telemetry),
+            "thermostats": build_thermostats(telemetry, profile),
             "ventilation": build_ventilation(telemetry),
         },
     }
@@ -228,13 +247,14 @@ def build_products(state):
     Sans telemetrie, renvoie un product vide (modem "N/A") pour eviter un
     crash de l'integration HA, qui itere toujours la liste.
     """
+    profile = getattr(state, "profile", None)
     try:
         telemetry = dict(state.telemetry)
     except AttributeError:
         telemetry = {}
-    products = [build_product(data, state.connected) for data in telemetry.values()]
+    products = [build_product(data, state.connected, profile) for data in telemetry.values()]
     if not products:
-        products = [build_product({}, state.connected)]
+        products = [build_product({}, state.connected, profile)]
     products.sort(key=lambda p: p["serial_number"])
     return products
 

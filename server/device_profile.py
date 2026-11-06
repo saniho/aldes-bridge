@@ -133,6 +133,31 @@ class DeviceProfile:
         }
 
 
+def telemetry_field(profile, name, default=None):
+    """Nom de champ telemetrie declare dans le profil, ou valeur par defaut.
+
+    profile peut etre None (aucun profil charge) : le defaut est alors
+    renvoye, ce qui preserve le comportement des installations existantes.
+    """
+    if profile is None:
+        return default
+    return profile.telemetry.get(name) or default
+
+
+def telemetry_key_for(profile, destination, default=None):
+    """Cle telemetrie qui alimente une destination du profil (ex: product.modem).
+
+    Certaines entrees du bloc telemetry sont ecrites a l'envers (cle = champ,
+    valeur = destination) : on retrouve donc le champ par sa destination.
+    """
+    if profile is None:
+        return default
+    for key, value in profile.telemetry.items():
+        if value == destination:
+            return key
+    return default
+
+
 DEFAULT_PROFILE_ID = "tone-aquaair"
 
 
