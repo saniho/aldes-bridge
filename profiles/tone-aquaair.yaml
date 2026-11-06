@@ -236,6 +236,7 @@ ui:
   show_vacations: true
   show_people: true
   show_hot_water: true
+  show_sensors: false
 
 # ── Home Assistant MQTT Auto-Discovery ──
 ha_discovery:

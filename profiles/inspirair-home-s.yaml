@@ -36,6 +36,7 @@ ui:
   show_vacations: false
   show_people: false
   show_hot_water: false
+  show_sensors: true
 
 # Unites deduites des valeurs observees, pas d'une documentation Aldes.
 ha_discovery:

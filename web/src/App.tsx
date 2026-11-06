@@ -387,6 +387,7 @@ const { messages, lastSnapshot } = useMemo(() => {
               config={config}
               connected={config?.connected ?? false}
               health={config?.health ?? null}
+              profile={config?.profile ?? null}
             />
           </div>
         )}

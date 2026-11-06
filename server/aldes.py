@@ -204,6 +204,27 @@ def build_ventilation(telemetry):
     return vent if vent else None
 
 
+def build_sensors(telemetry, profile):
+    """Valeurs des capteurs declares dans ha_discovery.entities.sensors.
+
+    Seules les cles effectivement presentes dans la telemetrie sont
+    exposees, sous forme brute : c'est le frontend qui formate.
+    Renvoie None sans profil ou quand aucun capteur n'a de valeur.
+    """
+    if profile is None:
+        return None
+    entities = profile.ha_discovery.get("entities") or {}
+    values = {}
+    for sensor in entities.get("sensors") or []:
+        key = sensor.get("key")
+        if not key or key in values:
+            continue
+        val = telemetry.get(key)
+        if val is not None:
+            values[key] = val
+    return values or None
+
+
 def build_product(telemetry, connected, profile=None):
     """Construit un product au format consomme par l'integration HA."""
     reference = _derive_reference(telemetry, profile)
@@ -246,6 +267,7 @@ def build_product(telemetry, connected, profile=None):
             },
             "thermostats": build_thermostats(telemetry, profile),
             "ventilation": build_ventilation(telemetry),
+            "sensors": build_sensors(telemetry, profile),
         },
     }
 

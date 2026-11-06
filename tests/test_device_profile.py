@@ -161,6 +161,39 @@ def test_build_product_vmc_air_mode_from_code():
     assert ind["ventilation"] is None
 
 
+def test_build_product_sensors_from_profile():
+    vmc = load_profile("inspirair-home-s")
+    product = build_product(
+        {"modemid": "AABBCC", "productid": "AABBCC_AIR", "Co2_vmc": 612, "RSSI": "-70"},
+        True,
+        profile=vmc,
+    )
+    sensors = product["indicator"]["sensors"]
+    assert sensors["Co2_vmc"] == 612
+    # RSSI est declare en diagnostic mais reste expose : les cartes sante en ont besoin
+    assert sensors["RSSI"] == "-70"
+    assert sensors["modemid"] == "AABBCC"
+    # les cles declares sans valeur dans la telemetrie ne sont pas exposees
+    assert "Pm25_Vmc" not in sensors
+
+
+def test_build_product_sensors_tone_profile():
+    tone = load_profile("tone-aquaair")
+    product = build_product({"Text": 12.5, "NED": 75}, True, profile=tone)
+    assert product["indicator"]["sensors"] == {"Text": 12.5, "NED": 75}
+
+
+def test_build_product_sensors_none_without_profile():
+    product = build_product({"Text": 12.5, "NED": 75}, True)
+    assert product["indicator"]["sensors"] is None
+
+
+def test_build_product_sensors_absent_when_no_value():
+    vmc = load_profile("inspirair-home-s")
+    product = build_product({}, True, profile=vmc)
+    assert product["indicator"]["sensors"] is None
+
+
 # --- Non-regression: mapping telemetrie identique ---
 
 TELEMETRY = {

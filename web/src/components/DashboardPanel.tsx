@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { getProducts, sendCommand } from '../api'
-import type { AldesProduct, AldesThermostat, Config, HealthData } from '../types'
+import type { AldesProduct, AldesThermostat, Config, DeviceMode, DeviceProfile, HealthData } from '../types'
 import styles from './DashboardPanel.module.css'
 
 interface Props {
   config?: Config | null
   connected?: boolean
   health?: HealthData | null
+  profile?: DeviceProfile | null
 }
 
 /* ── helpers ── */
@@ -19,19 +20,36 @@ function pct(v: number | null | undefined): string {
   return v == null ? '—' : String(Math.round(v))
 }
 
-function airLabel(code: string | null | undefined): string {
-  if (!code) return '—'
-  const m: Record<string, string> = {
-    A: 'Arrêt', B: 'Confort', C: 'Éco', D: 'Auto A', E: 'Auto B',
-    F: 'Froid confort', G: 'Froid boost', H: 'Froid A', I: 'Froid B',
-  }
-  return m[code] ?? code
+const FALLBACK_AIR_LABELS: Record<string, string> = {
+  A: 'Arrêt', B: 'Confort', C: 'Éco', D: 'Auto A', E: 'Auto B',
+  F: 'Froid confort', G: 'Froid boost', H: 'Froid A', I: 'Froid B',
 }
 
-function waterLabel(code: string | null | undefined): string {
+const FALLBACK_WATER_LABELS: Record<string, string> = { L: 'Arrêt', M: 'Marche', N: 'Boost' }
+
+function modeLabel(
+  code: string | null | undefined,
+  modes: DeviceMode[] | undefined,
+  fallback: Record<string, string>,
+): string {
   if (!code) return '—'
-  const m: Record<string, string> = { L: 'Arrêt', M: 'Marche', N: 'Boost' }
-  return m[code] ?? code
+  return modes?.find((m) => m.code === code)?.label ?? fallback[code] ?? code
+}
+
+function airLabel(code: string | null | undefined, modes?: DeviceMode[]): string {
+  return modeLabel(code, modes, FALLBACK_AIR_LABELS)
+}
+
+function waterLabel(code: string | null | undefined, modes?: DeviceMode[]): string {
+  return modeLabel(code, modes, FALLBACK_WATER_LABELS)
+}
+
+function sensorValue(v: string | number | boolean | undefined): string {
+  if (v == null || v === '') return '—'
+  if (typeof v === 'number') return Number.isInteger(v) ? String(v) : v.toFixed(1)
+  const s = String(v)
+  if (s === 'null' || s === '--%%') return '—'
+  return s
 }
 
 function compressorOn(mfac: number | null | undefined): boolean {
@@ -79,7 +97,7 @@ function fmtTime(ts: string | null | undefined): string {
 
 /* ── component ── */
 
-export default function DashboardPanel({ config, connected, health }: Props) {
+export default function DashboardPanel({ config, connected, health, profile }: Props) {
   const [products, setProducts] = useState<AldesProduct[]>([])
   const [now, setNow] = useState(() => Date.now())
   const [sysOpen, setSysOpen] = useState(false)
@@ -120,6 +138,23 @@ export default function DashboardPanel({ config, connected, health }: Props) {
   const apiPeopleIdx = ind?.settings?.people ?? 0
   const peopleIdx = localPeopleIdx ?? apiPeopleIdx
   const clientId = products[0]?.modem
+
+  const airModes = [
+    ...(profile?.air_modes_clim ?? []),
+    ...(profile?.air_modes_heat ?? []),
+    ...(profile?.air_modes ?? []),
+  ]
+  const waterModes = profile?.water_modes
+  const showHotWater = profile?.ui?.show_hot_water !== false
+  const showPeople = profile?.ui?.show_people !== false
+  const showSensors = profile?.ui?.show_sensors === true
+  const sensorMeta = showSensors
+    ? (profile?.ha_discovery?.entities?.sensors ?? []).filter(
+        (s) => s.entity_category !== 'diagnostic',
+      )
+    : []
+  const sensorValues = ind?.sensors ?? {}
+  const hasOutdoor = extTemp != null || extHum != null
 
   useEffect(() => {
     if (localPeopleIdx !== null && localPeopleIdx === apiPeopleIdx) {
@@ -173,31 +208,35 @@ export default function DashboardPanel({ config, connected, health }: Props) {
           <span className={styles.btnLabel}>Arrêt</span>
           <span className={styles.btnState}>{!connected ? 'Hors ligne' : 'Prêt'}</span>
         </div>
-        <div className={styles.btnAction + ' ' + (coOn ? styles.btnActive : '')}>
-          <span className={styles.btnIcon}>⚙</span>
-          <span className={styles.btnLabel}>Compresseur</span>
-          <span className={styles.btnState}>{coOn ? 'Marche' : 'Arrêt'}</span>
-        </div>
+        {health?.mfac != null && (
+          <div className={styles.btnAction + ' ' + (coOn ? styles.btnActive : '')}>
+            <span className={styles.btnIcon}>⚙</span>
+            <span className={styles.btnLabel}>Compresseur</span>
+            <span className={styles.btnState}>{coOn ? 'Marche' : 'Arrêt'}</span>
+          </div>
+        )}
       </div>
 
       {/* ── 4. Extérieur ── */}
-      <div className={styles.section}>
-        <div className={styles.sectionTitle}>Extérieur</div>
-        <div className={styles.twoCol}>
-          <div className={styles.statCard}>
-            <span className={styles.statLabel}>Température</span>
-            <span className={styles.statValue + ' ' + tempClass(extTemp)}>
-              {deg(extTemp)}<span className={styles.unit}>°C</span>
-            </span>
-          </div>
-          <div className={styles.statCard}>
-            <span className={styles.statLabel}>Humidité</span>
-            <span className={styles.statValue}>
-              {pct(extHum)}<span className={styles.unit}>%</span>
-            </span>
+      {hasOutdoor && (
+        <div className={styles.section}>
+          <div className={styles.sectionTitle}>Extérieur</div>
+          <div className={styles.twoCol}>
+            <div className={styles.statCard}>
+              <span className={styles.statLabel}>Température</span>
+              <span className={styles.statValue + ' ' + tempClass(extTemp)}>
+                {deg(extTemp)}<span className={styles.unit}>°C</span>
+              </span>
+            </div>
+            <div className={styles.statCard}>
+              <span className={styles.statLabel}>Humidité</span>
+              <span className={styles.statValue}>
+                {pct(extHum)}<span className={styles.unit}>%</span>
+              </span>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* ── 5. Zones ── */}
       {zones.length > 0 && (
@@ -222,43 +261,65 @@ export default function DashboardPanel({ config, connected, health }: Props) {
         </div>
       )}
 
-      {/* ── 6. Eau chaude ── */}
-      <div className={styles.section}>
-        <div className={styles.sectionTitle}>Eau chaude</div>
-        <div className={styles.ecsBar}>
-          <div className={styles.progressTrack}>
-            <div
-              className={styles.progressFill + (ned != null && ned < 20 ? ' ' + styles.progressLow : '')}
-              style={{ width: `${ned ?? 0}%` }}
-            />
-          </div>
-          <span className={styles.ecsPct}>{pct(ned)}%</span>
-        </div>
-        <div className={styles.ecsMeta}>
-          <span className={styles.ecsMode}>Mode : {waterLabel(ind?.current_water_mode)}</span>
-          <span className={styles.ecsMode}>Ventilation : {airLabel(ind?.current_air_mode)}</span>
-        </div>
-      </div>
-
-      {/* ── 7. Présence ── */}
-      <div className={styles.section}>
-        <div className={styles.sectionTitle}>Présence</div>
-        <div className={styles.presence}>
-          <span className={styles.presenceLabel}>Nombre de personnes</span>
-          <select
-            className={styles.presenceSelect}
-            value={peopleIdx}
-            disabled={sendingPeople}
-            onChange={(e) => changePeople(Number(e.target.value))}
-          >
-            {PEOPLE_OPTIONS.map((o) => (
-              <option key={o.idx} value={o.idx}>{o.label}</option>
+      {/* ── 6. Capteurs ── */}
+      {sensorMeta.length > 0 && (
+        <div className={styles.section}>
+          <div className={styles.sectionTitle}>Capteurs</div>
+          <div className={styles.sensorGrid}>
+            {sensorMeta.map((s) => (
+              <div key={s.key} className={styles.sensorCell}>
+                <span className={styles.sensorName}>{s.name || s.key}</span>
+                <span className={styles.sensorValue}>
+                  {sensorValue(sensorValues[s.key])}
+                  {s.unit && <span className={styles.unit}>{s.unit}</span>}
+                </span>
+              </div>
             ))}
-          </select>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* ── 8. Consignes actives ── */}
+      {/* ── 7. Eau chaude ── */}
+      {showHotWater && (
+        <div className={styles.section}>
+          <div className={styles.sectionTitle}>Eau chaude</div>
+          <div className={styles.ecsBar}>
+            <div className={styles.progressTrack}>
+              <div
+                className={styles.progressFill + (ned != null && ned < 20 ? ' ' + styles.progressLow : '')}
+                style={{ width: `${ned ?? 0}%` }}
+              />
+            </div>
+            <span className={styles.ecsPct}>{pct(ned)}%</span>
+          </div>
+          <div className={styles.ecsMeta}>
+            <span className={styles.ecsMode}>Mode : {waterLabel(ind?.current_water_mode, waterModes)}</span>
+            <span className={styles.ecsMode}>Ventilation : {airLabel(ind?.current_air_mode, airModes)}</span>
+          </div>
+        </div>
+      )}
+
+      {/* ── 8. Présence ── */}
+      {showPeople && (
+        <div className={styles.section}>
+          <div className={styles.sectionTitle}>Présence</div>
+          <div className={styles.presence}>
+            <span className={styles.presenceLabel}>Nombre de personnes</span>
+            <select
+              className={styles.presenceSelect}
+              value={peopleIdx}
+              disabled={sendingPeople}
+              onChange={(e) => changePeople(Number(e.target.value))}
+            >
+              {PEOPLE_OPTIONS.map((o) => (
+                <option key={o.idx} value={o.idx}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+
+      {/* ── 9. Consignes actives ── */}
       {pendingConsignes.length > 0 && (
         <div className={styles.section}>
           <div className={styles.sectionTitle}>Consignes en attente</div>
@@ -276,12 +337,12 @@ export default function DashboardPanel({ config, connected, health }: Props) {
         </div>
       )}
 
-      {/* ── 9. Dernière mise à jour ── */}
+      {/* ── 10. Dernière mise à jour ── */}
       <div className={styles.lastUpdate}>
         Dernière mise à jour : {fmtTime(products[0]?.updatedAt) || fmtTime(products[0]?.lastUpdatedDate)}
       </div>
 
-      {/* ── 10. Infos système ── */}
+      {/* ── 11. Infos système ── */}
       <div className={styles.sysSection}>
         <button className={styles.sysToggle} type="button" onClick={() => setSysOpen(!sysOpen)}>
           <span>Infos système</span>
