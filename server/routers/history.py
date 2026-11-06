@@ -1,6 +1,7 @@
 """Routes historisation des valeurs (SQLite)."""
 from fastapi import APIRouter, HTTPException, Request
 
+from ..device_profile import history_family_order, history_key_meta
 from . import get_state
 
 router = APIRouter(prefix="/api/history", tags=["history"])
@@ -16,7 +17,12 @@ def _history(request: Request):
 @router.get("/keys")
 def api_history_keys(request: Request):
     h = _history(request)
-    return {"keys": h.keys()}
+    profile = getattr(get_state(request), "profile", None)
+    keys = []
+    for k in h.keys():
+        family, label = history_key_meta(profile, k["key"])
+        keys.append({**k, "label": label, "family": family})
+    return {"keys": keys, "family_order": history_family_order(profile)}
 
 
 @router.get("/series")

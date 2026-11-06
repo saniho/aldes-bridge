@@ -11,6 +11,7 @@ import urllib.request
 sys.path.insert(0, "/home/ubuntu/aldes-bridge")
 
 from server.appstate import AppState
+from server.device_profile import load_profile
 from server.events import EventBus
 from server.history import HistoryDB
 
@@ -226,3 +227,51 @@ if __name__ == "__main__":
                 traceback.print_exc()
     print("\n%d tests en echec" % failures)
     sys.exit(1 if failures else 0)
+
+# --- Libelles d'historique resolus par le profil ---------------------------
+
+def test_history_key_meta_exact_and_pattern():
+    from server.device_profile import history_family_order, history_key_meta
+
+    tone = load_profile("tone-aquaair")
+    assert history_key_meta(tone, "Text") == ("Températures", "Température extérieure (°C)")
+    assert history_key_meta(tone, "MT0") == ("Températures", "Température zone 0 (°C)")
+    assert history_key_meta(tone, "CcH3") == (
+        "Zones (12) — répartition", "Zone 3 — indicateur H")
+    assert history_key_meta(tone, "ZZZ") == ("Divers / non documenté", "Non documenté")
+    assert history_key_meta(None, "Text") == ("Divers / non documenté", "Non documenté")
+
+    order = history_family_order(tone)
+    assert order[0] == "Températures"
+    assert len(order) == 11
+
+
+def test_history_key_meta_sensors_for_vmc():
+    from server.device_profile import history_family_order, history_key_meta
+
+    vmc = load_profile("inspirair-home-s")
+    assert history_key_meta(vmc, "outside_tpt") == ("Capteurs", "Température air neuf")
+    assert history_key_meta(vmc, "Co2_vmc") == ("Capteurs", "CO2")
+    # champ brut : nom identique a la cle -> pas de libelle, repli
+    assert history_key_meta(vmc, "modemid") == ("Divers / non documenté", "Non documenté")
+    assert history_family_order(vmc) == []
+
+
+def test_api_history_keys_include_profile_labels(tmp_path):
+    db = make_db(tmp_path, days=30)
+    state = AppState("h", 8883, EventBus(), history=db)
+    state.profile = load_profile("tone-aquaair")
+    port = _start_web(state)
+    _request(port, "/api/test/inject", "POST",
+             {"payload": '{"Text":21.5,"MT0":24.1,"ZZZ":1}'})
+
+    page = _request(port, "/api/history/keys")
+    by_key = {k["key"]: k for k in page["keys"]}
+    assert by_key["Text"]["label"] == "Température extérieure (°C)"
+    assert by_key["Text"]["family"] == "Températures"
+    assert by_key["MT0"]["label"] == "Température zone 0 (°C)"
+    assert by_key["ZZZ"]["family"] == "Divers / non documenté"
+    assert by_key["ZZZ"]["label"] == "Non documenté"
+    assert page["family_order"][0] == "Températures"
+    assert len(page["family_order"]) == 11
+    db.close()

@@ -10,8 +10,9 @@ import {
 } from 'recharts'
 import { getHistoryKeys, getHistorySeries, getHistoryTable } from '../api'
 import type { HistoryKey, HistoryPoint } from '../types'
-import { FAMILY_ORDER, getKeyMeta } from '../historyLabels'
 import styles from './HistoryPanel.module.css'
+
+const FALLBACK_FAMILY = 'Divers / non documenté'
 
 interface Props {
   historyDays?: number | null
@@ -44,6 +45,7 @@ function fmtTs(epoch: number): string {
 
 export default function HistoryPanel({ historyDays }: Props) {
   const [keys, setKeys] = useState<HistoryKey[]>([])
+  const [familyOrder, setFamilyOrder] = useState<string[]>([])
   const [key, setKey] = useState<string>('')
   const [period, setPeriod] = useState<PeriodId>('24h')
   const [mode, setMode] = useState<'graph' | 'table'>('graph')
@@ -57,9 +59,15 @@ export default function HistoryPanel({ historyDays }: Props) {
 
   const loadKeys = useCallback(async () => {
     try {
-      const ks = await getHistoryKeys()
-      setKeys(ks)
-      setKey((cur) => cur || ks.find((k) => k.kind === 'telemetry')?.key || (ks[0]?.key ?? ''))
+      const page = await getHistoryKeys()
+      setKeys(page.keys)
+      setFamilyOrder(page.family_order ?? [])
+      setKey(
+        (cur) =>
+          cur ||
+          page.keys.find((k) => k.kind === 'telemetry')?.key ||
+          (page.keys[0]?.key ?? '')
+      )
     } catch (e) {
       setError((e as Error).message)
     }
@@ -126,19 +134,19 @@ export default function HistoryPanel({ historyDays }: Props) {
   )
 
   const groups = useMemo(() => {
-    const famRank = new Map<string, number>(FAMILY_ORDER.map((f, i) => [f, i]))
+    const famRank = new Map<string, number>(familyOrder.map((f, i) => [f, i]))
     const map = new Map<string, HistoryKey[]>()
     for (const k of keys) {
-      const family = getKeyMeta(k.key).family
+      const family = k.family ?? FALLBACK_FAMILY
       if (!map.has(family)) map.set(family, [])
       map.get(family)!.push(k)
     }
     return [...map.entries()].sort(
       (a, b) =>
-        (famRank.get(a[0]) ?? FAMILY_ORDER.length) -
-        (famRank.get(b[0]) ?? FAMILY_ORDER.length)
+        (famRank.get(a[0]) ?? familyOrder.length) -
+        (famRank.get(b[0]) ?? familyOrder.length)
     )
-  }, [keys])
+  }, [keys, familyOrder])
 
   return (
     <div className={styles.wrap}>
@@ -161,14 +169,11 @@ export default function HistoryPanel({ historyDays }: Props) {
             </option>
             {groups.map(([family, ks]) => (
               <optgroup key={family} label={family}>
-                {ks.map((k) => {
-                  const meta = getKeyMeta(k.key)
-                  return (
-                    <option key={k.key} value={k.key}>
-                      {k.key} — {meta.label}
-                    </option>
-                  )
-                })}
+                {ks.map((k) => (
+                  <option key={k.key} value={k.key}>
+                    {k.key} — {k.label ?? k.key}
+                  </option>
+                ))}
               </optgroup>
             ))}
           </select>

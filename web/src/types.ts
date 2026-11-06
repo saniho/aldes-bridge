@@ -111,6 +111,13 @@ export interface HistoryKey {
   kind: string
   samples: number
   last_ts: number | null
+  label?: string
+  family?: string
+}
+
+export interface HistoryKeys {
+  keys: HistoryKey[]
+  family_order: string[]
 }
 
 export interface HistoryPoint {

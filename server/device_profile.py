@@ -6,6 +6,8 @@ modes, commandes, labels historique, et configuration UI.
 Les profils sont des fichiers YAML dans le dossier profiles/.
 """
 import os
+import re
+
 import yaml
 
 APP_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -142,6 +144,83 @@ class DeviceProfile:
             "health": self.health,
             "ha_discovery": self.ha_discovery,
         }
+
+
+# Famille et libelle de repli pour les cles d'historique non documentees.
+FALLBACK_HISTORY_FAMILY = "Divers / non documenté"
+FALLBACK_HISTORY_LABEL = "Non documenté"
+# Famille utilisee quand le libelle provient des capteurs du profil.
+SENSOR_HISTORY_FAMILY = "Capteurs"
+
+
+def history_key_meta(profile, key):
+    """(famille, libelle) d'une cle d'historique d'apres le profil.
+
+    Resolution : correspondance exacte, puis motifs regex du profil, puis
+    nom du capteur declare dans ha_discovery, sinon repli "Non documente".
+    """
+    if profile is None:
+        return FALLBACK_HISTORY_FAMILY, FALLBACK_HISTORY_LABEL
+    labels = profile.history_labels or {}
+    families = labels.get("families") or []
+    for fam in families:
+        name = fam.get("name") or FALLBACK_HISTORY_FAMILY
+        for item in fam.get("keys") or []:
+            if item.get("key") == key:
+                return name, item.get("label") or FALLBACK_HISTORY_LABEL
+    for fam in families:
+        name = fam.get("name") or FALLBACK_HISTORY_FAMILY
+        label = _expand_history_patterns(fam, key)
+        if label is not None:
+            return name, label
+    sensor = _history_sensor_name(profile, key)
+    if sensor:
+        return SENSOR_HISTORY_FAMILY, sensor
+    return FALLBACK_HISTORY_FAMILY, FALLBACK_HISTORY_LABEL
+
+
+def _expand_history_patterns(fam, key):
+    """Libelle du premier motif regex du profil qui accepte `key`, ou None.
+
+    `{0}` designe le 1er groupe de capture, `{1}` le 2e (comme en JS).
+    """
+    for pat in fam.get("patterns") or []:
+        pattern = pat.get("re")
+        if not pattern:
+            continue
+        try:
+            m = re.search(pattern, key)
+        except re.error:
+            continue
+        if not m:
+            continue
+        label = pat.get("label") or key
+        for i, group in enumerate(m.groups()):
+            label = label.replace("{%d}" % i, group)
+        return label
+    return None
+
+
+def _history_sensor_name(profile, key):
+    """Nom affiche du capteur `key` declare par le profil, ou None.
+
+    Un nom identique a la cle (champs bruts en diagnostic) n'est pas un
+    libelle : la cle tombe alors sur le repli "Non documente".
+    """
+    sensors = ((profile.ha_discovery or {}).get("entities") or {}).get("sensors") or []
+    for sensor in sensors:
+        if sensor.get("key") == key:
+            name = sensor.get("name")
+            return name if name and name != key else None
+    return None
+
+
+def history_family_order(profile):
+    """Ordre d'affichage des familles d'historique declare par le profil."""
+    if profile is None:
+        return []
+    labels = profile.history_labels or {}
+    return [f.get("name") for f in (labels.get("families") or []) if f.get("name")]
 
 
 def telemetry_field(profile, name, default=None):

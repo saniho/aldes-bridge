@@ -65,7 +65,7 @@ history_labels:
         - { key: TEHG, label: "Température échangeur — gaz (°C)" }
         - { key: TEHL, label: "Température échangeur — liquide (°C)" }
         - { key: TEHU, label: "Température échangeur — haut (°C)" }
-        - { key: THGa, label: "Température gaine d'air (°C)" }
+        - { key: THGa, label: "Température gaine d’air (°C)" }
         - { key: TUeH, label: "Température unité extérieure (°C)" }
       patterns:
         - { re: "^MT(\\d+)$", label: "Température zone {0} (°C)" }
@@ -117,16 +117,16 @@ history_labels:
         - { key: EcF, label: "Économie (non documenté)" }
         - { key: Rec, label: "Récupération (non documenté)" }
         - { key: Sec, label: "Secondaire (non documenté)" }
-    - name: "Ventilation & débits d'air"
+    - name: "Ventilation & débits d’air"
       keys:
         - { key: RVeI, label: "Vitesse rotation ventilateur (tr/min)" }
-        - { key: Dno, label: "Débit d'air — nominal (m³/h)" }
-        - { key: Dma, label: "Débit d'air — maximum (m³/h)" }
-        - { key: Dint, label: "Débit d'air — intermédiaire (m³/h)" }
-        - { key: DLN, label: "Débit d'air — faible nuit (m³/h)" }
-        - { key: DPLe, label: "Débit d'air — plein (m³/h)" }
-        - { key: DmCO, label: "Débit d'air — max CO₂ (m³/h)" }
-        - { key: Dkof, label: "Débit d'air — hors gel (m³/h)" }
+        - { key: Dno, label: "Débit d’air — nominal (m³/h)" }
+        - { key: Dma, label: "Débit d’air — maximum (m³/h)" }
+        - { key: Dint, label: "Débit d’air — intermédiaire (m³/h)" }
+        - { key: DLN, label: "Débit d’air — faible nuit (m³/h)" }
+        - { key: DPLe, label: "Débit d’air — plein (m³/h)" }
+        - { key: DmCO, label: "Débit d’air — max CO₂ (m³/h)" }
+        - { key: Dkof, label: "Débit d’air — hors gel (m³/h)" }
     - name: "Zones (10) — indicateurs"
       patterns:
         - { re: "^OCa(\\d+)$", label: "Zone {0} — indicateur ventilation (a)" }
@@ -141,10 +141,10 @@ history_labels:
         - { key: Vers_UC, label: "Version unité centrale" }
         - { key: box, label: "Connexion box (état)" }
         - { key: cloud, label: "Connexion cloud Aldes (état)" }
-        - { key: TyI, label: "Type d'installation" }
+        - { key: TyI, label: "Type d’installation" }
         - { key: TyM, label: "Type de machine" }
         - { key: IId, label: "Identifiant installation" }
-        - { key: NbO, label: "Nombre d'ouvertures (compteur)" }
+        - { key: NbO, label: "Nombre d’ouvertures (compteur)" }
         - { key: NbME, label: "Nombre de modes éco" }
         - { key: dt, label: "Horodatage dernier relevé (epoch)" }
         - { key: Ddef, label: "Compteur dégivrage" }
