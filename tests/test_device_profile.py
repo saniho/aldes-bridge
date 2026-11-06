@@ -7,7 +7,13 @@ import yaml
 
 sys.path.insert(0, "/home/ubuntu/aldes-bridge")
 
-from server.device_profile import DeviceProfile, load_profile, list_profiles
+from server.device_profile import (
+    DeviceProfile,
+    air_mode_code,
+    list_profiles,
+    load_profile,
+    water_mode_code,
+)
 from server.appstate import AppState, read_persisted_profile
 from server.config import ConfigStore
 from server.events import EventBus
@@ -94,6 +100,65 @@ def test_to_dict():
     assert "water_modes" in d
     assert "commands" in d
     assert "ui" in d
+
+
+# --- Resolution des codes de mode (air_mode_code / water_mode_code) ---
+
+def test_air_mode_code_index_resolved_by_profile():
+    p = load_profile("tone-aquaair")
+    assert air_mode_code(0, p) == "A"
+    assert air_mode_code("5", p) == "F"
+    assert air_mode_code(8, p) == "I"
+    assert air_mode_code(5.0, p) == "F"
+    # index hors bornes / valeur absente -> None (pas de crash HA)
+    assert air_mode_code(9, p) is None
+    assert air_mode_code(-1, p) is None
+    assert air_mode_code(None, p) is None
+    assert air_mode_code("", p) is None
+
+def test_air_mode_code_letter_only_when_declared():
+    tone = load_profile("tone-aquaair")
+    vmc = load_profile("inspirair-home-s")
+    # PAC : UAM est numerique, une lettre inconnue n'est jamais un code plausible
+    assert air_mode_code("F", tone) == "F"
+    assert air_mode_code("abc", tone) is None
+    # VMC : la telemetrie envoie deja le code (current_mode: "X")
+    assert air_mode_code("X", vmc) == "X"
+    assert air_mode_code("x", vmc) == "X"
+    assert air_mode_code("A", vmc) is None
+    # sans profil : repli sur les circuits A-I
+    assert air_mode_code("F", None) == "F"
+    assert air_mode_code("X", None) is None
+    assert air_mode_code(5, None) == "F"
+
+def test_air_mode_code_vmc_indexes():
+    vmc = load_profile("inspirair-home-s")
+    assert air_mode_code(0, vmc) == "V"
+    assert air_mode_code(4, vmc) == "Z"
+    assert air_mode_code(5, vmc) is None
+
+def test_water_mode_code():
+    p = load_profile("tone-aquaair")
+    assert water_mode_code(0, p) == "L"
+    assert water_mode_code("1", p) == "M"
+    assert water_mode_code(2, p) == "N"
+    assert water_mode_code(3, p) is None
+    assert water_mode_code("abc", p) is None
+    assert water_mode_code(None, None) is None
+
+def test_build_product_vmc_air_mode_from_code():
+    vmc = load_profile("inspirair-home-s")
+    product = build_product(
+        {"modemid": "AABBCC", "productid": "AABBCC_AIR", "current_mode": "Y"},
+        True,
+        profile=vmc,
+    )
+    ind = product["indicator"]
+    assert ind["current_air_mode"] == "Y"
+    assert ind["current_water_mode"] is None
+    assert ind["hors_gel"] is False
+    assert ind["thermostats"] == []
+    assert ind["ventilation"] is None
 
 
 # --- Non-regression: mapping telemetrie identique ---

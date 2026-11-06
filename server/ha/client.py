@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 
 from .. import mqtt
 from ..appstate import emit_message
-from ..device_profile import telemetry_field
+from ..device_profile import air_mode_code, telemetry_field, water_mode_code
 from ..utils import iso, safe_float
 from .mode_mappings import (
     ALDES_TO_HA_MODE, HA_MODE_TO_ALDES,
@@ -757,26 +757,12 @@ class HADiscoveryClient(threading.Thread):
             return None
 
     def _get_air_mode_code(self, data):
-        mode_field = telemetry_field(self._profile(), "air_mode_field", "UAM")
-        try:
-            index = int(float(data.get(mode_field, -1)))
-            modes = ["A", "B", "C", "D", "E", "F", "G", "H", "I"]
-            if 0 <= index < len(modes):
-                return modes[index]
-        except (TypeError, ValueError):
-            pass
-        return None
+        profile = self._profile()
+        return air_mode_code(data.get(telemetry_field(profile, "air_mode_field", "UAM")), profile)
 
     def _get_water_mode_code(self, data):
-        mode_field = telemetry_field(self._profile(), "water_mode_field", "UDM")
-        try:
-            index = int(float(data.get(mode_field, -1)))
-            codes = ["L", "M", "N"]
-            if 0 <= index < len(codes):
-                return codes[index]
-        except (TypeError, ValueError):
-            pass
-        return None
+        profile = self._profile()
+        return water_mode_code(data.get(telemetry_field(profile, "water_mode_field", "UDM")), profile)
 
     def _safe_send(self, data):
         with self._send_lock:

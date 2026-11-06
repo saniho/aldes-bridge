@@ -158,6 +158,74 @@ def telemetry_key_for(profile, destination, default=None):
     return default
 
 
+# Codes de mode par defaut (circuits d'une PAC Aldes), utilises quand le
+# profil ne declare aucun mode.
+DEFAULT_AIR_MODE_CODES = ["A", "B", "C", "D", "E", "F", "G", "H", "I"]
+DEFAULT_WATER_MODE_CODES = ["L", "M", "N"]
+
+
+def _declared_codes(profile, fields):
+    """Codes declares par le profil pour les champs de modes donnes."""
+    if profile is None:
+        return set()
+    codes = set()
+    for field in fields:
+        for mode in getattr(profile, field, None) or []:
+            code = mode.get("code")
+            if code:
+                codes.add(code)
+    return codes
+
+
+def air_mode_code(raw, profile=None):
+    """Code air (A-I pour une PAC, V-Z pour une VMC) depuis la valeur brute.
+
+    Un index numerique est resolu dans les modes du profil : quand le profil
+    en declare, il fait foi (aucun repli sur les circuits A-I). Sans
+    declaration, on retombe sur A-I. Une valeur deja textuelle n'est acceptee
+    que si le profil la declare : une donnee corrompue ne devient jamais un
+    code plausible.
+    """
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    if not text:
+        return None
+    declared = _declared_codes(profile, ("air_modes_clim", "air_modes_heat", "air_modes"))
+    try:
+        index = int(float(text))
+    except (TypeError, ValueError):
+        known = declared or set(DEFAULT_AIR_MODE_CODES)
+        code = text.upper()
+        return code if code in known else None
+    if declared:
+        return profile.get_air_mode_by_index(index)
+    if 0 <= index < len(DEFAULT_AIR_MODE_CODES):
+        return DEFAULT_AIR_MODE_CODES[index]
+    return None
+
+
+def water_mode_code(raw, profile=None):
+    """Code eau chaude (L/M/N) depuis la valeur brute, cf. air_mode_code."""
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    if not text:
+        return None
+    declared = _declared_codes(profile, ("water_modes",))
+    try:
+        index = int(float(text))
+    except (TypeError, ValueError):
+        known = declared or set(DEFAULT_WATER_MODE_CODES)
+        code = text.upper()
+        return code if code in known else None
+    if declared:
+        return profile.get_water_mode_by_index(index)
+    if 0 <= index < len(DEFAULT_WATER_MODE_CODES):
+        return DEFAULT_WATER_MODE_CODES[index]
+    return None
+
+
 DEFAULT_PROFILE_ID = "tone-aquaair"
 
 

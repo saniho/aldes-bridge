@@ -2,7 +2,7 @@
 import json
 import logging
 
-from ..device_profile import telemetry_field
+from ..device_profile import air_mode_code, telemetry_field
 from ..utils import safe_float
 from .mode_mappings import (
     ALDES_TO_HA_PRESET, ALDES_WATER_TO_HA,
@@ -11,20 +11,13 @@ from .mode_mappings import (
 
 _log = logging.getLogger("aldes-ha-discovery")
 
-_AIR_MODE_CODES = ["A", "B", "C", "D", "E", "F", "G", "H", "I"]
 _COOLING_CODES = frozenset({"F", "G", "H", "I"})
 _HEATING_CODES = frozenset({"B", "C", "D", "E"})
 
 
 def _air_mode_code(data, profile=None):
     raw = data.get(telemetry_field(profile, "air_mode_field", "UAM"), "") if data else ""
-    try:
-        index = int(float(raw))
-    except (TypeError, ValueError):
-        return str(raw).strip().upper()
-    if 0 <= index < len(_AIR_MODE_CODES):
-        return _AIR_MODE_CODES[index]
-    return ""
+    return air_mode_code(raw, profile) or ""
 
 
 def _filter_air_programs(clim_labels, heat_labels, air_code):

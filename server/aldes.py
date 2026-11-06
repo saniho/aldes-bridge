@@ -13,7 +13,7 @@ Mapping de la telemetrie brute (payload PUBLISH boxward) vers le product :
     productid   -> product["serial_number"]  (ex: "ABCDEF123456_TONE")
     MT0..MT9    -> thermostats CurrentTemperature
     UsC0..UsC9  -> thermostats TemperatureSet
-    UAM (0..8)  -> indicator.current_air_mode ("A".."I")
+    UAM (0..8)  -> indicator.current_air_mode ("A".."I", codes declares par le profil)
     UDM (0..2)  -> indicator.current_water_mode ("L"/"M"/"N")
     NED         -> indicator.qte_eau_chaude (%)
     NpiH        -> indicator.settings.people (index HomeComposition, 0..4)
@@ -29,7 +29,14 @@ import os
 import uuid
 from datetime import datetime, timezone
 
-from .device_profile import telemetry_field, telemetry_key_for
+from .device_profile import (
+    DEFAULT_AIR_MODE_CODES,
+    DEFAULT_WATER_MODE_CODES,
+    air_mode_code,
+    telemetry_field,
+    telemetry_key_for,
+    water_mode_code,
+)
 from .utils import parse_json_payload
 
 _log = logging.getLogger("aldes-telemetry")
@@ -60,9 +67,9 @@ FRIENDLY_NAMES = {
 
 # Modes air tels qu'ordonnes par l'app (TOneMode): index = valeur UAM.
 # A=Off, F=Air Confort (labels dans profiles/tone-aquaair.yaml)
-AIR_MODES = ["A", "B", "C", "D", "E", "F", "G", "H", "I"]
+AIR_MODES = DEFAULT_AIR_MODE_CODES
 # Modes eau chaude sanitaire (index = valeur UDM).
-WATER_MODES = ["L", "M", "N"]
+WATER_MODES = DEFAULT_WATER_MODE_CODES
 
 # people = index de l'enum HomeComposition (TWO=0..SIX_AND_MORE=4),
 # l'integration HA affiche people + 2 pour retrouver le nombre reel.
@@ -200,10 +207,12 @@ def build_ventilation(telemetry):
 def build_product(telemetry, connected, profile=None):
     """Construit un product au format consomme par l'integration HA."""
     reference = _derive_reference(telemetry, profile)
-    air_index = int(_num(telemetry.get(telemetry_field(profile, "air_mode_field", "UAM")), -1))
-    water_index = int(_num(telemetry.get(telemetry_field(profile, "water_mode_field", "UDM")), -1))
-    air_mode = AIR_MODES[air_index] if 0 <= air_index < len(AIR_MODES) else None
-    water_mode = WATER_MODES[water_index] if 0 <= water_index < len(WATER_MODES) else None
+    air_mode = air_mode_code(
+        telemetry.get(telemetry_field(profile, "air_mode_field", "UAM")), profile
+    )
+    water_mode = water_mode_code(
+        telemetry.get(telemetry_field(profile, "water_mode_field", "UDM")), profile
+    )
     people = _num(telemetry.get(telemetry_field(profile, "people_field", "NpiH")))
     if people is not None:
         people = max(0, min(_HOME_COMPOSITION_MAX - 1, int(people)))
