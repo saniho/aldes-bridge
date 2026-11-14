@@ -1,0 +1,48 @@
+# Profil Aldes T.Flow Hygro+ 200 L collectif
+# Mesures basées sur la télémétrie réellement observée.
+# Le pilotage reste volontairement désactivé : commandes non vérifiées.
+id: tflow-hygro-200-collectif
+name: "T.Flow Hygro+ 200 L collectif"
+description: "Chauffe-eau thermodynamique collectif Aldes T.Flow Hygro+ 200 L"
+type: water_heater
+
+products:
+  TFLOW_HYGRO_200_COLLECTIF:
+    name: "T.Flow Hygro+ 200 L collectif"
+    reference_fields: [modemid, productid]
+
+telemetry:
+  modem_id_field: modemid
+  product_id_field: productid
+
+commands: []
+
+ui:
+  show_thermostats: false
+  show_vacations: false
+  show_people: false
+  show_hot_water: false
+
+ha_discovery:
+  entities:
+    sensors:
+      - { key: usr_setpt_tpt, name: "Consigne température eau", unit: "°C", device_class: temperature }
+      - { key: Ctn_H_Bal, name: "Température ballon haut", unit: "°C", device_class: temperature }
+      - { key: Ctn_B_Bal, name: "Température ballon bas", unit: "°C", device_class: temperature }
+      - { key: Ctn_VMC, name: "Température VMC", unit: "°C", device_class: temperature }
+      - { key: Ctn_Evap, name: "Température évaporateur", unit: "°C", device_class: temperature }
+      - { key: ctn_hp_histo, name: "Température historique HP", unit: "°C", device_class: temperature }
+      - { key: Ctn_Option, name: "Température option", unit: "°C", device_class: temperature }
+      - { key: conso_tot_PAC, name: "Compteur consommation PAC" }
+      - { key: conso_tot_venti, name: "Compteur consommation ventilation" }
+      - { key: conso_tot_elec, name: "Compteur consommation électrique" }
+      - { key: current_mode, name: "Mode actuel (code brut)" }
+      - { key: showr_state, name: "État affiché" }
+      - { key: code_error, name: "Code erreur" }
+      - { key: num_err, name: "Nombre erreurs" }
+      - { key: ff_cpt, name: "Compteur filtre (valeur brute)" }
+      - { key: level_pwr, name: "Niveau puissance (valeur brute)" }
+      - { key: RSSI, name: "Qualité signal (valeur brute)" }
+      - { key: Tarif_en_Cours, name: "Tarif en cours (code brut)" }
+      - { key: Vers_W, name: "Version firmware Wi-Fi" }
+      - { key: Vers_UC, name: "Version unité centrale" }
