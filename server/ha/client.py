@@ -481,7 +481,11 @@ class HADiscoveryClient(threading.Thread):
         if not data:
             return
 
-        self._publish_telemetry_data(data, include_zone_aliases=True)
+        profile = getattr(self.state, "profile", None)
+        if profile and profile.id == "tflow-hygro-200-collectif":
+            self._publish_tflow_telemetry(data)
+        else:
+            self._publish_telemetry_data(data, include_zone_aliases=True)
 
     def _publish_health(self):
         with self.state._lock:
