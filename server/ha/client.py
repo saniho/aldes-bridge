@@ -140,18 +140,22 @@ class HADiscoveryClient(threading.Thread):
 
         self._sock = s
 
-        cmd_topics = [
-            (f"{self.prefix}/set/mode", 1),
-            (f"{self.prefix}/set/consigne", 1),
-            (f"{self.prefix}/set/preset", 1),
-            (f"{self.prefix}/set/ecs", 1),
-            (f"{self.prefix}/set/vacation_start", 1),
-            (f"{self.prefix}/set/vacation_end", 1),
-            (f"{self.prefix}/set/vacation_enable", 1),
-            (f"{self.prefix}/set/people", 1),
-        ]
-        for zi in range(10):
-            cmd_topics.append((f"{self.prefix}/set/zone{zi}/consigne", 1))
+        profile = getattr(self.state, "profile", None)
+        if profile and profile.id == "tflow-hygro-200-collectif":
+            cmd_topics = []
+        else:
+            cmd_topics = [
+                (f"{self.prefix}/set/mode", 1),
+                (f"{self.prefix}/set/consigne", 1),
+                (f"{self.prefix}/set/preset", 1),
+                (f"{self.prefix}/set/ecs", 1),
+                (f"{self.prefix}/set/vacation_start", 1),
+                (f"{self.prefix}/set/vacation_end", 1),
+                (f"{self.prefix}/set/vacation_enable", 1),
+                (f"{self.prefix}/set/people", 1),
+            ]
+            for zi in range(10):
+                cmd_topics.append((f"{self.prefix}/set/zone{zi}/consigne", 1))
         # Plancher energetique : le broker renvoie les valeurs retenues de nos
         # propres capteurs des la souscription, ce qui reconstruit l'offset apres
         # la perte du fichier de persistance (reinstallation, backup ancien).
@@ -243,6 +247,11 @@ class HADiscoveryClient(threading.Thread):
             payload = payload.decode("utf-8", errors="replace")
         payload = payload.strip()
         _log.info("ha-discovery: COMMANDE RECUE topic=%s payload=%s", topic, payload)
+
+        profile = getattr(self.state, "profile", None)
+        if profile and profile.id == "tflow-hygro-200-collectif":
+            _log.warning("ha-discovery: commande ignorée, pilotage T.Flow non implémenté")
+            return
 
         try:
             if topic == f"{self.prefix}/set/mode":
@@ -505,6 +514,10 @@ class HADiscoveryClient(threading.Thread):
     def publish_telemetry(self, data):
         if not self._sock:
             return
+        profile = getattr(self.state, "profile", None)
+        if profile and profile.id == "tflow-hygro-200-collectif":
+            self._publish_tflow_telemetry(data)
+            return
 
         air_mode_code = self._get_air_mode_code(data)
         if air_mode_code:
@@ -515,6 +528,27 @@ class HADiscoveryClient(threading.Thread):
             self._last_mode = ha_mode
 
         self._publish_telemetry_data(data, include_zone_aliases=False)
+
+    def _publish_tflow_telemetry(self, data):
+        """Publie uniquement les champs réellement observés du T.Flow."""
+        keys = (
+            "usr_setpt_tpt", "Ctn_H_Bal", "Ctn_B_Bal", "Ctn_VMC",
+            "Ctn_Evap", "ctn_hp_histo", "Ctn_Option", "conso_tot_PAC",
+            "conso_tot_venti", "conso_tot_elec", "current_mode",
+            "showr_state", "code_error", "num_err", "ff_cpt", "level_pwr",
+            "RSSI", "Tarif_en_Cours", "Vers_W", "Vers_UC",
+        )
+        for key in keys:
+            value = data.get(key)
+            if value is None:
+                continue
+            if isinstance(value, (dict, list)):
+                payload = json.dumps(value, ensure_ascii=False)
+            else:
+                payload = str(value)
+            self._safe_send(mqtt.build_publish(
+                f"{self.prefix}/state/sensor/{key}", payload, qos=1, retain=True
+            ))
 
     def _publish_telemetry_data(self, data, include_zone_aliases=False):
         air_mode_code = self._get_air_mode_code(data)
