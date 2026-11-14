@@ -95,6 +95,39 @@ def _build_tflow_discovery_config(device_id, profile, prefix):
         "model": profile.name,
     }
     configs = []
+    # Nettoie les anciennes entités PAC retenues si ce boîtier avait auparavant
+    # été associé au profil T.ONE AquaAIR.
+    stale_topics = [
+        "climate/aldes",
+        "water_heater/aldes_ballon",
+        "date/vacation_start",
+        "date/vacation_end",
+        "switch/vacation_enable",
+        "number/aldes_people",
+        "sensor/outdoor_temp",
+        "sensor/indoor_temp",
+        "sensor/air_mode",
+        "binary_sensor/compressor",
+        "binary_sensor/antil",
+        "sensor/dhw_level",
+        "sensor/dhw_temp_bottom",
+        "sensor/dhw_temp_top",
+        "sensor/fan_rpm",
+        "sensor/airflow_nominal",
+        "sensor/airflow_max",
+        "sensor/airflow_medium",
+        "sensor/airflow_night",
+        "sensor/airflow_full",
+        "sensor/airflow_max_co2",
+        "sensor/energy_ecs",
+        "sensor/energy_heating_c",
+        "sensor/energy_heating_h",
+    ]
+    stale_topics.extend(f"climate/aldes_zone{zone}" for zone in range(10))
+    for stale in stale_topics:
+        domain, object_id = stale.split("/", 1)
+        configs.append((f"{discovery_prefix}/{domain}/{object_id}/config", ""))
+
     sensors = (profile.ha_discovery.get("entities", {}).get("sensors", []) or [])
     for item in sensors:
         key = item["key"]
