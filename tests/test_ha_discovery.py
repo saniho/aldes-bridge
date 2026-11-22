@@ -1180,3 +1180,351 @@ def test_publish_telemetry_people_count(monkeypatch):
     published.clear()
     client._publish_telemetry_data({"NpiH": "abc"})
     assert ("aldes/state/people", "2") in published
+
+
+# --- Tests des capteurs énergie (issue #62) ---
+
+def test_build_discovery_config_has_energy_sensors():
+    configs = _build_discovery_config("dev123", None)
+    topics = [t for t, _ in configs]
+    assert any("sensor/energy_ecs" in t for t in topics)
+    assert any("sensor/energy_heating_c" in t for t in topics)
+    assert any("sensor/energy_heating_h" in t for t in topics)
+
+
+def test_build_discovery_config_energy_sensor_details():
+    configs = _build_discovery_config("dev123", None)
+    for topic, payload_str in configs:
+        if "sensor/energy_ecs" in topic:
+            payload = json.loads(payload_str)
+            assert payload["unit_of_measurement"] == "kWh"
+            assert payload["device_class"] == "energy"
+            assert payload["state_class"] == "total_increasing"
+            assert payload["state_topic"] == "aldes/state/energy/energy_ecs"
+            assert payload["unique_id"] == "aldes_dev123_energy_ecs"
+            assert payload["availability_topic"] == "aldes/state/available"
+            break
+
+
+def test_build_discovery_config_energy_sensor_names():
+    configs = _build_discovery_config("dev123", None)
+    names = {}
+    for topic, payload_str in configs:
+        if "sensor/energy_" in topic:
+            payload = json.loads(payload_str)
+            names[topic] = payload["name"]
+    assert len(names) == 3
+    assert any(n == "Consommation Chauffage H" for n in names.values())
+    assert any(n == "Consommation ECS" for n in names.values())
+    assert any(n == "Consommation Climatisation" for n in names.values())
+    assert not any("Chauffage C" in n for n in names.values())
+
+
+def test_publish_telemetry_energy_sums(monkeypatch):
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events)
+    client = _energy_client(state)
+    published = _spy_build_publish(monkeypatch)
+
+    data = {}
+    for i in range(1, 13):
+        data[f"CoE{i}"] = "10"
+        data[f"CoC{i}"] = "20"
+        data[f"CoH{i}"] = "30"
+    client._publish_telemetry_data(data)
+
+    assert ("aldes/state/energy/energy_ecs", "120") in published
+    assert ("aldes/state/energy/energy_heating_c", "240") in published
+    assert ("aldes/state/energy/energy_heating_h", "360") in published
+
+
+def _energy_published(published, topic_key):
+    return [v for t, v in published if t == f"aldes/state/energy/{topic_key}"]
+
+
+def _energy_client(state):
+    """Client simulant un reseed termine (messages retenus du broker recus).
+
+    En production `_energy_seeded` passe a True des que les 3 retenus sont
+    lus ; les tests n'ouvrent pas de session MQTT, on simule cet etat.
+    """
+    client = HADiscoveryClient(state)
+    client._energy_seeded = True
+    return client
+
+
+def _full_counters(ecs, heating_c, heating_h):
+    data = {}
+    for i in range(1, 13):
+        data[f"CoE{i}"] = str(ecs / 12)
+        data[f"CoC{i}"] = str(heating_c / 12)
+        data[f"CoH{i}"] = str(heating_h / 12)
+    return data
+
+
+def test_publish_telemetry_energy_partial_zones(monkeypatch):
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events)
+    client = _energy_client(state)
+    published = _spy_build_publish(monkeypatch)
+
+    data = {"CoE8": "340", "CoC8": "378", "CoH8": "799"}
+    client._publish_telemetry_data(data)
+
+    assert _energy_published(published, "energy_ecs") == []
+    assert _energy_published(published, "energy_heating_c") == []
+    assert _energy_published(published, "energy_heating_h") == []
+
+
+def test_publish_telemetry_energy_partial_after_complete(monkeypatch):
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events)
+    client = _energy_client(state)
+    published = _spy_build_publish(monkeypatch)
+
+    client._publish_telemetry_data(_full_counters(120, 240, 360))
+    assert _energy_published(published, "energy_ecs") == ["120"]
+
+    client._publish_telemetry_data({"CoE8": "340", "CoC8": "378", "CoH8": "799"})
+
+    assert _energy_published(published, "energy_ecs") == ["120"]
+    assert _energy_published(published, "energy_heating_c") == ["240"]
+    assert _energy_published(published, "energy_heating_h") == ["360"]
+
+
+def test_publish_telemetry_energy_never_decreases(tmp_path, monkeypatch):
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events,
+                     energy_file=str(tmp_path / "energy_totals.json"))
+    client = _energy_client(state)
+    published = _spy_build_publish(monkeypatch)
+
+    client._publish_telemetry_data(_full_counters(120, 240, 360))
+    client._publish_telemetry_data(_slots_payload(
+        ecs=[10] * 11 + [0], cooling=[20] * 11 + [0], heating=[30] * 11 + [0]))
+    client._publish_telemetry_data(_slots_payload(
+        ecs=[10] * 11 + [1], cooling=[20] * 11 + [2], heating=[30] * 11 + [3]))
+
+    for key in ("energy_ecs", "energy_heating_c", "energy_heating_h"):
+        values = [int(v) for v in _energy_published(published, key)]
+        assert values, key
+        assert values == sorted(values), f"{key}: {values} n'est pas monotone"
+
+
+def test_publish_telemetry_energy_absent_keys(monkeypatch):
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events)
+    client = _energy_client(state)
+    published = _spy_build_publish(monkeypatch)
+
+    client._publish_telemetry_data({"NED": "75"})
+
+    energy_published = [t for t, _ in published if "energy" in t]
+    assert energy_published == []
+
+
+# --- Tests fenetre glissante 12 mois des compteurs Co* (issue #78) ---
+
+def _slots_payload(ecs=None, cooling=None, heating=None):
+    """Payload complet (12 compteurs par famille) construit a partir de slots."""
+    data = {}
+    for prefix, slots in (("CoE", ecs), ("CoC", cooling), ("CoH", heating)):
+        for i, v in enumerate(slots if slots is not None else [0] * 12, start=1):
+            data[f"{prefix}{i}"] = str(v)
+    return data
+
+
+def test_energy_rollover_capitalizes_departing_month(tmp_path, monkeypatch):
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events,
+                     energy_file=str(tmp_path / "energy_totals.json"))
+    client = _energy_client(state)
+    published = _spy_build_publish(monkeypatch)
+
+    client._publish_telemetry_data(_slots_payload(heating=[0] * 10 + [102, 0]))
+    assert _energy_published(published, "energy_heating_h") == ["102"]
+
+    client._publish_telemetry_data(_slots_payload(heating=[0] * 10 + [1, 0]))
+
+    assert _energy_published(published, "energy_heating_h") == ["102", "103"]
+
+
+def test_energy_rollover_survives_restart(tmp_path, monkeypatch):
+    energy_file = str(tmp_path / "energy_totals.json")
+    published = _spy_build_publish(monkeypatch)
+
+    state = AppState("127.0.0.1", 8883, EventBus(), energy_file=energy_file)
+    _energy_client(state)._publish_telemetry_data(
+        _slots_payload(heating=[0] * 10 + [102, 0]))
+    assert _energy_published(published, "energy_heating_h") == ["102"]
+
+    state2 = AppState("127.0.0.1", 8883, EventBus(), energy_file=energy_file)
+    _energy_client(state2)._publish_telemetry_data(
+        _slots_payload(heating=[0] * 10 + [1, 0]))
+
+    assert _energy_published(published, "energy_heating_h") == ["102", "103"]
+
+
+def test_energy_first_run_without_file_uses_raw_sum(tmp_path, monkeypatch):
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events,
+                     energy_file=str(tmp_path / "missing.json"))
+    client = _energy_client(state)
+    published = _spy_build_publish(monkeypatch)
+
+    client._publish_telemetry_data(_slots_payload(heating=[10] * 12))
+
+    assert _energy_published(published, "energy_heating_h") == ["120"]
+
+
+def test_energy_incomplete_payload_keeps_previous_state(tmp_path, monkeypatch):
+    events = EventBus()
+    energy_file = str(tmp_path / "energy_totals.json")
+    state = AppState("127.0.0.1", 8883, events, energy_file=energy_file)
+    client = _energy_client(state)
+    published = _spy_build_publish(monkeypatch)
+
+    client._publish_telemetry_data(_slots_payload(heating=[10] * 12))
+    assert _energy_published(published, "energy_heating_h") == ["120"]
+
+    partial = _slots_payload(heating=[10] * 12)
+    del partial["CoH12"]
+    client._publish_telemetry_data(partial)
+
+    assert _energy_published(published, "energy_heating_h") == ["120"]
+    with open(energy_file, encoding="utf-8") as f:
+        assert json.load(f)["energy_heating_h"]["total"] == 120
+
+
+def test_energy_simultaneous_rollover_multiple_families(tmp_path, monkeypatch):
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events,
+                     energy_file=str(tmp_path / "energy_totals.json"))
+    client = _energy_client(state)
+    published = _spy_build_publish(monkeypatch)
+
+    client._publish_telemetry_data(
+        _slots_payload(ecs=[0] * 10 + [18, 0], heating=[0] * 10 + [102, 0]))
+    assert _energy_published(published, "energy_ecs") == ["18"]
+    assert _energy_published(published, "energy_heating_h") == ["102"]
+
+    client._publish_telemetry_data(
+        _slots_payload(ecs=[0] * 10 + [0, 0], heating=[0] * 10 + [1, 0]))
+
+    assert _energy_published(published, "energy_ecs") == ["18", "18"]
+    assert _energy_published(published, "energy_heating_h") == ["102", "103"]
+
+
+# --- Reseed depuis les messages retenus du broker + soupape reset device ---
+
+def test_energy_floor_recovers_after_file_loss(tmp_path, monkeypatch):
+    """Perte du fichier de persistance : le plancher issu du broker recompte."""
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events,
+                     energy_file=str(tmp_path / "energy_totals.json"))
+    client = _energy_client(state)
+    published = _spy_build_publish(monkeypatch)
+
+    client._publish_telemetry_data(_slots_payload(heating=[0] * 10 + [102, 0]))
+    client._publish_telemetry_data(_slots_payload(heating=[0] * 10 + [1, 0]))
+    assert _energy_published(published, "energy_heating_h") == ["102", "103"]
+
+    # Reinstallation : fichier perdu, offset remis a zero.
+    state2 = AppState("127.0.0.1", 8883, EventBus(),
+                      energy_file=str(tmp_path / "lost.json"))
+    state2.seed_energy_floor("energy_heating_h", "103")
+    client2 = _energy_client(state2)
+    client2._publish_telemetry_data(_slots_payload(heating=[0] * 10 + [1, 0]))
+
+    assert _energy_published(published, "energy_heating_h") == ["102", "103", "103"]
+
+
+def test_energy_floor_allows_growth_after_recovery(tmp_path, monkeypatch):
+    """Apres un reseed, les valeurs suivantes continuent de monter."""
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events,
+                     energy_file=str(tmp_path / "lost.json"))
+    state.seed_energy_floor("energy_heating_h", "716")
+    client = _energy_client(state)
+    published = _spy_build_publish(monkeypatch)
+
+    client._publish_telemetry_data(_slots_payload(heating=[10] * 12))
+    assert _energy_published(published, "energy_heating_h") == ["716"]
+
+    # Le mois suivant, la somme brute monte : le plancher ne bloque pas.
+    client._publish_telemetry_data(_slots_payload(heating=[11] * 12))
+    # 132 (somme brute) + offset 596 pose au reseed = 728.
+    assert _energy_published(published, "energy_heating_h") == ["716", "728"]
+
+
+def test_energy_device_reset_clears_offset(tmp_path, monkeypatch):
+    """Reset usine Aldes : 12 compteurs a zero sur 3 payloads -> replantif."""
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events,
+                     energy_file=str(tmp_path / "energy_totals.json"))
+    client = _energy_client(state)
+    published = _spy_build_publish(monkeypatch)
+
+    client._publish_telemetry_data(_slots_payload(heating=[0] * 10 + [102, 0]))
+    client._publish_telemetry_data(_slots_payload(heating=[0] * 10 + [1, 0]))
+    assert _energy_published(published, "energy_heating_h") == ["102", "103"]
+
+    zero = _slots_payload(heating=[0] * 12)
+    client._publish_telemetry_data(zero)
+    client._publish_telemetry_data(zero)
+    client._publish_telemetry_data(zero)
+
+    # Les deux premiers zero ne font pas encore reset (streak < 3) : on publie
+    # encore 103. Au 3e, l'offset est purge et on repart de la somme brute.
+    assert _energy_published(published, "energy_heating_h") == \
+        ["102", "103", "103", "103", "0"]
+
+
+def test_energy_single_zero_slot_is_rollover_not_reset(tmp_path, monkeypatch):
+    """Un seul slot a zero = changement de mois, pas un reset usine."""
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events,
+                     energy_file=str(tmp_path / "energy_totals.json"))
+    client = _energy_client(state)
+    published = _spy_build_publish(monkeypatch)
+
+    client._publish_telemetry_data(_slots_payload(heating=[0] * 10 + [102, 50]))
+    client._publish_telemetry_data(_slots_payload(heating=[0] * 10 + [0, 50]))
+
+    # Le slot de 102 est capitalise, pas purge.
+    assert _energy_published(published, "energy_heating_h") == ["152", "152"]
+
+
+def test_energy_publication_blocked_until_reseed(monkeypatch):
+    """Sans reseed, aucun publish energie — sinon on publierait une somme basse."""
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events)
+    client = HADiscoveryClient(state)
+    published = _spy_build_publish(monkeypatch)
+
+    client._publish_telemetry_data(_full_counters(120, 240, 360))
+    assert _energy_published(published, "energy_ecs") == []
+    assert _energy_published(published, "energy_heating_h") == []
+
+    client._energy_seeded = True
+    client._publish_telemetry_data(_full_counters(120, 240, 360))
+    assert _energy_published(published, "energy_ecs") == ["120"]
+
+
+def test_handle_energy_retained_sets_floor_and_seed(monkeypatch):
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events)
+    client = HADiscoveryClient(state)
+    _spy_build_publish(monkeypatch)
+
+    for key, val in (("energy_ecs", "396"), ("energy_heating_c", "428"),
+                     ("energy_heating_h", "716")):
+        client._handle_energy_retained(f"aldes/state/energy/{key}", val)
+
+    assert client._energy_seeded is True
+    assert state._energy_floors["energy_heating_h"] == 716.0
+
+    # Un topic inconnu ou une valeur non numerique est ignore sans effet.
+    client._handle_energy_retained("aldes/state/energy/other", "12")
+    client._handle_energy_retained("aldes/state/energy/energy_ecs", "not-a-number")
+    assert "other" not in state._energy_floors
