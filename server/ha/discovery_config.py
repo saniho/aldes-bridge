@@ -84,8 +84,59 @@ def detect_active_zones(data):
     return zones
 
 
+def build_vmc_discovery_config(device_id, profile, prefix="aldes"):
+    """Configs HA d'une VMC : sensors du profil + select du mode."""
+    discovery_prefix = "homeassistant"
+    device = {
+        "identifiers": [f"aldes_{device_id}"],
+        "name": f"Aldes {profile.name}",
+        "manufacturer": "Aldes",
+        "model": profile.name,
+    }
+    availability = {
+        "availability_topic": f"{prefix}/state/available",
+        "payload_available": "online",
+        "payload_not_available": "offline",
+    }
+    configs = [(f"{discovery_prefix}/select/aldes_vmc_mode/config", json.dumps({
+        "name": "Mode",
+        "unique_id": f"aldes_{device_id}_vmc_mode",
+        "state_topic": f"{prefix}/state/vmc_mode",
+        "command_topic": f"{prefix}/set/vmc_mode",
+        "options": [m["label"] for m in profile.air_modes],
+        "device": device,
+        "icon": "mdi:hvac",
+        **availability,
+    }, ensure_ascii=False))]
+    for sensor in (profile.ha_discovery.get("entities", {}) or {}).get("sensors", []) or []:
+        key = sensor["key"]
+        config = {
+            "name": sensor["name"],
+            "unique_id": f"aldes_{device_id}_{key}",
+            "state_topic": f"{prefix}/state/sensor/{key}",
+            "device": device,
+            **availability,
+        }
+        # Diagnostics are raw modem fields (ids, versions, dates): not measurements.
+        if sensor.get("entity_category") != "diagnostic":
+            config["state_class"] = "measurement"
+        for src, dst in (
+            ("unit", "unit_of_measurement"),
+            ("device_class", "device_class"),
+            ("icon", "icon"),
+            ("entity_category", "entity_category"),
+            ("value_template", "value_template"),
+        ):
+            if sensor.get(src):
+                config[dst] = sensor[src]
+        configs.append((f"{discovery_prefix}/sensor/aldes_{key}/config", json.dumps(config, ensure_ascii=False)))
+    return configs
+
+
 def build_discovery_config(device_id, profile, prefix="aldes", data=None,
                            previous_active_zones=None, zone_sensors=False):
+    if profile is not None and profile.type == "vmc":
+        return build_vmc_discovery_config(device_id, profile, prefix)
     configs = []
     discovery_prefix = "homeassistant"
 

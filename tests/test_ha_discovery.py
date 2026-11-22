@@ -673,7 +673,7 @@ def test_detect_mqtt_broker_success(monkeypatch):
     monkeypatch.setenv("SUPERVISOR_TOKEN", "test-token")
 
     fake_response = json.dumps({
-        "data": {"host": "core-mosquitto", "port": 1883}
+        "data": {"host": "core-mosquitto", "port": 1883, "username": "addons", "password": "pw"}
     }).encode()
 
     class FakeResp:
@@ -692,7 +692,7 @@ def test_detect_mqtt_broker_success(monkeypatch):
     monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
 
     result = detect_mqtt_broker()
-    assert result == {"host": "core-mosquitto", "port": 1883}
+    assert result == {"host": "core-mosquitto", "port": 1883, "username": "addons", "password": "pw"}
 
 
 def test_detect_mqtt_broker_http_error(monkeypatch):

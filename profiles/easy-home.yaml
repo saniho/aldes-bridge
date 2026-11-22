@@ -1,0 +1,54 @@
+# Profil device : EASY Home
+id: easy-home
+name: "EASY Home"
+description: "VMC simple flux EASY Home"
+type: vmc
+
+telemetry:
+  modemid: product.modem
+  productid: product.serial_number
+  air_mode_field: ConVe
+
+air_modes:
+  - { index: 0, code: "V", label: "Daily" }
+  - { index: 1, code: "W", label: "Holidays" }
+  - { index: 2, code: "X", label: "Guest" }
+  - { index: 3, code: "Y", label: "Boost" }
+  - { index: 4, code: "Z", label: "Air Prog" }
+
+ui:
+  quick_modes:
+    - field: ConVe
+      label: "Ventilation"
+  show_thermostats: false
+  show_vacations: false
+  show_people: false
+  show_hot_water: false
+
+# Unites deduites des valeurs observees, pas d'une documentation Aldes.
+ha_discovery:
+  # Selecting Holidays starts a bounded window; another mode cancels it.
+  holiday_duration_hours: 24
+  entities:
+    sensors:
+      - { key: HrCu, name: "Humidité Cuisine", unit: "%", device_class: humidity }
+      - { key: TmpCu, name: "Température Cuisine", unit: "°C", device_class: temperature, value_template: "{{ (value | float / 10) | round(1) }}" }
+      - { key: HrBa1, name: "Humidité SdB1", unit: "%", device_class: humidity }
+      - { key: TmpBa1, name: "Température SdB1", unit: "°C", device_class: temperature, value_template: "{{ (value | float / 10) | round(1) }}" }
+      - { key: HrBa2, name: "Humidité SdB2", unit: "%", device_class: humidity }
+      - { key: TmpBa2, name: "Température SdB2", unit: "°C", device_class: temperature, value_template: "{{ (value | float / 10) | round(1) }}" }
+      - { key: CO2, name: "CO2", icon: "mdi:molecule-co2" }
+      - { key: 0_10V, name: "0_10V", device_class: voltage }
+      - { key: Pcap, name: "Pcap" }
+      - { key: VarHR, name: "VarHR" }
+      - { key: TimCu, name: "TimCu" }
+      - { key: PwmQai, name: "PwmQai" }
+      - { key: PwmReal, name: "PwmReal" }
+      # Champs bruts non documentes, exposes en diagnostic.
+      - { key: modemid, name: "modemid", entity_category: diagnostic }
+      - { key: productid, name: "productid", entity_category: diagnostic }
+      - { key: Vers_W, name: "Vers_W", entity_category: diagnostic }
+      - { key: Vers_UC, name: "Vers_UC", entity_category: diagnostic }
+      - { key: RSSI, name: "RSSI", entity_category: diagnostic, value_template: "{{ 'unknown' if value in ['', '--%%'] else value }}" }
+      - { key: Ver, name: "Ver", entity_category: diagnostic }
+      - { key: Switch, name: "Switch", entity_category: diagnostic }

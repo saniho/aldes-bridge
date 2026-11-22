@@ -17,7 +17,6 @@ from .appstate import emit_message, emit_connect, MQTTEndpoint
 
 _log = logging.getLogger("aldes-bridge-mode")
 
-
 class BridgeHandler(MQTTEndpoint):
     def __init__(self, state, sock, addr, session=None):
         self.state = state
@@ -59,16 +58,22 @@ class BridgeHandler(MQTTEndpoint):
                 break
 
     def shutdown(self):
+        # shutdown() wakes run() blocked in recv; closing the fd from this thread
+        # would leave the SSL read polling an invalid fd until its timeout.
+        # Engine._handle closes the socket once run() returns.
         self._closed = True
         try:
-            self.sock.close()
+            self.sock.shutdown(socket.SHUT_RDWR)
         except Exception:
             pass
 
     def _send(self, data):
         with self._send_lock:
             if not self._closed:
-                self.sock.sendall(data)
+                try:
+                    self.sock.sendall(data)
+                except Exception as exc:
+                    _log.error("_send exc=%s", exc)
 
     def inject(self, topic, payload, qos):
         return self._inject_raw(topic, payload, qos)
@@ -86,7 +91,6 @@ class BridgeHandler(MQTTEndpoint):
             self._send(build_connack(0))
         elif ptype == PT_PUBLISH:
             topic, qos, pkt_id, payload = parse_publish_full(body, flags)
-            _log.debug("bridge: <-- PUBLISH topic=%s qos=%d payload=%s", topic, qos, payload[:100] if isinstance(payload, str) else payload)
             emit_message(self.state, "in", "PUBLISH", topic=topic, payload=payload, qos=qos)
             if qos == QOS_AT_LEAST_ONCE:
                 self._send(build_puback(pkt_id))
