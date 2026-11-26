@@ -34,38 +34,86 @@ function buildWaterLabel(profile: DeviceProfile | null | undefined): Record<stri
   return { L: 'Arrêt', M: 'Marche', N: 'Boost' }
 }
 
-function buildQuickAirGroup(modes: DeviceMode[] | undefined, fallback: { code: string; label: string }[]): { code: string; label: string }[] {
-  if (modes?.length) {
-    return modes.map((m) => ({
-      code: m.code, label: `${m.code} · ${m.label}`
-    }))
+function modesOfField(profile: DeviceProfile | null | undefined, field: string): DeviceMode[] {
+  switch (field) {
+    case 'air_modes_clim':
+      return profile?.air_modes_clim ?? []
+    case 'air_modes_heat':
+      return profile?.air_modes_heat ?? []
+    case 'air_modes':
+      return profile?.air_modes ?? []
+    case 'water_modes':
+      return profile?.water_modes ?? []
+    default:
+      return []
   }
-  return fallback
 }
 
-function buildQuickClim(profile: DeviceProfile | null | undefined): { code: string; label: string }[] {
-  return buildQuickAirGroup(profile?.air_modes_clim, [
-    { code: 'F', label: 'F · Confort' }, { code: 'G', label: 'G · Boost' },
-    { code: 'H', label: 'H · Programme C' }, { code: 'I', label: 'I · Programme D' },
-    { code: 'A', label: 'A · Off' },
-  ])
+const QUICK_GROUP_LABELS: Record<string, string> = {
+  air_modes_clim: 'Climatisation',
+  air_modes_heat: 'Chauffage',
+  air_modes: 'Air',
+  water_modes: 'ECS',
 }
 
-function buildQuickHeat(profile: DeviceProfile | null | undefined): { code: string; label: string }[] {
-  return buildQuickAirGroup(profile?.air_modes_heat, [
-    { code: 'B', label: 'B · Confort' }, { code: 'C', label: 'C · Éco' },
-    { code: 'D', label: 'D · Programme A' }, { code: 'E', label: 'E · Programme B' },
-    { code: 'A', label: 'A · Off' },
-  ])
+interface QuickGroup {
+  field: string
+  label: string
+  water: boolean
+  modes: { code: string; label: string }[]
 }
 
-function buildQuickWater(profile: DeviceProfile | null | undefined): { code: string; label: string }[] {
-  if (profile?.water_modes?.length) {
-    return profile.water_modes.map((m) => ({
-      code: m.code, label: `${m.code} · ${m.label}`
-    }))
-  }
-  return [{ code: 'M', label: 'M · On' }, { code: 'L', label: 'L · Off' }]
+// Repli historique utilise uniquement quand aucun profil n'est charge
+// (installation sans profil, ou API sans champ profile).
+const LEGACY_QUICK_GROUPS: QuickGroup[] = [
+  {
+    field: 'air_modes_clim',
+    label: 'Climatisation',
+    water: false,
+    modes: [
+      { code: 'F', label: 'F · Confort' }, { code: 'G', label: 'G · Boost' },
+      { code: 'H', label: 'H · Programme C' }, { code: 'I', label: 'I · Programme D' },
+      { code: 'A', label: 'A · Off' },
+    ],
+  },
+  {
+    field: 'air_modes_heat',
+    label: 'Chauffage',
+    water: false,
+    modes: [
+      { code: 'B', label: 'B · Confort' }, { code: 'C', label: 'C · Éco' },
+      { code: 'D', label: 'D · Programme A' }, { code: 'E', label: 'E · Programme B' },
+      { code: 'A', label: 'A · Off' },
+    ],
+  },
+  {
+    field: 'water_modes',
+    label: 'ECS',
+    water: true,
+    modes: [{ code: 'M', label: 'M · On' }, { code: 'L', label: 'L · Off' }],
+  },
+]
+
+function buildQuickGroups(profile: DeviceProfile | null | undefined): QuickGroup[] {
+  if (!profile) return LEGACY_QUICK_GROUPS
+
+  const defs = profile.ui?.quick_modes?.length
+    ? profile.ui.quick_modes
+    : Object.keys(QUICK_GROUP_LABELS)
+        .filter((field) => modesOfField(profile, field).length > 0)
+        .map((field) => ({ field, label: QUICK_GROUP_LABELS[field] }))
+
+  return defs
+    .map((def) => {
+      const modes = modesOfField(profile, def.field)
+      return {
+        field: def.field,
+        label: def.label || QUICK_GROUP_LABELS[def.field] || def.field,
+        water: def.field === 'water_modes',
+        modes: modes.map((m) => ({ code: m.code, label: `${m.code} · ${m.label}` })),
+      }
+    })
+    .filter((group) => group.modes.length > 0)
 }
 
 function fmtDeg(v: number | null, digits = 1): string {
@@ -125,9 +173,9 @@ export default function TempsPanel({ pollMs = 5000, clientId, connected, consign
 
   const AIR_LABEL = buildAirLabel(profile)
   const WATER_LABEL = buildWaterLabel(profile)
-  const QUICK_CLIM = buildQuickClim(profile)
-  const QUICK_HEAT = buildQuickHeat(profile)
-  const QUICK_WATER = buildQuickWater(profile)
+  const QUICK_GROUPS = buildQuickGroups(profile)
+  const showThermostats = profile?.ui?.show_thermostats !== false
+  const showHotWater = profile?.ui?.show_hot_water !== false
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 15_000)
@@ -250,121 +298,76 @@ export default function TempsPanel({ pollMs = 5000, clientId, connected, consign
             </div>
 
             <div className={styles.quickGroup}>
-              {QUICK_CLIM.length > 0 && (
-                <div className={styles.quick}>
-                  <span className={styles.quickLabel}>Climatisation</span>
-                  {QUICK_CLIM.map((q) => (
-                    <button
-                      key={'clim-' + q.code}
-                      className={
-                        styles.quickBtn +
-                        (p.indicator.current_air_mode === q.code ? ' ' + styles.active : '')
-                      }
-                      onClick={() => quickMode(q.code, false)}
-                      disabled={!canSend || sending !== null}
-                      title={`changeMode ["${q.code}"]`}
-                    >
-                      {q.label}
-                    </button>
-                  ))}
+              {QUICK_GROUPS.map((group) => (
+                <div key={group.field} className={styles.quick}>
+                  <span className={styles.quickLabel}>{group.label}</span>
+                  {group.modes.map((q) => {
+                    const current = group.water
+                      ? p.indicator.current_water_mode
+                      : p.indicator.current_air_mode
+                    return (
+                      <button
+                        key={group.field + '-' + q.code}
+                        className={styles.quickBtn + (current === q.code ? ' ' + styles.active : '')}
+                        onClick={() => quickMode(q.code, group.water)}
+                        disabled={!canSend || sending !== null}
+                        title={`changeMode ["${q.code}"]`}
+                      >
+                        {q.label}
+                      </button>
+                    )
+                  })}
                 </div>
-              )}
-              {QUICK_HEAT.length > 0 && (
-                <div className={styles.quick}>
-                  <span className={styles.quickLabel}>Chauffage</span>
-                  {QUICK_HEAT.map((q) => (
-                    <button
-                      key={'heat-' + q.code}
-                      className={
-                        styles.quickBtn +
-                        (p.indicator.current_air_mode === q.code ? ' ' + styles.active : '')
-                      }
-                      onClick={() => quickMode(q.code, false)}
-                      disabled={!canSend || sending !== null}
-                      title={`changeMode ["${q.code}"]`}
-                    >
-                      {q.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-              {QUICK_CLIM.length === 0 && QUICK_HEAT.length === 0 && (
-                <div className={styles.quick}>
-                  <span className={styles.quickLabel}>Air</span>
-                  {buildQuickAirGroup(profile?.air_modes, []).map((q) => (
-                    <button
-                      key={q.code}
-                      className={
-                        styles.quickBtn +
-                        (p.indicator.current_air_mode === q.code ? ' ' + styles.active : '')
-                      }
-                      onClick={() => quickMode(q.code, false)}
-                      disabled={!canSend || sending !== null}
-                      title={`changeMode ["${q.code}"]`}
-                    >
-                      {q.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <div className={styles.quick}>
-                <span className={styles.quickLabel}>ECS</span>
-                {QUICK_WATER.map((q) => (
-                  <button
-                    key={q.code}
-                    className={
-                      styles.quickBtn +
-                      (p.indicator.current_water_mode === q.code ? ' ' + styles.active : '')
-                    }
-                    onClick={() => quickMode(q.code, true)}
-                    disabled={!canSend || sending !== null}
-                    title={`changeMode ["${q.code}"]`}
-                  >
-                    {q.label}
-                  </button>
-                ))}
-              </div>
+              ))}
             </div>
 
             <div className={styles.stats}>
-              <div className={styles.stat}>
-                <span className={styles.statLabel}>Temp. principale</span>
-                <span className={styles.statValue + ' ' + styles.big}>
-                  {fmtDeg(p.indicator.tmp_principal)}
-                </span>
-              </div>
-              <div className={styles.stat}>
-                <span className={styles.statLabel}>Eau chaude (ECS)</span>
-                <span className={styles.statValue}>
-                  {p.indicator.qte_eau_chaude === null || p.indicator.qte_eau_chaude === undefined
-                    ? '—'
-                    : `${p.indicator.qte_eau_chaude} %`}
-                </span>
-              </div>
-              {(() => {
-                const b = ballonMode(p.indicator.current_water_mode, WATER_LABEL)
-                return (
-                  <div className={styles.stat + (b && b.on ? ' ' + styles.ballonOn : '')}>
-                    <span className={styles.statLabel}>Ballon</span>
+              {showThermostats && (
+                <div className={styles.stat}>
+                  <span className={styles.statLabel}>Temp. principale</span>
+                  <span className={styles.statValue + ' ' + styles.big}>
+                    {fmtDeg(p.indicator.tmp_principal)}
+                  </span>
+                </div>
+              )}
+              {showHotWater && (
+                <>
+                  <div className={styles.stat}>
+                    <span className={styles.statLabel}>Eau chaude (ECS)</span>
                     <span className={styles.statValue}>
-                      {b ? (b.on ? 'On' : 'Off') : '—'}
-                      {b && <span className={styles.ballonMode}>&nbsp;· {b.label}</span>}
+                      {p.indicator.qte_eau_chaude === null || p.indicator.qte_eau_chaude === undefined
+                        ? '—'
+                        : `${p.indicator.qte_eau_chaude} %`}
                     </span>
                   </div>
-                )
-              })()}
+                  {(() => {
+                    const b = ballonMode(p.indicator.current_water_mode, WATER_LABEL)
+                    return (
+                      <div className={styles.stat + (b && b.on ? ' ' + styles.ballonOn : '')}>
+                        <span className={styles.statLabel}>Ballon</span>
+                        <span className={styles.statValue}>
+                          {b ? (b.on ? 'On' : 'Off') : '—'}
+                          {b && <span className={styles.ballonMode}>&nbsp;· {b.label}</span>}
+                        </span>
+                      </div>
+                    )
+                  })()}
+                </>
+              )}
               <div className={styles.stat}>
                 <span className={styles.statLabel}>Mode air</span>
                 <span className={styles.statValue}>
                   {fmtMode(p.indicator.current_air_mode, AIR_LABEL)}
                 </span>
               </div>
-              <div className={styles.stat}>
-                <span className={styles.statLabel}>Mode ECS</span>
-                <span className={styles.statValue}>
-                  {fmtMode(p.indicator.current_water_mode, WATER_LABEL)}
-                </span>
-              </div>
+              {showHotWater && (
+                <div className={styles.stat}>
+                  <span className={styles.statLabel}>Mode ECS</span>
+                  <span className={styles.statValue}>
+                    {fmtMode(p.indicator.current_water_mode, WATER_LABEL)}
+                  </span>
+                </div>
+              )}
               {p.indicator.hors_gel && (
                 <div className={styles.stat + ' ' + styles.gel}>
                   <span className={styles.statLabel}>Hors gel</span>
@@ -379,64 +382,68 @@ export default function TempsPanel({ pollMs = 5000, clientId, connected, consign
               )}
             </div>
 
-            <div className={styles.tableTitle}>Thermostats</div>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>Zone</th>
-                  <th>Réel</th>
-                  <th>Consigne</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ts.length === 0 && (
-                  <tr>
-                    <td colSpan={3} className={styles.none}>
-                      aucune zone connue
-                    </td>
-                  </tr>
-                )}
-                {ts.map((t) => {
-                  const entry = consignes[t.ThermostatId]
-                  const isPending = entry !== undefined && !entry.confirmed
-                  return (
-                    <tr key={t.ThermostatId}>
-                      <td className={styles.zone}>{t.Name}</td>
-                      <td className={styles.reel}>{fmtDeg(t.CurrentTemperature)}</td>
-                      <td className={styles.consigne}>
-                        <div className={styles.consigneRow}>
-                          <button
-                            className={styles.stepBtn}
-                            onClick={() => step(t, -1)}
-                            disabled={!canSend || sending !== null}
-                            title="Diminuer de 1 °C"
-                          >
-                            −
-                          </button>
-                          <span className={styles.consigneVal}>{fmtDeg(t.TemperatureSet)}</span>
-                          <button
-                            className={styles.stepBtn}
-                            onClick={() => step(t, 1)}
-                            disabled={!canSend || sending !== null}
-                            title="Augmenter de 1 °C"
-                          >
-                            +
-                          </button>
-                        </div>
-                        {isPending && (
-                          <div className={styles.pending}>
-                            demandé {fmtDeg(entry.requested, 1)}
-                            {(entry.attempts ?? 0) > 0 && (
-                              <span> (tentative {entry.attempts}/2)</span>
-                            )}
-                          </div>
-                        )}
-                      </td>
+            {showThermostats && (
+              <>
+                <div className={styles.tableTitle}>Thermostats</div>
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th>Zone</th>
+                      <th>Réel</th>
+                      <th>Consigne</th>
                     </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody>
+                    {ts.length === 0 && (
+                      <tr>
+                        <td colSpan={3} className={styles.none}>
+                          aucune zone connue
+                        </td>
+                      </tr>
+                    )}
+                    {ts.map((t) => {
+                      const entry = consignes[t.ThermostatId]
+                      const isPending = entry !== undefined && !entry.confirmed
+                      return (
+                        <tr key={t.ThermostatId}>
+                          <td className={styles.zone}>{t.Name}</td>
+                          <td className={styles.reel}>{fmtDeg(t.CurrentTemperature)}</td>
+                          <td className={styles.consigne}>
+                            <div className={styles.consigneRow}>
+                              <button
+                                className={styles.stepBtn}
+                                onClick={() => step(t, -1)}
+                                disabled={!canSend || sending !== null}
+                                title="Diminuer de 1 °C"
+                              >
+                                −
+                              </button>
+                              <span className={styles.consigneVal}>{fmtDeg(t.TemperatureSet)}</span>
+                              <button
+                                className={styles.stepBtn}
+                                onClick={() => step(t, 1)}
+                                disabled={!canSend || sending !== null}
+                                title="Augmenter de 1 °C"
+                              >
+                                +
+                              </button>
+                            </div>
+                            {isPending && (
+                              <div className={styles.pending}>
+                                demandé {fmtDeg(entry.requested, 1)}
+                                {(entry.attempts ?? 0) > 0 && (
+                                  <span> (tentative {entry.attempts}/2)</span>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </>
+            )}
 
             {p.indicator.ventilation && (() => {
               const v = p.indicator.ventilation as VentilationData

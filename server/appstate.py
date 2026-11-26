@@ -4,6 +4,7 @@ import logging
 import threading
 import time
 
+from .device_profile import telemetry_field
 from .events import EventBus
 from .mqtt import build_publish, parse_connect
 from .utils import atomic_write_json, iso, read_json
@@ -281,7 +282,27 @@ class AppState:
     def set_profile(self, profile):
         """Change le profil device et persiste le choix."""
         self.profile = profile
+        allowed = self._health_keys()
+        with self._lock:
+            self._health = {
+                k: v for k, v in self._health.items() if k.lower() in allowed
+            }
         self._persist_profile()
+
+    def _health_keys(self):
+        """Cles de telemetrie de sante autorisees pour le profil actif.
+
+        Un profil peut declarer health_keys (liste vide comprise pour un
+        appareil sans donnees de sante PAC) ; sans declaration, le jeu
+        legacy s'applique, ce qui preserve les installations existantes.
+        """
+        declared = None
+        profile = getattr(self, "profile", None)
+        if profile is not None:
+            declared = getattr(profile, "health_keys", None)
+        if declared is None:
+            return {k.lower() for k in _HEALTH_KEYS}
+        return {str(k).lower() for k in declared}
 
     def _persist_profile(self):
         """Ecrit le profil courant dans profile_file (atomique, ne casse jamais le runtime)."""
@@ -354,7 +375,9 @@ class AppState:
         with self._lock:
             current = dict(self.telemetry.get(pid, {}))
             # Log les changements de temperature/consigne
-            temp_keys = [k for k in data if k.startswith("MT") or k.startswith("UsC")]
+            temp_prefix = telemetry_field(self.profile, "zone_temp_prefix", "MT")
+            setpoint_prefix = telemetry_field(self.profile, "zone_setpoint_prefix", "UsC")
+            temp_keys = [k for k in data if k.startswith(temp_prefix) or k.startswith(setpoint_prefix)]
             if temp_keys:
                 changes = {k: data[k] for k in temp_keys if str(data.get(k)) != str(current.get(k))}
                 if changes:
@@ -514,19 +537,20 @@ class AppState:
     def _confirm_consignes_from(self, data):
         """Confirme ou rejette les consignes en attente.
 
-        A appeler sous self._lock : pour chaque zone dont une UsC<n> est presente
-        dans la trame, si elle correspond a une consigne demandee, on la marque
-        confirmee (la box a bien applique la valeur) et on persiste.
+        A appeler sous self._lock : pour chaque zone dont une setpoint<n> est
+        presente dans la trame, si elle correspond a une consigne demandee, on
+        la marque confirmee (la box a bien applique la valeur) et on persiste.
         Si la valeur ne correspond pas, on incremente le compteur d'apres 2
         tentatives sans concordance, la consigne est supprimee (rejetee).
         """
+        setpoint_prefix = telemetry_field(self.profile, "zone_setpoint_prefix", "UsC")
         confirmed = []
         rejected = []
         for zone, entry in list(self._consignes.items()):
             if entry.get("confirmed"):
                 continue
             try:
-                got = float(data.get("UsC%s" % zone))
+                got = float(data.get("%s%s" % (setpoint_prefix, zone)))
             except (TypeError, ValueError):
                 continue
             _log.debug("confirm_consigne: zone %s requested=%.1f got=%.1f (diff=%.2f) attempts=%d",
@@ -654,11 +678,20 @@ class AppState:
 
         Appeler sous self._lock. Renvoie un dict avec les valeurs ou None.
         Priorise self._health (persistance) puis fallback sur telemetry live.
+        Seules les cles autorisees par le profil actif sont exposees : des
+        valeurs PAC persistees ne doivent pas survivre a un changement de
+        profil vers un appareil sans donnees de sante.
         Les valeurs sentinelles (<= -40) sont filtrees.
         """
+        allowed = self._health_keys()
         # Priorite 1 : donnees persistees (disponibles au demarrage)
         if self._health:
-            return {k: v for k, v in self._health.items() if not isinstance(v, (int, float)) or v > -40}
+            return {
+                k: v
+                for k, v in self._health.items()
+                if k.lower() in allowed
+                and (not isinstance(v, (int, float)) or v > -40)
+            }
         # Priorite 2 : donnees live depuis la telemetrie (fallback)
         for data in self.telemetry.values():
             if not isinstance(data, dict):
@@ -684,6 +717,8 @@ class AppState:
                 ("TUeH", "tueh"),
                 ("THGa", "thga"),
             ):
+                if key.lower() not in allowed:
+                    continue
                 val = data.get(key)
                 if val is not None:
                     try:

@@ -2,6 +2,7 @@
 import json
 import logging
 
+from ..device_profile import air_mode_code, telemetry_field
 from ..utils import safe_float
 from .mode_mappings import (
     ALDES_TO_HA_PRESET, ALDES_WATER_TO_HA,
@@ -10,20 +11,13 @@ from .mode_mappings import (
 
 _log = logging.getLogger("aldes-ha-discovery")
 
-_AIR_MODE_CODES = ["A", "B", "C", "D", "E", "F", "G", "H", "I"]
 _COOLING_CODES = frozenset({"F", "G", "H", "I"})
 _HEATING_CODES = frozenset({"B", "C", "D", "E"})
 
 
-def _air_mode_code(data):
-    raw = data.get("UAM", "") if data else ""
-    try:
-        index = int(float(raw))
-    except (TypeError, ValueError):
-        return str(raw).strip().upper()
-    if 0 <= index < len(_AIR_MODE_CODES):
-        return _AIR_MODE_CODES[index]
-    return ""
+def _air_mode_code(data, profile=None):
+    raw = data.get(telemetry_field(profile, "air_mode_field", "UAM"), "") if data else ""
+    return air_mode_code(raw, profile) or ""
 
 
 def _filter_air_programs(clim_labels, heat_labels, air_code):
@@ -42,10 +36,10 @@ def _filter_air_programs(clim_labels, heat_labels, air_code):
     return list(dict.fromkeys(selected))
 
 
-def _get_min_max(data):
+def _get_min_max(data, profile=None):
     if data is None:
         return 5, 30
-    is_cooling = _air_mode_code(data) in _COOLING_CODES
+    is_cooling = _air_mode_code(data, profile) in _COOLING_CODES
     if is_cooling:
         mi = safe_float(data.get("FMiST"))
         ma = safe_float(data.get("FMaST"))
@@ -65,13 +59,16 @@ def _get_min_max(data):
     return int(mi), int(ma)
 
 
-def detect_active_zones(data):
+def detect_active_zones(data, profile=None):
     if data is None:
         return []
+    temp_prefix = telemetry_field(profile, "zone_temp_prefix", "MT")
+    setpoint_prefix = telemetry_field(profile, "zone_setpoint_prefix", "UsC")
+    zone_count = int(telemetry_field(profile, "zone_count", 10))
     zones = []
-    for i in range(10):
-        mt = data.get(f"MT{i}")
-        usc = data.get(f"UsC{i}")
+    for i in range(zone_count):
+        mt = data.get(f"{temp_prefix}{i}")
+        usc = data.get(f"{setpoint_prefix}{i}")
         if mt is not None and usc is not None:
             try:
                 mt_val = float(mt)
@@ -84,8 +81,59 @@ def detect_active_zones(data):
     return zones
 
 
+def build_vmc_discovery_config(device_id, profile, prefix="aldes"):
+    """Configs HA d'une VMC : sensors du profil + select du mode."""
+    discovery_prefix = "homeassistant"
+    device = {
+        "identifiers": [f"aldes_{device_id}"],
+        "name": f"Aldes {profile.name}",
+        "manufacturer": "Aldes",
+        "model": profile.name,
+    }
+    availability = {
+        "availability_topic": f"{prefix}/state/available",
+        "payload_available": "online",
+        "payload_not_available": "offline",
+    }
+    configs = [(f"{discovery_prefix}/select/aldes_vmc_mode/config", json.dumps({
+        "name": "Mode",
+        "unique_id": f"aldes_{device_id}_vmc_mode",
+        "state_topic": f"{prefix}/state/vmc_mode",
+        "command_topic": f"{prefix}/set/vmc_mode",
+        "options": [m["label"] for m in profile.air_modes],
+        "device": device,
+        "icon": "mdi:hvac",
+        **availability,
+    }, ensure_ascii=False))]
+    for sensor in (profile.ha_discovery.get("entities", {}) or {}).get("sensors", []) or []:
+        key = sensor["key"]
+        config = {
+            "name": sensor["name"],
+            "unique_id": f"aldes_{device_id}_{key}",
+            "state_topic": f"{prefix}/state/sensor/{key}",
+            "device": device,
+            **availability,
+        }
+        # Les diagnostics sont des champs modem bruts (ids, versions, dates) : pas des mesures.
+        if sensor.get("entity_category") != "diagnostic":
+            config["state_class"] = "measurement"
+        for src, dst in (
+            ("unit", "unit_of_measurement"),
+            ("device_class", "device_class"),
+            ("icon", "icon"),
+            ("entity_category", "entity_category"),
+            ("value_template", "value_template"),
+        ):
+            if sensor.get(src):
+                config[dst] = sensor[src]
+        configs.append((f"{discovery_prefix}/sensor/aldes_{key}/config", json.dumps(config, ensure_ascii=False)))
+    return configs
+
+
 def build_discovery_config(device_id, profile, prefix="aldes", data=None,
                            previous_active_zones=None, zone_sensors=False):
+    if profile is not None and profile.type == "vmc":
+        return build_vmc_discovery_config(device_id, profile, prefix)
     configs = []
     discovery_prefix = "homeassistant"
 
@@ -96,12 +144,15 @@ def build_discovery_config(device_id, profile, prefix="aldes", data=None,
         "model": profile.name if profile else "T.ONE AquaAIR",
     }
 
-    min_temp, max_temp = _get_min_max(data)
+    min_temp, max_temp = _get_min_max(data, profile)
 
-    active_zones = detect_active_zones(data)
+    active_zones = detect_active_zones(data, profile)
+    # Plancher a 10 : les zones de la T.ONE au-dela de zone_count doivent
+    # rester purgees si le profil en reduit le nombre.
+    zone_count = max(int(telemetry_field(profile, "zone_count", 10)), 10)
     air_programs_clim = profile_mode_labels(profile, "air_modes_clim", ALDES_TO_HA_PRESET)
     air_programs_heat = profile_mode_labels(profile, "air_modes_heat", ALDES_TO_HA_PRESET)
-    air_programs = _filter_air_programs(air_programs_clim, air_programs_heat, _air_mode_code(data))
+    air_programs = _filter_air_programs(air_programs_clim, air_programs_heat, _air_mode_code(data, profile))
     water_programs = profile_mode_labels(profile, "water_modes", ALDES_WATER_TO_HA)
 
     ha_entities = (profile.ha_discovery.get("entities", {}) if profile else {}) or {}
@@ -109,7 +160,7 @@ def build_discovery_config(device_id, profile, prefix="aldes", data=None,
     temp_step = climate_entities[0].get("temp_step", 1) if climate_entities else 1
 
     if previous_active_zones is not None:
-        for zi in range(10):
+        for zi in range(zone_count):
             if zi not in active_zones:
                 configs.append((f"{discovery_prefix}/climate/aldes_zone{zi}/config", ""))
 
@@ -478,7 +529,7 @@ def build_discovery_config(device_id, profile, prefix="aldes", data=None,
                 json.dumps(zone_temp_config, ensure_ascii=False),
             ))
 
-        for zi in range(10):
+        for zi in range(zone_count):
             if zi not in active_zones:
                 configs.append((
                     f"{discovery_prefix}/sensor/zone{zi}_temp/config", "",

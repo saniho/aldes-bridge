@@ -44,6 +44,11 @@ def _permissive(ctx):
         ctx.minimum_version = ssl.TLSVersion.TLSv1
     except Exception:
         pass
+    # Les relais lisent et ecrivent le meme SSLSocket depuis deux threads. Les
+    # messages post-handshake de TLS 1.3 rendent cela sans effet (ecritures
+    # perdues) ; Azure IoT Hub negoci deja du 1.2. Plafonnement a 1.2 tant
+    # qu'Azure n'exige pas TLS 1.3.
+    ctx.maximum_version = ssl.TLSVersion.TLSv1_2
     try:
         ctx.set_ciphers("ALL:@SECLEVEL=0")
     except ssl.SSLError:

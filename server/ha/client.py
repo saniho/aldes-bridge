@@ -6,10 +6,11 @@ import socket
 import struct
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from .. import mqtt
 from ..appstate import emit_message
+from ..device_profile import air_mode_code, telemetry_field, water_mode_code
 from ..utils import iso, safe_float
 from .mode_mappings import (
     ALDES_TO_HA_MODE, HA_MODE_TO_ALDES,
@@ -149,8 +150,9 @@ class HADiscoveryClient(threading.Thread):
             (f"{self.prefix}/set/vacation_end", 1),
             (f"{self.prefix}/set/vacation_enable", 1),
             (f"{self.prefix}/set/people", 1),
+            (f"{self.prefix}/set/vmc_mode", 1),
         ]
-        for zi in range(10):
+        for zi in range(int(telemetry_field(self._profile(), "zone_count", 10))):
             cmd_topics.append((f"{self.prefix}/set/zone{zi}/consigne", 1))
         # Plancher energetique : le broker renvoie les valeurs retenues de nos
         # propres capteurs des la souscription, ce qui reconstruit l'offset apres
@@ -268,6 +270,8 @@ class HADiscoveryClient(threading.Thread):
                 self._handle_vacation_enable_command(payload)
             elif topic == f"{self.prefix}/set/people":
                 self._handle_people_command(payload)
+            elif topic == f"{self.prefix}/set/vmc_mode":
+                self._handle_vmc_mode_command(payload)
         except Exception as exc:
             _log.warning("ha-discovery: erreur commande %s: %s", topic, exc)
 
@@ -305,6 +309,43 @@ class HADiscoveryClient(threading.Thread):
             return
         self._inject_aldes_command("changeMode", [aldes_code])
         _log.info("ha-discovery: mode %s -> Aldes %s", ha_mode, aldes_code)
+
+    def _handle_vmc_mode_command(self, payload):
+        code = profile_code_for_label(self._profile(), "air_modes", payload, None)
+        if not code:
+            _log.warning("ha-discovery: mode VMC inconnu: %s", payload)
+            return
+        if code == "W":
+            # InspirAIR ignore W sans la fenetre UTC que son application utilise.
+            hours = float(self._profile().ha_discovery.get("holiday_duration_hours", 24))
+            if not 0 < hours <= 8760:
+                _log.warning("ha-discovery: invalid holiday duration: %s", hours)
+                return
+            start = datetime.now(timezone.utc)
+            end = start + timedelta(hours=hours)
+            code += start.strftime("%Y%m%d%H%M%SZ") + end.strftime("%Y%m%d%H%M%SZ")
+        self._inject_aldes_command("changeMode", [code])
+        _log.info("ha-discovery: mode VMC %s -> Aldes %s", payload, code)
+
+    def _profile(self):
+        return getattr(self.state, "profile", None)
+
+    def _is_vmc(self):
+        profile = self._profile()
+        return profile is not None and profile.type == "vmc"
+
+    def _publish_vmc_telemetry(self, data):
+        profile = self._profile()
+        mode_field = telemetry_field(profile, "air_mode_field", "current_mode")
+        label = profile_label_for_code(profile, "air_modes", data.get(mode_field), None)
+        if label:
+            self._safe_send(mqtt.build_publish(f"{self.prefix}/state/vmc_mode", label, qos=1, retain=True))
+        for sensor in (profile.ha_discovery.get("entities", {}) or {}).get("sensors", []) or []:
+            val = data.get(sensor["key"])
+            if val is not None:
+                self._safe_send(mqtt.build_publish(
+                    f"{self.prefix}/state/sensor/{sensor['key']}", str(val), qos=1, retain=True
+                ))
 
     def _handle_consigne_command(self, payload, zone=0):
         try:
@@ -422,14 +463,15 @@ class HADiscoveryClient(threading.Thread):
             "method": method,
             "params": params if isinstance(params, list) else [params],
         }
-        dry_run = self.state.config.get("ha_mqtt_dry_run") if self.state.config else self.dry_run
-        if dry_run:
+        # L'API settings met a jour self.dry_run au toggle ; state.config ecraserait
+        # la valeur de demarrage avec son defaut False.
+        if self.dry_run:
             _log.info("ha-discovery [DRY-RUN]: commande simulée: %s", json.dumps(body, ensure_ascii=False))
             return
         hook = getattr(self.state, "_ha_inject_hook", None)
         if hook:
             hook(
-                f"devices/{self._device_id}/messages/devicebound",
+                f"devices/{self.state._client_id or self._device_id}/messages/devicebound",
                 json.dumps(body, ensure_ascii=False),
                 1,
             )
@@ -441,7 +483,7 @@ class HADiscoveryClient(threading.Thread):
             telemetry = dict(self.state.telemetry)
         data = next(iter(telemetry.values()), {}) if telemetry else None
         profile = getattr(self.state, "profile", None)
-        active_zones = detect_active_zones(data) if data else []
+        active_zones = detect_active_zones(data, profile) if data else []
         zone_sensors = self.state.config.get("ha_zone_sensors") if self.state.config else False
         configs = build_discovery_config(
             self._device_id, profile, self.prefix, data,
@@ -472,6 +514,9 @@ class HADiscoveryClient(threading.Thread):
         if not data:
             return
 
+        if self._is_vmc():
+            self._publish_vmc_telemetry(data)
+            return
         self._publish_telemetry_data(data, include_zone_aliases=True)
 
     def _publish_health(self):
@@ -505,6 +550,9 @@ class HADiscoveryClient(threading.Thread):
     def publish_telemetry(self, data):
         if not self._sock:
             return
+        if self._is_vmc():
+            self._publish_vmc_telemetry(data)
+            return
 
         air_mode_code = self._get_air_mode_code(data)
         if air_mode_code:
@@ -517,13 +565,13 @@ class HADiscoveryClient(threading.Thread):
         self._publish_telemetry_data(data, include_zone_aliases=False)
 
     def _publish_telemetry_data(self, data, include_zone_aliases=False):
+        profile = self._profile()
         air_mode_code = self._get_air_mode_code(data)
         if air_mode_code:
             ha_mode = ALDES_TO_HA_MODE.get(air_mode_code, "off")
             self._safe_send(mqtt.build_publish(
                 f"{self.prefix}/state/mode", ha_mode, qos=1, retain=True
             ))
-            profile = getattr(self.state, "profile", None)
             preset = profile_label_for_code(
                 profile, ["air_modes_clim", "air_modes_heat"], air_mode_code, ALDES_TO_HA_PRESET
             )
@@ -531,10 +579,12 @@ class HADiscoveryClient(threading.Thread):
                 f"{self.prefix}/state/preset", preset, qos=1, retain=True
             ))
 
+        temp_prefix = telemetry_field(profile, "zone_temp_prefix", "MT")
+        setpoint_prefix = telemetry_field(profile, "zone_setpoint_prefix", "UsC")
         consignes = self.state.consignes_state()
-        active_zones = detect_active_zones(data)
+        active_zones = detect_active_zones(data, profile)
         for zone_idx in active_zones:
-            temp = safe_float(data.get(f"MT{zone_idx}"))
+            temp = safe_float(data.get(f"{temp_prefix}{zone_idx}"))
             if temp is not None:
                 self._safe_send(mqtt.build_publish(
                     f"{self.prefix}/state/zone{zone_idx}/temperature",
@@ -546,7 +596,7 @@ class HADiscoveryClient(threading.Thread):
                         f"{temp:.1f}", qos=1, retain=True
                     ))
 
-            consigne = safe_float(data.get(f"UsC{zone_idx}"))
+            consigne = safe_float(data.get(f"{setpoint_prefix}{zone_idx}"))
             entry = consignes.get(str(zone_idx))
             if entry and not entry.get("confirmed"):
                 consigne = float(entry["requested"])
@@ -581,7 +631,6 @@ class HADiscoveryClient(threading.Thread):
 
         water_mode_code = self._get_water_mode_code(data)
         if water_mode_code:
-            profile = getattr(self.state, "profile", None)
             ha_water = profile_label_for_code(
                 profile, "water_modes", water_mode_code, ALDES_WATER_TO_HA
             )
@@ -589,13 +638,13 @@ class HADiscoveryClient(threading.Thread):
                 f"{self.prefix}/state/ecs", ha_water, qos=1, retain=True
             ))
 
-        ned = safe_float(data.get("NED"))
+        ned = safe_float(data.get(telemetry_field(profile, "hot_water_field", "NED")))
         if ned is not None:
             self._safe_send(mqtt.build_publish(
                 f"{self.prefix}/state/sensor/NED", f"{ned:.0f}", qos=1, retain=True
             ))
 
-        npih = data.get("NpiH")
+        npih = data.get(telemetry_field(profile, "people_field", "NpiH"))
         if npih is not None:
             try:
                 people_idx = max(0, min(4, int(npih)))
@@ -661,8 +710,9 @@ class HADiscoveryClient(threading.Thread):
                          payload=data, source="bridge", destination="ha")
 
     def _publish_vacation_state(self, data):
-        dvac = data.get("Dvac")
-        fvac = data.get("Fvac")
+        profile = self._profile()
+        dvac = data.get(telemetry_field(profile, "vacation_start_field", "Dvac"))
+        fvac = data.get(telemetry_field(profile, "vacation_end_field", "Fvac"))
         start_date = self._epoch_to_date_str(dvac)
         end_date = self._epoch_to_date_str(fvac)
 
@@ -707,24 +757,12 @@ class HADiscoveryClient(threading.Thread):
             return None
 
     def _get_air_mode_code(self, data):
-        try:
-            index = int(float(data.get("UAM", -1)))
-            modes = ["A", "B", "C", "D", "E", "F", "G", "H", "I"]
-            if 0 <= index < len(modes):
-                return modes[index]
-        except (TypeError, ValueError):
-            pass
-        return None
+        profile = self._profile()
+        return air_mode_code(data.get(telemetry_field(profile, "air_mode_field", "UAM")), profile)
 
     def _get_water_mode_code(self, data):
-        try:
-            index = int(float(data.get("UDM", -1)))
-            codes = ["L", "M", "N"]
-            if 0 <= index < len(codes):
-                return codes[index]
-        except (TypeError, ValueError):
-            pass
-        return None
+        profile = self._profile()
+        return water_mode_code(data.get(telemetry_field(profile, "water_mode_field", "UDM")), profile)
 
     def _safe_send(self, data):
         with self._send_lock:

@@ -387,6 +387,7 @@ const { messages, lastSnapshot } = useMemo(() => {
               config={config}
               connected={config?.connected ?? false}
               health={config?.health ?? null}
+              profile={config?.profile ?? null}
             />
           </div>
         )}
@@ -402,7 +403,7 @@ const { messages, lastSnapshot } = useMemo(() => {
         )}
         {view === 'health' && (
           <div className="streamCol">
-            <HealthPanel health={config?.health ?? null} />
+            <HealthPanel health={config?.health ?? null} profile={config?.profile ?? null} />
           </div>
         )}
         {view === 'commande' && (

@@ -103,6 +103,7 @@ export interface AldesIndicator {
   settings?: { people?: number | null }
   thermostats: AldesThermostat[]
   ventilation?: VentilationData | null
+  sensors?: Record<string, string | number | boolean> | null
 }
 
 export interface HistoryKey {
@@ -110,6 +111,13 @@ export interface HistoryKey {
   kind: string
   samples: number
   last_ts: number | null
+  label?: string
+  family?: string
+}
+
+export interface HistoryKeys {
+  keys: HistoryKey[]
+  family_order: string[]
 }
 
 export interface HistoryPoint {
@@ -164,12 +172,32 @@ export interface DeviceCommand {
   }>
 }
 
+export interface HealthCard {
+  title: string
+  sensors: string[]
+}
+
 export interface DeviceUi {
   quick_modes?: Array<{ field: string; label: string }>
   show_thermostats?: boolean
   show_vacations?: boolean
   show_people?: boolean
   show_hot_water?: boolean
+  show_sensors?: boolean
+}
+
+export interface HaSensorMeta {
+  key: string
+  name?: string
+  unit?: string
+  icon?: string
+  device_class?: string
+  entity_category?: string
+}
+
+export interface HaDiscovery {
+  entities?: { sensors?: HaSensorMeta[] }
+  [k: string]: unknown
 }
 
 export interface DeviceProfile {
@@ -183,6 +211,8 @@ export interface DeviceProfile {
   water_modes: DeviceMode[]
   commands: DeviceCommand[]
   ui: DeviceUi
+  health?: { cards?: HealthCard[] } | null
+  ha_discovery?: HaDiscovery | null
 }
 
 export interface AppConfig {

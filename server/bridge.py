@@ -59,9 +59,12 @@ class BridgeHandler(MQTTEndpoint):
                 break
 
     def shutdown(self):
+        # shutdown() reveille run() bloque dans recv ; fermer le fd depuis ce
+        # thread laisserait la lecture SSL poller un fd invalide jusqu'a son timeout.
+        # Engine._handle ferme le socket une fois run() retourne.
         self._closed = True
         try:
-            self.sock.close()
+            self.sock.shutdown(socket.SHUT_RDWR)
         except Exception:
             pass
 

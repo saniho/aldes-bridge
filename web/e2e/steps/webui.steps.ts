@@ -2,7 +2,21 @@ import { createBdd } from 'playwright-bdd'
 import { expect } from '@playwright/test'
 import './parameter-types'
 
-const { Given, When, Then } = createBdd()
+const { Given, When, Then, Before, After } = createBdd()
+
+// Chaque scénario démarre sur le profil par défaut : un scénario qui bascule
+// sur un autre profil ne doit pas contaminer les suivants.
+Before(async ({ request }) => {
+  const res = await request.put('/api/profile', { data: { profile_id: 'tone-aquaair' } })
+  expect(res.ok()).toBeTruthy()
+})
+
+// Les fichiers de persistance du bridge (logs/profile.json) survivent aux
+// exécutions : on rend la main sur le profil par défaut.
+After(async ({ request }) => {
+  const res = await request.put('/api/profile', { data: { profile_id: 'tone-aquaair' } })
+  expect(res.ok()).toBeTruthy()
+})
 
 // ---------------------------------------------------------------------------
 //  Given : état initial de la WebUI
@@ -341,6 +355,14 @@ Then('le profil {texte} est actif côté API', async ({ page }, profileId: strin
 When('je change le profil pour {texte}', async ({ page }, profileId: string) => {
   const select = page.locator('.profileSelect, select').filter({ has: page.locator(`option[value="${profileId}"]`) }).first()
   await select.selectOption(profileId)
+})
+
+Then('le texte {texte} est affiché', async ({ page }, text: string) => {
+  await expect(page.getByText(text, { exact: false }).first()).toBeVisible({ timeout: 10000 })
+})
+
+Then('le texte {texte} n\'est pas affiché', async ({ page }, text: string) => {
+  await expect(page.getByText(text, { exact: false }).first()).not.toBeVisible({ timeout: 10000 })
 })
 
 Given('le snapshot simule un dégivrage actif', async ({ page }) => {

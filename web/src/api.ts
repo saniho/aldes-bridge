@@ -109,10 +109,8 @@ export async function getLogs(limit: number, offset: number): Promise<LogPage> {
   return json<LogPage>(await fetch(`api/logs?limit=${limit}&offset=${offset}`))
 }
 
-export async function getHistoryKeys(): Promise<import('./types').HistoryKey[]> {
-  return json<{ keys: import('./types').HistoryKey[] }>(await fetch('api/history/keys')).then(
-    (r) => r.keys
-  )
+export async function getHistoryKeys(): Promise<import('./types').HistoryKeys> {
+  return json<import('./types').HistoryKeys>(await fetch('api/history/keys'))
 }
 
 export async function getHistorySeries(
