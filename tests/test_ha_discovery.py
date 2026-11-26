@@ -1,5 +1,6 @@
 """Tests du module Home Assistant MQTT Auto-Discovery."""
 import json
+import logging
 import socket
 import struct
 import threading
@@ -1478,6 +1479,42 @@ def test_energy_device_reset_clears_offset(tmp_path, monkeypatch):
     # encore 103. Au 3e, l'offset est purge et on repart de la somme brute.
     assert _energy_published(published, "energy_heating_h") == \
         ["102", "103", "103", "103", "0"]
+
+
+def test_energy_reset_logged_once_per_zero_episode(tmp_path, monkeypatch, caplog):
+    """Une consommation saisonniere a zero ne reloggue pas le reset a chaque payload."""
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events,
+                     energy_file=str(tmp_path / "energy_totals.json"))
+    client = _energy_client(state)
+    published = _spy_build_publish(monkeypatch)
+
+    client._publish_telemetry_data(_slots_payload(heating=[0] * 10 + [102, 0]))
+    zero = _slots_payload(heating=[0] * 12)
+    with caplog.at_level(logging.WARNING, logger="aldes-appstate"):
+        for _ in range(10):
+            client._publish_telemetry_data(zero)
+
+    warnings = [r for r in caplog.records if "reset usine" in r.getMessage()]
+    assert len(warnings) == 1, [r.getMessage() for r in warnings]
+    assert _energy_published(published, "energy_heating_h")[-1] == "0"
+
+
+def test_energy_steady_zero_does_not_warn(tmp_path, monkeypatch, caplog):
+    """12 compteurs a zero sans offset a abandonner : aucun reset logue."""
+    events = EventBus()
+    state = AppState("127.0.0.1", 8883, events,
+                     energy_file=str(tmp_path / "energy_totals.json"))
+    client = _energy_client(state)
+    published = _spy_build_publish(monkeypatch)
+
+    zero = _slots_payload(heating=[0] * 12)
+    with caplog.at_level(logging.WARNING, logger="aldes-appstate"):
+        for _ in range(5):
+            client._publish_telemetry_data(zero)
+
+    assert not [r for r in caplog.records if "reset usine" in r.getMessage()]
+    assert _energy_published(published, "energy_heating_h") == ["0"] * 5
 
 
 def test_energy_single_zero_slot_is_rollover_not_reset(tmp_path, monkeypatch):

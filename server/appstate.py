@@ -476,27 +476,35 @@ class AppState:
             entry = entry if isinstance(entry, dict) else {}
             prev_slots = entry.get("slots")
             zero_streak = int(entry.get("zero_streak") or 0)
+            reset_done = bool(entry.get("reset_done"))
 
-            # Soupape de reset usine Aldes : les 12 compteurs a zero sur plusieurs
-            # payloads consecutifs. Un rollover de mois ne vide qu'un seul slot,
-            # donc ce signal est discriminant.
-            if all(abs(float(v)) < ENERGY_ZERO_EPS for v in slots):
-                zero_streak += 1
+            all_zero = all(abs(float(v)) < ENERGY_ZERO_EPS for v in slots)
+            if all_zero:
+                zero_streak = min(zero_streak + 1, ENERGY_RESET_STREAK)
             else:
                 zero_streak = 0
-            if zero_streak >= ENERGY_RESET_STREAK:
-                _log.warning(
-                    "energie: reset usine detecte sur %s (%d payloads a zero) "
-                    "— offset et total reinitialises", topic_key, zero_streak)
-                offset = 0.0
-                last_total = None
-            else:
-                offset = float(entry.get("offset") or 0.0)
-                last_total = entry.get("total")
-                if isinstance(prev_slots, list) and len(prev_slots) == len(slots):
-                    for prev, cur in zip(prev_slots, slots):
-                        if cur < prev:
-                            offset += prev
+                reset_done = False
+
+            offset = float(entry.get("offset") or 0.0)
+            last_total = entry.get("total")
+
+            # Soupape de reset usine Aldes : les 12 compteurs a zero sur
+            # plusieurs payloads consecutifs. Un rollover de mois ne vide qu'un
+            # seul slot, donc ce signal est discriminant. Un episode de zeros
+            # n'est traite qu'une fois : sinon une consommation saisonniere a
+            # zero (climatisation en hiver) reloggait le reset a chaque payload.
+            if all_zero and zero_streak >= ENERGY_RESET_STREAK and not reset_done:
+                reset_done = True
+                if offset > 0 or (last_total is not None and float(last_total) > 0):
+                    _log.warning(
+                        "energie: reset usine detecte sur %s (%d payloads a zero) "
+                        "— offset et total reinitialises", topic_key, zero_streak)
+                    offset = 0.0
+                    last_total = None
+            elif isinstance(prev_slots, list) and len(prev_slots) == len(slots):
+                for prev, cur in zip(prev_slots, slots):
+                    if cur < prev:
+                        offset += prev
 
             total = offset + sum(slots)
 
@@ -516,6 +524,7 @@ class AppState:
                 "offset": offset,
                 "total": total,
                 "zero_streak": zero_streak,
+                "reset_done": reset_done,
             }
             self._save_energy()
             return total
