@@ -168,6 +168,20 @@ def test_build_thermostats_without_profile_keeps_legacy_prefixes():
     }]
 
 
+def test_build_thermostats_ignores_aberrant_zones():
+    """Issue #82 : la trame aberrante ne cree pas de thermostat fantome."""
+    data = {"MT0": 21.0, "UsC0": 20.0, "MT5": -15.36, "MT6": 107.49,
+            "MT7": 84.47, "MT8": -324.54, "MT9": 0.08}
+    thermostats = build_thermostats(data, load_profile("tone-aquaair"))
+    assert [t["ThermostatId"] for t in thermostats] == ["0"]
+
+
+def test_build_thermostats_drops_aberrant_setpoint():
+    thermostats = build_thermostats({"MT0": 21.0, "UsC0": 107.0},
+                                    load_profile("tone-aquaair"))
+    assert thermostats[0]["TemperatureSet"] is None
+
+
 def test_build_products_uses_state_profile():
     state = _state(_custom_profile())
     state.telemetry["SERIAL123_TONE"] = dict(CUSTOM_TELEMETRY)
@@ -193,6 +207,38 @@ def test_detect_active_zones_profile_prefixes_and_count():
     assert detect_active_zones(data, _custom_profile()) == [0, 1, 2, 3]
     assert detect_active_zones({"MT0": 21.0, "UsC0": 20.0}) == [0]
     assert detect_active_zones(None, _custom_profile()) == []
+
+
+# Trame aberrante du 24/11 (issue #82) : valeurs decodees de travers.
+ABERRANT_FRAME = {
+    "MT4": 0.0, "MT5": -15.36, "MT6": 107.49, "MT7": 84.47,
+    "MT8": -324.54, "MT9": 0.08,
+    **{f"UsC{i}": 0.0 for i in range(10)},
+}
+
+
+def test_detect_active_zones_ignores_aberrant_frame():
+    assert detect_active_zones(ABERRANT_FRAME, load_profile("tone-aquaair")) == []
+
+
+def test_detect_active_zones_keeps_zone_without_setpoint():
+    """Zone en mode Off : temperature plausible, consigne a 0 -> active."""
+    assert detect_active_zones({"MT0": 20.5, "UsC0": 0.0}) == [0]
+
+
+def test_detect_active_zones_keeps_cold_zone_with_setpoint():
+    """Zone froide (garage) : temperature negative mais consigne plausible."""
+    assert detect_active_zones({"MT0": -2.0, "UsC0": 18.0}) == [0]
+
+
+def test_detect_active_zones_uses_profile_bounds():
+    profile = _custom_profile()
+    profile.telemetry.update({
+        "zone_temp_min": 10, "zone_temp_max": 25,
+        "zone_zero_eps": 1, "zone_setpoint_max": 30,
+    })
+    data = {"TempZ0": 9.0, "ConsigneZ0": 0.0, "TempZ1": 21.0, "ConsigneZ1": 0.0}
+    assert detect_active_zones(data, profile) == [1]
 
 
 def test_air_mode_code_and_min_max_read_profile_field():

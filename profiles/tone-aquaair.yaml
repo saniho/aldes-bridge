@@ -23,6 +23,13 @@ telemetry:
   zone_temp_prefix: MT
   zone_count: 10
   zone_setpoint_prefix: UsC
+  # Plages de plausibilite : une trame aberrante (valeurs decodees de
+  # travers) ne doit pas creer de zone fantome. Temperature hors plage ou
+  # quasi nulle = zone inactive ; consigne au-dessus du plafond = ignoree.
+  zone_temp_min: -30
+  zone_temp_max: 60
+  zone_zero_eps: 0.5
+  zone_setpoint_max: 40
   # Modes
   air_mode_field: UAM
   water_mode_field: UDM

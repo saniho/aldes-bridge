@@ -248,6 +248,72 @@ def telemetry_key_for(profile, destination, default=None):
     return default
 
 
+# Plages de plausibilite par defaut des zones. Une trame de telemetrie
+# aberrante (valeurs decodees de travers) ne doit pas creer de zone fantome
+# dans Home Assistant : une temperature hors plage ou quasi nulle est ignoree.
+DEFAULT_ZONE_TEMP_MIN = -30.0
+DEFAULT_ZONE_TEMP_MAX = 60.0
+DEFAULT_ZONE_ZERO_EPS = 0.5
+DEFAULT_ZONE_SETPOINT_MAX = 40.0
+
+
+def _zone_float_field(profile, name, default):
+    """Valeur numerique d'un champ du bloc telemetry, ou defaut."""
+    value = telemetry_field(profile, name, default)
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return float(default)
+
+
+def zone_temp_range(profile=None):
+    """(min, max) plausibles d'une temperature de zone, declares par le profil."""
+    return (
+        _zone_float_field(profile, "zone_temp_min", DEFAULT_ZONE_TEMP_MIN),
+        _zone_float_field(profile, "zone_temp_max", DEFAULT_ZONE_TEMP_MAX),
+    )
+
+
+def zone_zero_eps(profile=None):
+    """Seuil sous lequel une valeur de zone est consideree nulle."""
+    return _zone_float_field(profile, "zone_zero_eps", DEFAULT_ZONE_ZERO_EPS)
+
+
+def plausible_zone_temp(value, profile=None):
+    """Temperature de zone exploitable : non nulle et dans la plage du profil."""
+    try:
+        val = float(value)
+    except (TypeError, ValueError):
+        return False
+    lo, hi = zone_temp_range(profile)
+    return lo <= val <= hi and abs(val) > zone_zero_eps(profile)
+
+
+def plausible_zone_setpoint(value, profile=None):
+    """Consigne de zone exploitable : positive et sous le plafond du profil."""
+    try:
+        val = float(value)
+    except (TypeError, ValueError):
+        return False
+    return zone_zero_eps(profile) < val <= _zone_float_field(
+        profile, "zone_setpoint_max", DEFAULT_ZONE_SETPOINT_MAX)
+
+
+def zone_active(mt_value, setpoint_value, profile=None):
+    """Une zone est active si sa consigne est plausible, ou si sa temperature
+    mesuree est plausible et positive.
+
+    Une temperature negative sans consigne (MT=-15,36 / UsC=0 sur une trame
+    aberrante) ne suffit pas : une zone reellement froide a une consigne.
+    """
+    if plausible_zone_setpoint(setpoint_value, profile):
+        return True
+    try:
+        return plausible_zone_temp(mt_value, profile) and float(mt_value) > 0
+    except (TypeError, ValueError):
+        return False
+
+
 # Codes de mode par defaut (circuits d'une PAC Aldes), utilises quand le
 # profil ne declare aucun mode.
 DEFAULT_AIR_MODE_CODES = ["A", "B", "C", "D", "E", "F", "G", "H", "I"]

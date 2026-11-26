@@ -33,9 +33,12 @@ from .device_profile import (
     DEFAULT_AIR_MODE_CODES,
     DEFAULT_WATER_MODE_CODES,
     air_mode_code,
+    plausible_zone_setpoint,
+    plausible_zone_temp,
     telemetry_field,
     telemetry_key_for,
     water_mode_code,
+    zone_active,
 )
 from .utils import parse_json_payload
 
@@ -163,8 +166,9 @@ def _derive_reference(telemetry, profile=None):
 def build_thermostats(telemetry, profile=None):
     """Construit la liste des thermostats depuis <temp_prefix>x/<setpoint_prefix>x.
 
-    Un thermostat est actif si sa temperature mesuree est non nulle.
-    L'id (ThermostatId) est l'index de zone, stable entre 2 appels.
+    Un thermostat est actif si sa temperature mesuree est plausible (non
+    nulle et dans la plage du profil). L'id (ThermostatId) est l'index de
+    zone, stable entre 2 appels.
     """
     temp_prefix = telemetry_field(profile, "zone_temp_prefix", "MT")
     setpoint_prefix = telemetry_field(profile, "zone_setpoint_prefix", "UsC")
@@ -172,9 +176,13 @@ def build_thermostats(telemetry, profile=None):
     thermostats = []
     for i in range(zone_count):
         measured = _num(telemetry.get("%s%d" % (temp_prefix, i)))
-        if measured is None or measured <= 0:
-            continue
         setpoint = _num(telemetry.get("%s%d" % (setpoint_prefix, i)))
+        if not plausible_zone_temp(measured, profile):
+            continue
+        if not zone_active(measured, setpoint, profile):
+            continue
+        if not plausible_zone_setpoint(setpoint, profile):
+            setpoint = None
         thermostats.append({
             "ThermostatId": str(i),
             "thermostatId": str(i),

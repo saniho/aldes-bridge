@@ -2,7 +2,7 @@
 import json
 import logging
 
-from ..device_profile import air_mode_code, telemetry_field
+from ..device_profile import air_mode_code, telemetry_field, zone_active
 from ..utils import safe_float
 from .mode_mappings import (
     ALDES_TO_HA_PRESET, ALDES_WATER_TO_HA,
@@ -60,6 +60,13 @@ def _get_min_max(data, profile=None):
 
 
 def detect_active_zones(data, profile=None):
+    """Zones actives d'une trame, filtrees par plausibilite.
+
+    Une zone est active si sa temperature mesuree est plausible, ou sa
+    consigne. Les valeurs hors plage (trame decodee de travers) ou quasi
+    nulles sont ignorees : sans ce filtre, une trame aberrante creait des
+    entites climate fantomes dans Home Assistant (issue #82).
+    """
     if data is None:
         return []
     temp_prefix = telemetry_field(profile, "zone_temp_prefix", "MT")
@@ -67,16 +74,8 @@ def detect_active_zones(data, profile=None):
     zone_count = int(telemetry_field(profile, "zone_count", 10))
     zones = []
     for i in range(zone_count):
-        mt = data.get(f"{temp_prefix}{i}")
-        usc = data.get(f"{setpoint_prefix}{i}")
-        if mt is not None and usc is not None:
-            try:
-                mt_val = float(mt)
-                usc_val = float(usc)
-            except (TypeError, ValueError):
-                continue
-            if mt_val == 0 and usc_val == 0:
-                continue
+        if zone_active(data.get(f"{temp_prefix}{i}"),
+                       data.get(f"{setpoint_prefix}{i}"), profile):
             zones.append(i)
     return zones
 
